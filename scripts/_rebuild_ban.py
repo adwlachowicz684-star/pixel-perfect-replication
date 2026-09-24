@@ -122,7 +122,8 @@ AE=('AE 执行层诚实性',['kind','cli','可运行','不能 which','能力缺�
      'odd_paths_sha','odd_count','cmd_assert_legacy_files',
      'cmd_show_legacy_files','_rec_body','LEGACY_SAMPLE_N','claims_103',
      'LEGACY_FILES_DIR','cmd_dump_legacy_files','cmd_assert_legacy_dump',
-     'claims_104'])
+     'claims_104','BOTH_LAYERS','cmd_check_both_layers','unknown_modes',
+     'bad_line','claims_105'])
 CATS=[('A 流程与收工',['收工','不得声明','签字','批准','未读','未关闭','缺口','遗留','阶段','unknown','猜','受阻']),
 ('B 取证与证据',['证据','取证','推测','推断','假设','源码','反编译','录像','截图','测量','不可复现','等级','采样','观测','实测']),
 ('C 判定与偏离',['偏离','must-match','判定','分类','擅自','优化','改进','现代化','修复','清理','preserve','技术债']),

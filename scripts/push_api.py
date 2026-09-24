@@ -745,7 +745,12 @@ def cmd_show_legacy_files(a):
         if os.path.isfile(fp):
             try:
                 with open(fp, encoding='utf-8') as f:
-                    paths = [ln for ln in f.read().splitlines() if ln]
+                    _raw = [ln for ln in f.read().splitlines() if ln]
+                # 🔑 每行 = `mode\tpath`；兼容旧版纯 path
+                paths = [(ln.split('\t', 1)[1] if '\t' in ln else ln)
+                         for ln in _raw]
+                modes = sorted({(ln.split('\t', 1)[0] if '\t' in ln
+                                 else '?') for ln in _raw})
                 src = '本地落盘'
             except Exception as e:
                 print(f'\n🔴 {t["sha"]} 落盘清单不可读：{e} —— 拒绝给结论')
@@ -759,11 +764,16 @@ def cmd_show_legacy_files(a):
                 return 1
             paths = sorted(it['path'] for it in d.get('tree', [])
                            if it['type'] == 'blob' and it['mode'] not in want)
+            modes = sorted({it['mode'] for it in d.get('tree', [])
+                            if it['type'] == 'blob'
+                            and it['mode'] not in want})
             src = '远端'
         total += len(paths)
         print(f'\n### {t["sha"]}  {t.get("msg", "")}   [来源：{src}]')
         print(f'    mode 异常文件 **{len(paths)} 个**'
               f'（台账记 odd_count={t.get("odd_count", "?")}）')
+        if modes:
+            print(f'    异常 mode：{modes}')
         if t.get('odd_count') != len(paths):
             print(f'    🔴 与台账 odd_count **不一致** —— 台账已过期')
         for p_ in paths[:LEGACY_SHOW_N]:
@@ -915,15 +925,22 @@ def cmd_dump_legacy_files():
         if '__err' in t:
             print(f'   ⚠️ {h} 树读取失败 HTTP {t["__err"]} —— 跳过')
             continue
-        paths = sorted(it['path'] for it in t.get('tree', [])
-                       if it['type'] == 'blob' and it['mode'] not in want)
+        # 🔑 第一百零五轮：落盘每行 = `mode\tpath`
+        #    🔴 上一轮只有 path —— 答不了"这个文件是 100755 还是 100664"。
+        #    🔑 排序**只按 path**（不按 (mode,path)），因为台账的
+        #       odd_paths_sha 也是按 path 排的 —— 两者必须**同源**。
+        entries = sorted(((it['mode'], it['path'])
+                          for it in t.get('tree', [])
+                          if it['type'] == 'blob' and it['mode'] not in want),
+                         key=lambda x: x[1])
+        paths = [pp for _m, pp in entries]
         fp = hashlib.sha1('\n'.join(paths).encode('utf-8')).hexdigest()
         # 🔑 与台账指纹**同源校验**：不一致说明两者不是同一份数据
         if known[h].get('odd_paths_sha') != fp:
             bad_fp.append(h)
         fp_out = os.path.join(LEGACY_FILES_DIR, h + '.txt')
         # 🔑 幂等：内容一致不重写
-        body = '\n'.join(paths) + '\n'
+        body = ''.join(f'{_m}\t{_p}\n' for _m, _p in entries)
         try:
             prev = None
             if os.path.isfile(fp_out):
@@ -1028,14 +1045,39 @@ def cmd_assert_legacy_dump():
             print(f'   🔴 {h} 不可读：{e}')
             ok = False
             continue
-        fp_sha = hashlib.sha1('\n'.join(lines).encode('utf-8')).hexdigest()
-        c_ok = known[h].get('odd_count') == len(lines)
+        # ② 每行必须是 `mode\tpath`
+        recs, bad_line = [], []
+        for ln in lines:
+            if '\t' not in ln:
+                bad_line.append(ln[:60])
+                continue
+            _m, _pp = ln.split('\t', 1)
+            recs.append((_m, _pp))
+        paths = [_pp for _m, _pp in recs]
+        fp_sha = hashlib.sha1('\n'.join(paths).encode('utf-8')).hexdigest()
+        c_ok = known[h].get('odd_count') == len(paths)
         s_ok = known[h].get('odd_paths_sha') == fp_sha
+        # ③ **内部自洽**：落盘里的 mode 必须是台账记录的 odd_modes 之一
+        #    🔑 答得了"哪个文件的哪个权限不对"，且**不与台账自相矛盾**
+        want_modes = set(known[h].get('odd_modes', {}).keys())
+        modes = sorted({_m for _m, _ in recs})
+        unknown_modes = sorted(set(modes) - want_modes) if want_modes else []
+        if bad_line:
+            print(f'   🔴 {h}  {len(bad_line)} 行缺少制表符（应为 '
+                  f'mode\tpath）：{bad_line[:2]}')
+            ok = False
+            continue
+        if unknown_modes:
+            print(f'   🔴 {h} 落盘 mode {unknown_modes} **不在**台账 '
+                  f'odd_modes {sorted(want_modes)} —— 落盘与台账自相矛盾')
+            ok = False
+            continue
         if c_ok and s_ok:
-            print(f'   ✅ {h}  {len(lines)} 行 · 指纹 {fp_sha[:8]} 一致')
+            print(f'   ✅ {h}  {len(paths)} 行 · 指纹 {fp_sha[:8]} 一致'
+                  f' · mode {modes}')
         else:
             print(f'   🔴 {h}  行数 台账{known[h].get("odd_count")}'
-                  f'/落盘{len(lines)}  指纹 '
+                  f'/落盘{len(paths)}  指纹 '
                   f'{str(known[h].get("odd_paths_sha"))[:8]}/{fp_sha[:8]}')
             ok = False
 

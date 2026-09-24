@@ -1,262 +1,262 @@
-.gitignore
-README.md
-SKILL.md
-_inactive/README.md
-_inactive/agents/README.md
-_inactive/agents/archivist-agent.md
-_inactive/agents/auditor-agent.md
-_inactive/agents/contract-agent.md
-_inactive/agents/experience-agent.md
-_inactive/agents/forensics-agent.md
-_inactive/agents/implementer-agent.md
-_inactive/agents/planner-agent.md
-_inactive/agents/recon-agent.md
-_inactive/agents/verifier-agent.md
-_inactive/rules/01-复刻纪律.md
-_inactive/rules/02-数据风险.md
-_inactive/rules/03-像素级对齐.md
-_inactive/rules/04-证据与门禁.md
-_inactive/rules/05-整合与勿删.md
-_inactive/rules/06-原版取证与体验不丢失.md
-_inactive/rules/README.md
-assets/BUG与审查问题模板.md
-assets/CI门禁模板.yml
-assets/体验参数清单模板.md
-assets/功能卡模板.md
-assets/功能对照表模板.md
-assets/契约模板.yaml
-assets/文案与全维度清单模板.md
-assets/清单模板.md
-assets/等价性三层模板.yaml
-assets/能力包模板.md
-assets/视觉状态契约模板.yaml
-assets/证据卡模板.yaml
-assets/资产与资源清单模板.md
-audit/.chaos_last.json
-audit/.coverage_last.json
-audit/00-入口-不能怎么做.md
-audit/01-禁令总表.md
-audit/02-不得收工的判据.md
-audit/03-证据与unknown红线.md
-audit/04-门禁清单.md
-flow/00-流程怎么用.md
-flow/S0-原版证据采集.md
-flow/S1-立项与基线.md
-flow/S2-穷尽挖掘.md
-flow/S2A-资产与资源清点.md
-flow/S2B-BUG与审查发现.md
-flow/S2M-机器证据.md
-flow/S2P-体验参数提取.md
-flow/S2T-文案与全维度.md
-flow/S3-证据与性质判定.md
-flow/S4-契约与能力包.md
-flow/S5-择优设计.md
-flow/S6-迁移执行.md
-flow/S7-验证与验收.md
-flow/S7V-视觉状态契约门禁.md
-guide/00-入口-怎么做.md
-guide/01-七阶段流程.md
-guide/02-怎么取证.md
-guide/03-怎么记录.md
-guide/04-怎么判定与偏离.md
-guide/05-怎么验收.md
-guide/06-游戏引擎场景怎么做.md
-ledger/_audit_all_last.json
-ledger/_chaos_baseline.json
-ledger/_chaos_last.json
-ledger/claims_75.txt
-ledger/claims_76.txt
-ledger/claims_77.txt
-ledger/claims_78.txt
-ledger/claims_79.txt
-ledger/claims_80.txt
-ledger/claims_81.txt
-ledger/claims_82.txt
-ledger/claims_83.txt
-ledger/claims_84.txt
-ledger/claims_85.txt
-ledger/claims_86.txt
-ledger/claims_87.txt
-ledger/claims_88.txt
-ledger/claims_89.txt
-ledger/claims_90.txt
-ledger/claims_91.txt
-ledger/claims_92.txt
-ledger/claims_93.txt
-ledger/claims_94.txt
-ledger/claims_95.txt
-ledger/rc_domain_allowlist.txt
-ledger/scan_doc_allowlist.txt
-method/01-穷尽挖掘.md
-method/02-整合与优化设计.md
-method/03-实现方案与代码审查.md
-method/04-执行与验收.md
-method/05-跨端一致性.md
-references/BUG判定与即时修复.md
-references/不变量与差分测试.md
-references/九切角.md
-references/体验参数挖掘.md
-references/体验维度总清单.md
-references/原版取证.md
-references/原版机制与目标栈.md
-references/外部经验吸收.md
-references/安全信任与无障碍.md
-references/工具白名单.md
-references/性质判定与动作.md
-references/机器查询规则.md
-references/树对齐与差异归因.md
-references/游戏引擎复刻.md
-references/状态迁移与可观测性.md
-references/编排与证据治理.md
-references/视觉稳定化.md
-references/许可与依赖治理.md
-references/证据等级.md
-references/语义证据层.md
-references/负面教训库.md
-references/资产与资源总清单.md
-references/跨引擎迁移与二次创作.md
-references/运行时取证与二进制覆盖.md
-scripts/README.md
-scripts/_rebuild_ban.py
-scripts/a11y_ime.py
-scripts/asset_inventory.py
-scripts/ast_query.py
-scripts/binary_coverage.py
-scripts/brace_check.py
-scripts/bug_triage.py
-scripts/build_manifest_spdx.py
-scripts/cdkey_input_linter.py
-scripts/claim_verify.py
-scripts/comment_extract.py
-scripts/config_field_diff.py
-scripts/context_pack.py
-scripts/coverage_gate.py
-scripts/credits_diff.py
-scripts/cross-end-check.mjs
-scripts/diff_classify.py
-scripts/diff_fuzz.py
-scripts/edge_accept.py
-scripts/edge_pipeline.py
-scripts/engine_migration.py
-scripts/env_lock.py
-scripts/fault_matrix.py
-scripts/feature_matrix.py
-scripts/game_animation.py
-scripts/game_asset.py
-scripts/game_audio_read.py
-scripts/game_audio_render.py
-scripts/game_budget_intent.py
-scripts/game_carrier_rights.py
-scripts/game_cloth_reflect.py
-scripts/game_cognition.py
-scripts/game_cognitive_social.py
-scripts/game_colo_weather.py
-scripts/game_combat_ai.py
-scripts/game_combat_rules.py
-scripts/game_content.py
-scripts/game_content_limit.py
-scripts/game_continuity.py
-scripts/game_coupling_health.py
-scripts/game_degrade_fail.py
-scripts/game_delivery_observe.py
-scripts/game_depth_difficulty.py
-scripts/game_destruct_chain.py
-scripts/game_edge.py
-scripts/game_editor_data.py
-scripts/game_embodied_input.py
-scripts/game_evidence_chain.py
-scripts/game_faction_save.py
-scripts/game_fault_reset.py
-scripts/game_feel.py
-scripts/game_force_resource.py
-scripts/game_frame_script.py
-scripts/game_gen_shadow.py
-scripts/game_haptics_numbers.py
-scripts/game_hotfix_mem.py
-scripts/game_identity.py
-scripts/game_inference.py
-scripts/game_input_ops.py
-scripts/game_input_percept.py
-scripts/game_inventory_flow.py
-scripts/game_latency_camera.py
-scripts/game_level_balance.py
-scripts/game_life.py
-scripts/game_lifeplay_trace.py
-scripts/game_load_locale.py
-scripts/game_luck_skill.py
-scripts/game_meaning_layer.py
-scripts/game_meta.py
-scripts/game_micro_rhythm.py
-scripts/game_migration_govern.py
-scripts/game_net_mod.py
-scripts/game_netfeel_ai_trust.py
-scripts/game_pacing_info.py
-scripts/game_perf_interact.py
-scripts/game_periphery.py
-scripts/game_presence_interact.py
-scripts/game_progress_input.py
-scripts/game_quest_dialog.py
-scripts/game_reach_material.py
-scripts/game_relation.py
-scripts/game_render.py
-scripts/game_replay.py
-scripts/game_replay_identity.py
-scripts/game_retry_spawn.py
-scripts/game_rng_save.py
-scripts/game_session.py
-scripts/game_sim_resource.py
-scripts/game_social.py
-scripts/game_social_meta.py
-scripts/game_stats_runs.py
-scripts/game_stream_thread.py
-scripts/game_surface.py
-scripts/game_team_release.py
-scripts/game_terrain_water.py
-scripts/game_time_pacing.py
-scripts/game_trace_notify.py
-scripts/game_trust_settings.py
-scripts/game_txn_contract.py
-scripts/game_ui_motion_camera.py
-scripts/game_ui_physics.py
-scripts/game_ui_sound_transition.py
-scripts/game_variant.py
-scripts/game_world_body.py
-scripts/game_world_economy.py
-scripts/gate_chaos.py
-scripts/install_contract.py
-scripts/ipc_surface.py
-scripts/kiosk_recorder.py
-scripts/ledger.py
-scripts/license_gate.py
-scripts/log_parity.py
-scripts/motion_check.py
-scripts/network_resilience.py
-scripts/original_capture.py
-scripts/param_extract.py
-scripts/registry_normalize.py
-scripts/renumber_check.py
-scripts/run_all_gates.py
-scripts/runtime_forensics.py
-scripts/security_trust.py
-scripts/state_migration.py
-scripts/target_stack.py
-scripts/text_extract.py
-scripts/text_layout.py
-scripts/tool_run.py
-scripts/tools/README.md
-scripts/tools/_common.py
-scripts/tools/duckdb_evidence.py
-scripts/tools/gumtree_diff.py
-scripts/tools/harfbuzz_shape.py
-scripts/tools/kaitai_probe.py
-scripts/tools/ocr_text.py
-scripts/tools/odiff_image.py
-scripts/tools/registry.yaml
-scripts/tools/resvg_render.py
-scripts/tools/toxiproxy_fault.py
-scripts/tools/vmaf_quality.py
-scripts/tree_align.py
-scripts/tree_sitter_parse.py
-scripts/value_fidelity.py
-scripts/visual_check.py
-scripts/wpf_mechanism.py
+100755	.gitignore
+100755	README.md
+100755	SKILL.md
+100755	_inactive/README.md
+100755	_inactive/agents/README.md
+100755	_inactive/agents/archivist-agent.md
+100755	_inactive/agents/auditor-agent.md
+100755	_inactive/agents/contract-agent.md
+100755	_inactive/agents/experience-agent.md
+100755	_inactive/agents/forensics-agent.md
+100755	_inactive/agents/implementer-agent.md
+100755	_inactive/agents/planner-agent.md
+100755	_inactive/agents/recon-agent.md
+100755	_inactive/agents/verifier-agent.md
+100755	_inactive/rules/01-复刻纪律.md
+100755	_inactive/rules/02-数据风险.md
+100755	_inactive/rules/03-像素级对齐.md
+100755	_inactive/rules/04-证据与门禁.md
+100755	_inactive/rules/05-整合与勿删.md
+100755	_inactive/rules/06-原版取证与体验不丢失.md
+100755	_inactive/rules/README.md
+100755	assets/BUG与审查问题模板.md
+100755	assets/CI门禁模板.yml
+100755	assets/体验参数清单模板.md
+100755	assets/功能卡模板.md
+100755	assets/功能对照表模板.md
+100755	assets/契约模板.yaml
+100755	assets/文案与全维度清单模板.md
+100755	assets/清单模板.md
+100755	assets/等价性三层模板.yaml
+100755	assets/能力包模板.md
+100755	assets/视觉状态契约模板.yaml
+100755	assets/证据卡模板.yaml
+100755	assets/资产与资源清单模板.md
+100755	audit/.chaos_last.json
+100755	audit/.coverage_last.json
+100755	audit/00-入口-不能怎么做.md
+100755	audit/01-禁令总表.md
+100755	audit/02-不得收工的判据.md
+100755	audit/03-证据与unknown红线.md
+100755	audit/04-门禁清单.md
+100755	flow/00-流程怎么用.md
+100755	flow/S0-原版证据采集.md
+100755	flow/S1-立项与基线.md
+100755	flow/S2-穷尽挖掘.md
+100755	flow/S2A-资产与资源清点.md
+100755	flow/S2B-BUG与审查发现.md
+100755	flow/S2M-机器证据.md
+100755	flow/S2P-体验参数提取.md
+100755	flow/S2T-文案与全维度.md
+100755	flow/S3-证据与性质判定.md
+100755	flow/S4-契约与能力包.md
+100755	flow/S5-择优设计.md
+100755	flow/S6-迁移执行.md
+100755	flow/S7-验证与验收.md
+100755	flow/S7V-视觉状态契约门禁.md
+100755	guide/00-入口-怎么做.md
+100755	guide/01-七阶段流程.md
+100755	guide/02-怎么取证.md
+100755	guide/03-怎么记录.md
+100755	guide/04-怎么判定与偏离.md
+100755	guide/05-怎么验收.md
+100755	guide/06-游戏引擎场景怎么做.md
+100755	ledger/_audit_all_last.json
+100755	ledger/_chaos_baseline.json
+100755	ledger/_chaos_last.json
+100755	ledger/claims_75.txt
+100755	ledger/claims_76.txt
+100755	ledger/claims_77.txt
+100755	ledger/claims_78.txt
+100755	ledger/claims_79.txt
+100755	ledger/claims_80.txt
+100755	ledger/claims_81.txt
+100755	ledger/claims_82.txt
+100755	ledger/claims_83.txt
+100755	ledger/claims_84.txt
+100755	ledger/claims_85.txt
+100755	ledger/claims_86.txt
+100755	ledger/claims_87.txt
+100755	ledger/claims_88.txt
+100755	ledger/claims_89.txt
+100755	ledger/claims_90.txt
+100755	ledger/claims_91.txt
+100755	ledger/claims_92.txt
+100755	ledger/claims_93.txt
+100755	ledger/claims_94.txt
+100755	ledger/claims_95.txt
+100755	ledger/rc_domain_allowlist.txt
+100755	ledger/scan_doc_allowlist.txt
+100755	method/01-穷尽挖掘.md
+100755	method/02-整合与优化设计.md
+100755	method/03-实现方案与代码审查.md
+100755	method/04-执行与验收.md
+100755	method/05-跨端一致性.md
+100755	references/BUG判定与即时修复.md
+100755	references/不变量与差分测试.md
+100755	references/九切角.md
+100755	references/体验参数挖掘.md
+100755	references/体验维度总清单.md
+100755	references/原版取证.md
+100755	references/原版机制与目标栈.md
+100755	references/外部经验吸收.md
+100755	references/安全信任与无障碍.md
+100755	references/工具白名单.md
+100755	references/性质判定与动作.md
+100755	references/机器查询规则.md
+100755	references/树对齐与差异归因.md
+100755	references/游戏引擎复刻.md
+100755	references/状态迁移与可观测性.md
+100755	references/编排与证据治理.md
+100755	references/视觉稳定化.md
+100755	references/许可与依赖治理.md
+100755	references/证据等级.md
+100755	references/语义证据层.md
+100755	references/负面教训库.md
+100755	references/资产与资源总清单.md
+100755	references/跨引擎迁移与二次创作.md
+100755	references/运行时取证与二进制覆盖.md
+100755	scripts/README.md
+100755	scripts/_rebuild_ban.py
+100755	scripts/a11y_ime.py
+100755	scripts/asset_inventory.py
+100755	scripts/ast_query.py
+100755	scripts/binary_coverage.py
+100755	scripts/brace_check.py
+100755	scripts/bug_triage.py
+100755	scripts/build_manifest_spdx.py
+100755	scripts/cdkey_input_linter.py
+100755	scripts/claim_verify.py
+100755	scripts/comment_extract.py
+100755	scripts/config_field_diff.py
+100755	scripts/context_pack.py
+100755	scripts/coverage_gate.py
+100755	scripts/credits_diff.py
+100755	scripts/cross-end-check.mjs
+100755	scripts/diff_classify.py
+100755	scripts/diff_fuzz.py
+100755	scripts/edge_accept.py
+100755	scripts/edge_pipeline.py
+100755	scripts/engine_migration.py
+100755	scripts/env_lock.py
+100755	scripts/fault_matrix.py
+100755	scripts/feature_matrix.py
+100755	scripts/game_animation.py
+100755	scripts/game_asset.py
+100755	scripts/game_audio_read.py
+100755	scripts/game_audio_render.py
+100755	scripts/game_budget_intent.py
+100755	scripts/game_carrier_rights.py
+100755	scripts/game_cloth_reflect.py
+100755	scripts/game_cognition.py
+100755	scripts/game_cognitive_social.py
+100755	scripts/game_colo_weather.py
+100755	scripts/game_combat_ai.py
+100755	scripts/game_combat_rules.py
+100755	scripts/game_content.py
+100755	scripts/game_content_limit.py
+100755	scripts/game_continuity.py
+100755	scripts/game_coupling_health.py
+100755	scripts/game_degrade_fail.py
+100755	scripts/game_delivery_observe.py
+100755	scripts/game_depth_difficulty.py
+100755	scripts/game_destruct_chain.py
+100755	scripts/game_edge.py
+100755	scripts/game_editor_data.py
+100755	scripts/game_embodied_input.py
+100755	scripts/game_evidence_chain.py
+100755	scripts/game_faction_save.py
+100755	scripts/game_fault_reset.py
+100755	scripts/game_feel.py
+100755	scripts/game_force_resource.py
+100755	scripts/game_frame_script.py
+100755	scripts/game_gen_shadow.py
+100755	scripts/game_haptics_numbers.py
+100755	scripts/game_hotfix_mem.py
+100755	scripts/game_identity.py
+100755	scripts/game_inference.py
+100755	scripts/game_input_ops.py
+100755	scripts/game_input_percept.py
+100755	scripts/game_inventory_flow.py
+100755	scripts/game_latency_camera.py
+100755	scripts/game_level_balance.py
+100755	scripts/game_life.py
+100755	scripts/game_lifeplay_trace.py
+100755	scripts/game_load_locale.py
+100755	scripts/game_luck_skill.py
+100755	scripts/game_meaning_layer.py
+100755	scripts/game_meta.py
+100755	scripts/game_micro_rhythm.py
+100755	scripts/game_migration_govern.py
+100755	scripts/game_net_mod.py
+100755	scripts/game_netfeel_ai_trust.py
+100755	scripts/game_pacing_info.py
+100755	scripts/game_perf_interact.py
+100755	scripts/game_periphery.py
+100755	scripts/game_presence_interact.py
+100755	scripts/game_progress_input.py
+100755	scripts/game_quest_dialog.py
+100755	scripts/game_reach_material.py
+100755	scripts/game_relation.py
+100755	scripts/game_render.py
+100755	scripts/game_replay.py
+100755	scripts/game_replay_identity.py
+100755	scripts/game_retry_spawn.py
+100755	scripts/game_rng_save.py
+100755	scripts/game_session.py
+100755	scripts/game_sim_resource.py
+100755	scripts/game_social.py
+100755	scripts/game_social_meta.py
+100755	scripts/game_stats_runs.py
+100755	scripts/game_stream_thread.py
+100755	scripts/game_surface.py
+100755	scripts/game_team_release.py
+100755	scripts/game_terrain_water.py
+100755	scripts/game_time_pacing.py
+100755	scripts/game_trace_notify.py
+100755	scripts/game_trust_settings.py
+100755	scripts/game_txn_contract.py
+100755	scripts/game_ui_motion_camera.py
+100755	scripts/game_ui_physics.py
+100755	scripts/game_ui_sound_transition.py
+100755	scripts/game_variant.py
+100755	scripts/game_world_body.py
+100755	scripts/game_world_economy.py
+100755	scripts/gate_chaos.py
+100755	scripts/install_contract.py
+100755	scripts/ipc_surface.py
+100755	scripts/kiosk_recorder.py
+100755	scripts/ledger.py
+100755	scripts/license_gate.py
+100755	scripts/log_parity.py
+100755	scripts/motion_check.py
+100755	scripts/network_resilience.py
+100755	scripts/original_capture.py
+100755	scripts/param_extract.py
+100755	scripts/registry_normalize.py
+100755	scripts/renumber_check.py
+100755	scripts/run_all_gates.py
+100755	scripts/runtime_forensics.py
+100755	scripts/security_trust.py
+100755	scripts/state_migration.py
+100755	scripts/target_stack.py
+100755	scripts/text_extract.py
+100755	scripts/text_layout.py
+100755	scripts/tool_run.py
+100755	scripts/tools/README.md
+100755	scripts/tools/_common.py
+100755	scripts/tools/duckdb_evidence.py
+100755	scripts/tools/gumtree_diff.py
+100755	scripts/tools/harfbuzz_shape.py
+100755	scripts/tools/kaitai_probe.py
+100755	scripts/tools/ocr_text.py
+100755	scripts/tools/odiff_image.py
+100755	scripts/tools/registry.yaml
+100755	scripts/tools/resvg_render.py
+100755	scripts/tools/toxiproxy_fault.py
+100755	scripts/tools/vmaf_quality.py
+100755	scripts/tree_align.py
+100755	scripts/tree_sitter_parse.py
+100755	scripts/value_fidelity.py
+100755	scripts/visual_check.py
+100755	scripts/wpf_mechanism.py

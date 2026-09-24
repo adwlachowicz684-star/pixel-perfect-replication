@@ -719,7 +719,22 @@ GATES = [
      #    G398 查落盘防"离线答不了"。断网时 G397/396 拒绝给结论，
      #    G398 **仍可通过** —— 这正是它存在的意义。
      ["{py}", "{s}/push_api.py", "--assert-legacy-dump"], "hard", []),
+    ("G399", "**在线层与离线层必须并存**（不得只留一个）",
+     ["{py}", "{s}/run_all_gates.py", "--check-both-layers"], "hard", []),
 ]
+
+# 🔑 第一百零五轮：**必须并存的层**（在线 ↔ 离线）
+#    🔴 第一百零四轮诚实结论①：G398 不查远端 → 台账若记错，
+#       G398 会"一致地错"（落盘与台账同源且都错）。
+#    🔑 所以**查远端的那个不能被删** —— 两者互为补强，删任一个都开洞。
+#    (在线层, 离线层, 为什么必须并存)
+BOTH_LAYERS = (
+    ('G397', 'G398',
+     'G397 查远端防台账撒谎；G398 查落盘防离线答不了。'
+     '删任一个都开洞：只留 G398 → 台账记错时一致地错；'
+     '只留 G397 → 断网时拒绝给结论。'),
+)
+
 
 MANUAL_GATES = [
     # 🔑 第九十八轮：**G391 只能人工执行**。
@@ -1705,6 +1720,60 @@ def cmd_check_dup_cmds(a):
 
 
 
+
+def cmd_check_both_layers():
+    """🔑 G399：**在线层与离线层必须并存**（不得只留一个）。
+
+    🔴 第一百零四轮诚实结论①：G398 不查远端 → 台账若记错，
+       G398 会"一致地错"（落盘与台账同源且都错）。
+    🔑 因此"查远端的那一个"**不能被删**。本门禁断言：
+       ① 每层都存在（在自动 GATES 里）
+       ② 每层都是 hard（软警告会让"层缺失"被当作提示而非阻断）
+       ③ 🔑 两层**命令必须不同**（相同命令 = 同一实现 = 层是假的）
+    """
+    print('=' * 70)
+    print('🔑 **在线层与离线层必须并存**（G399）')
+    print('=' * 70)
+    gmap = {g[0]: g for g in GATES}
+    bad = 0
+    for on, off, why in BOTH_LAYERS:
+        print(f'\n### {on}（在线） ↔ {off}（离线）')
+        print(f'    {why}')
+        for gid in (on, off):
+            if gid not in gmap:
+                print(f'    🔴 {gid} **不在自动门禁表** '
+                      f'（被删除或移到人工门禁 —— 不再每次回归执行）')
+                bad += 1
+                continue
+            # 🔑 GATES 元组：(gid, desc, cmd, kind, files) → **kind 是 [3]**
+            kind = gmap[gid][3]
+            tag = '✅' if kind == 'hard' else '🔴'
+            print(f'    {tag} {gid} 在自动门禁 · kind={kind}')
+            if kind != 'hard':
+                print('       🔑 kind 必须是 hard —— 软警告会让'
+                      '"层缺失"被当提示而非阻断')
+                bad += 1
+        # ③ 命令必须不同
+        if on in gmap and off in gmap:
+            c1 = tuple(gmap[on][2])
+            c2 = tuple(gmap[off][2])
+            if c1 == c2:
+                print(f'    🔴 两层命令**相同** —— 同一实现，'
+                      f'"两层"是假的：{" ".join(c1)}')
+                bad += 1
+            else:
+                print('    ✅ 两层命令不同（确为两条独立实现）')
+    print()
+    print('=' * 70)
+    if bad:
+        print(f'🔴 **层缺失 / 层退化** {bad} 处 —— 只留一层会开洞')
+        print('=' * 70)
+        return 1
+    print(f'✅ {len(BOTH_LAYERS)} 组在线/离线层**均并存**且命令互异')
+    print('=' * 70)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="一键跑全部门禁")
     ap.add_argument("--work", default="work", help="工作区目录")
@@ -1713,6 +1782,8 @@ def main():
                     help="G387：门禁命令不得误重复（刻意重复须登记）")
     ap.add_argument("--self-check-noop", action="store_true",
                     help="G377：说明性门禁是否未被伪装成软警告")
+    ap.add_argument("--check-both-layers", action="store_true",
+                    help="G399：在线层与离线层必须并存")
     ap.add_argument("--list", action="store_true", help="只列门禁清单")
     ap.add_argument("--verbose", "-v", action="store_true")
     a = ap.parse_args()
@@ -1721,6 +1792,9 @@ def main():
 
     if a.self_check_noop:
         return cmd_self_check_noop(a)
+    if a.check_both_layers:
+        return cmd_check_both_layers()
+
     if a.list:
         return cmd_list(a)
     return cmd_run(a)
