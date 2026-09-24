@@ -1,0 +1,30 @@
+# 第九十七轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**推送不得静默漏传**
+
+# ① 漏传检查（只引代码标识符）
+grep:scripts/push_api.py::check_untracked
+grep:scripts/push_api.py::--check-leak
+grep:scripts/push_api.py::拒绝给结论
+grep:scripts/push_api.py::静默漏传
+grep:scripts/push_api.py::allow_untracked
+cmd:push_api.py --check-leak
+gate:G390
+# ② 门禁登记
+grep:scripts/run_all_gates.py::无漏传风险
+# ③ 既有能力仍工作
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:gate_chaos.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+gate:G387
+gate:G389
+# ④ 历史清单不得被误删
+file:ledger/claims_94.txt
+file:ledger/claims_95.txt
+file:ledger/claims_96.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

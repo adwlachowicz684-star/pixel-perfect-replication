@@ -682,6 +682,11 @@ GATES = [
     ("G389", "**豁免须带批准轮次**（不得静默增删、不得僵尸）",
      # 🔴 第九十五轮诚实结论②：两条 allowlist 的增删不触发任何检查。
      ["{py}", "{s}/claim_verify.py", "--check-allowlist"], "hard", []),
+    # ---- 游戏第九十七轮：推送不得静默漏传 ----
+    ("G390", "**无漏传风险**（无未 git add 的文件）",
+     # 🔴 第九十六轮诚实结论⑤：`push_api.py` 依赖 `git ls-files`，
+     #    忘 add 的新文件会被悄悄漏传，而推送仍显示"成功"。
+     ["{py}", "{s}/push_api.py", "--check-leak"], "hard", []),
 ]
 
 MANUAL_GATES = [
