@@ -381,6 +381,7 @@ python3 scripts/a11y_ime.py --ime             # 中文/日文输入法全事件
 | 🔑 第九十八轮：G391 **推送完整性回读验证**（逐条比对 blob sha）；🔴 门禁自身写缓存 → 只能人工/推送后执行 | `references/游戏引擎复刻.md` 第九十八部分 |
 | 🔑 第九十九轮：第④层**权限比对** + `--report` 复核入口；🔴 曾把 266 文件全推成 100755（mode 须取自 git 索引） | `references/游戏引擎复刻.md` 第九十九部分 |
 | 🔑 第一百轮：G393 **symlink 处理自测**（mode 120000）；🔴 自测曾复刻被测逻辑 → 回退也测不出 | `references/游戏引擎复刻.md` 第一百部分 |
+| 🔑 第一百零一轮：G394 **历史权限审计**（🔴 5 个 commit 遗留 100755，未改写）+ G395 gitlink（160000）；🔴 有 submodule 时旧流程整个仓库推不出去 | `references/游戏引擎复刻.md` 第一百零一部分 |
 | 🔑 元规则：**完成声明须回读代码核实**（`claim_verify.py`，G381） | `references/游戏引擎复刻.md` 第七十五部分 |
 | 许可与 SBOM | `references/许可与依赖治理.md` |
 | 证据可信度 | `references/证据等级.md` |

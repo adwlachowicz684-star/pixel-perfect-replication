@@ -1,0 +1,41 @@
+# 第一百零一轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**历史 commit 权限审计 + gitlink（160000）**
+
+# ① 历史审计（只读）
+grep:scripts/push_api.py::cmd_audit_history
+grep:scripts/push_api.py::只读不改写
+cmd:push_api.py --audit-history
+gate:G394
+# ② gitlink 支持（只引代码标识符）
+grep:scripts/push_api.py::cmd_check_gitlink
+grep:scripts/push_api.py::160000
+grep:scripts/push_api.py::glinks
+cmd:push_api.py --check-gitlink
+gate:G395
+# ③ 既有能力仍工作
+cmd:push_api.py --check-leak
+cmd:push_api.py --check-symlink
+cmd:push_api.py --verify-push
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:gate_chaos.py --self-check
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+gate:G387
+gate:G389
+gate:G390
+gate:G391
+gate:G392
+gate:G393
+# ④ 历史清单不得被误删
+file:ledger/claims_98.txt
+file:ledger/claims_99.txt
+file:ledger/claims_100.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

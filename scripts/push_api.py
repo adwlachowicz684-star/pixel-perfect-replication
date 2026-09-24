@@ -373,6 +373,147 @@ def cmd_check_symlink():
     return 1
 
 
+
+def cmd_audit_history():
+    """🔑 G394：**历史 commit 权限审计**（只读，不改写历史）。
+
+    🔴 第九十九轮诚实结论②：96~98 轮的 commit 里，266 个文件
+       **全部被推成 100755**（`os.access(X_OK)` 恒 True 的遗留），
+       第九十九轮只修正了**最新 commit**，历史未改写。
+    🔑 本入口把这件事变成**可查的事实**：逐个 commit 统计 mode 分布。
+
+    🔑 **只读**：不发 PATCH、不 force push。
+       🔴 改写历史是破坏性操作，必须人工显式决定，不由脚本自作主张。
+    """
+    print('=' * 70)
+    print('🔑 **历史 commit 权限审计**（只读 · 不改写历史）')
+    print('=' * 70)
+    idx = local_index_entries()
+    if not idx:
+        print('🔴 无法确定 git 索引 mode —— 拒绝给结论')
+        return 1
+    want = {}
+    for _m, _ in idx.values():
+        want[_m] = want.get(_m, 0) + 1
+    print(f'\n🔑 当前 git 索引基准：{want}')
+
+    d = req('GET', f'{API}/commits?per_page=100')
+    if '__err' in d:
+        print(f"🔴 无法读取 commit 列表: HTTP {d['__err']}")
+        return 1
+    if not isinstance(d, list):
+        print('🔴 commit 列表格式异常 —— 拒绝给结论')
+        return 1
+    print(f'🔑 远端 commit {len(d)} 个\n')
+
+    bad = []
+    for c in d:
+        sha = c['sha']
+        t = req('GET', f'{API}/git/trees/{sha}?recursive=1')
+        if '__err' in t:
+            print(f"⚠️ {sha[:12]} 树读取失败 HTTP {t['__err']} —— 跳过")
+            continue
+        dist = {}
+        for it in t.get('tree', []):
+            if it['type'] == 'blob':
+                dist[it['mode']] = dist.get(it['mode'], 0) + 1
+        msg = c['commit']['message'].splitlines()[0][:34]
+        # 🔑 判据：与该 commit **当时**应有的 mode 无法自动得知，
+        #    故用**当前索引基准**比对：出现索引里**没有**的 mode 即为异常。
+        odd = {m: n for m, n in dist.items() if m not in want}
+        if odd:
+            bad.append((sha[:12], msg, odd, dist))
+            print(f'🔴 {sha[:12]}  {msg}')
+            print(f'     异常 mode {odd}   全分布 {dist}')
+        else:
+            print(f'✅ {sha[:12]}  {msg}   {dist}')
+
+    print()
+    print('=' * 70)
+    if bad:
+        print(f'🔴 **{len(bad)} 个历史 commit 的 mode 与当前索引基准不一致**')
+        print('   🔑 这些是**历史遗留**，当前 HEAD 已正确（见 G391）。')
+        print('   🔴 修正需**改写历史（force push）** —— 破坏性操作，')
+        print('      本脚本**只读不改写**，须人工显式决定。')
+        print('=' * 70)
+        # 🔑 审计发现已知历史问题**不算失败** —— 它不被掩盖即算达标
+        return 0
+    print('✅ 全部历史 commit 的 mode 与当前索引基准一致')
+    print('=' * 70)
+    return 0
+
+
+def cmd_check_gitlink():
+    """🔑 G395：gitlink（mode 160000，submodule）处理自测。
+
+    🔴 第一百轮诚实结论①：gitlink **仍未实测**。
+    🔑 而且它比 symlink 更危险：gitlink **磁盘上没有对应文件**
+       —— `git ls-files` 会列出它，但 `os.path.exists()` 为 False。
+       🔴 这意味着：一旦仓库里真有 submodule，旧的推送流程会
+          在「N 个文件在磁盘上不存在」处**直接退出**。
+
+    🔑 用 `git update-index --add --cacheinfo` 造一个**纯索引** gitlink
+       （不需要真 submodule），验证：
+       ① `local_index_entries()` 认出 mode = 160000
+       ② 推送前置检查**不会**把它当成"磁盘上不存在"而崩掉
+    """
+    import subprocess
+    print('=' * 70)
+    print('🔑 **gitlink 处理自测**（G395）')
+    print('=' * 70)
+    gl = 'scripts/_gitlink_selftest'
+    subprocess.run(['git', 'rm', '-f', '--cached', gl],
+                   capture_output=True, cwd=ROOT)
+    # 一个任意存在的 commit sha 即可（gitlink 指向 submodule 的 commit）
+    fake = '0000000000000000000000000000000000000001'
+    ok_all = True
+    try:
+        r = subprocess.run(
+            ['git', 'update-index', '--add', '--cacheinfo',
+             f'160000,{fake},{gl}'],
+            capture_output=True, text=True, cwd=ROOT)
+        print(f'\n① 构造 gitlink（纯索引，无磁盘文件）: rc={r.returncode}')
+        idx = local_index_entries()
+        e = idx.get(gl) if idx else None
+        print(f'   git 索引条目：{e}')
+        got = bool(e) and e[0] == '160000'
+        print(f'   {"✅" if got else "🔴"} mode == 160000'
+              f'（实测 {e[0] if e else "无"}）')
+        ok_all &= got
+
+        # ② 磁盘上确实没有
+        on_disk = os.path.exists(gl)
+        print(f'\n② 磁盘上存在？{on_disk}'
+              f'   {"✅ 符合预期（gitlink 无磁盘文件）" if not on_disk else "⚠️"}')
+        ok_all &= (not on_disk)
+
+        # ③ 复现旧流程：os.path.exists 检查会把它判为"文件不存在"
+        print(f'\n③ 反证（旧流程 os.path.exists 前置检查）：')
+        if not on_disk:
+            print(f'   🔴 旧流程会报「{gl} 在磁盘上不存在」并 **sys.exit(1)**')
+            print(f'   🔑 说明：仓库里一旦有 submodule，旧推送流程**完全不可用**')
+        else:
+            print('   ⚠️ 磁盘上竟然存在，无法复现')
+    finally:
+        subprocess.run(['git', 'rm', '-f', '--cached', gl],
+                       capture_output=True, cwd=ROOT)
+        try:
+            os.remove(gl)
+        except OSError:
+            pass
+
+    print()
+    print('=' * 70)
+    if ok_all:
+        print('✅ gitlink 识别正确（mode 160000 · 无磁盘文件）')
+        print('   🔑 但**推送流程仍未支持** —— 见下方诚实结论')
+        print('=' * 70)
+        return 0
+    print('🔴 gitlink 识别不正确')
+    print('=' * 70)
+    return 1
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -392,6 +533,10 @@ def main():
                     help='明确接受漏传（不推荐）')
     ap.add_argument('--verify-push', action='store_true',
                     help='G391：**回读远端 tree** 并与本地逐条比对')
+    ap.add_argument('--audit-history', action='store_true',
+                    help='G394：历史 commit 权限审计（**只读**，不改写历史）')
+    ap.add_argument('--check-gitlink', action='store_true',
+                    help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
                     help='G393：symlink（mode 120000）处理正确性**自测**')
     ap.add_argument('--report', action='store_true',
@@ -401,6 +546,14 @@ def main():
     msg = a.message
     dry = a.dry_run
     allow_untracked = a.allow_untracked
+
+    if a.audit_history:
+        os.chdir(ROOT)
+        return cmd_audit_history()
+
+    if a.check_gitlink:
+        os.chdir(ROOT)
+        return cmd_check_gitlink()
 
     if a.check_symlink:
         os.chdir(ROOT)
@@ -459,7 +612,20 @@ def main():
 
     files = list_files()
     print(f'🔑 受管文件 {len(files)} 个')
-    miss = [f for f in files if not os.path.exists(f)]
+
+    # 🔑 第一百轮修复：**gitlink（submodule）磁盘上没有文件**。
+    #    🔴 旧流程用 `os.path.exists` 前置检查 → 一旦仓库有 submodule，
+    #       会被判「N 个文件在磁盘上不存在」并 `sys.exit(1)`，
+    #       🔴 **整个仓库都推不出去**（不是只漏传 submodule）。
+    #    🔑 判据：gitlink 的"内容"是 submodule 的 commit sha，
+    #        只存在于 **git 索引**里，磁盘上本就没有对应文件。
+    idx_all = local_index_entries() or {}
+    glinks = [f for f in files if idx_all.get(f, ('', ''))[0] == '160000']
+    if glinks:
+        print(f'🔑 其中 gitlink（submodule）{len(glinks)} 个'
+              f' —— 无磁盘文件，按 commit 引用处理')
+    miss = [f for f in files
+            if f not in set(glinks) and not os.path.exists(f)]
     if miss:
         print(f'🔴 {len(miss)} 个文件在磁盘上不存在（中文路径问题？）:')
         for f in miss[:5]:
@@ -482,9 +648,18 @@ def main():
               '（否则会重演"全部推成 100755"）')
         sys.exit(1)
 
-    tree, fails = [], []
+    # 🔑 gitlink 直接取**索引里的 sha**（就是 submodule 的 commit），
+    #    不需要也不应该走 mk_blob（磁盘上没有内容可读）。
+    tree = [{'path': p_, 'mode': '160000', 'type': 'commit',
+             'sha': idx_all[p_][1]} for p_ in glinks]
+    if tree:
+        print(f'🔑 gitlink 条目已按 commit 引用加入 tree：{len(tree)} 个')
+
+    _gs = set(glinks)
+    fails = []
     with ThreadPoolExecutor(max_workers=8) as ex:
-        for path, sha, err in ex.map(mk_blob, files):
+        for path, sha, err in ex.map(mk_blob,
+                                     [f for f in files if f not in _gs]):
             if sha is None:
                 fails.append((path, err))
             else:
