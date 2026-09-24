@@ -1,10 +1,27 @@
 {
-  "generated_at": "2026-09-25T05:09:03+0800",
+  "generated_at": "2026-09-25T05:20:04+0800",
   "baseline_modes": {
-    "100644": 280
+    "100644": 281
   },
-  "baseline_fp": "b375095cd44a4be09f11cb568071019be612dbf5",
-  "checked_commits": 17,
+  "baseline_fp_history": [
+    {
+      "round": 108,
+      "from_fp": "b375095cd44a4be09f11cb568071019be612dbf5",
+      "to_fp": "53b9749a79344f81fd1f7dd3fb0256049f310754",
+      "from_modes": {
+        "100644": 280
+      },
+      "to_modes": {
+        "100644": 281
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-25T05:20:05+0800",
+      "note": "🔴 本条轮次曾被误记为 100 —— 中文数字解析 bug（\"一百零七\"的\"零七\"未处理 → 100）。 ✅ 第一百零八轮修复解析后回填真实轮次 108。"
+    }
+  ],
+  "baseline_fp": "53b9749a79344f81fd1f7dd3fb0256049f310754",
+  "checked_commits": 18,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -28,7 +45,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 280
+        "100644": 281
       }
     },
     {
@@ -53,7 +70,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 280
+        "100644": 281
       }
     },
     {
@@ -78,7 +95,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 280
+        "100644": 281
       }
     },
     {
@@ -103,7 +120,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 280
+        "100644": 281
       }
     },
     {
@@ -128,7 +145,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 280
+        "100644": 281
       }
     }
   ],

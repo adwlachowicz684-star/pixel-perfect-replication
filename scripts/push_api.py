@@ -38,6 +38,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 # 🔑 第一百零二轮：历史遗留台账 —— 让"已知遗留"成为**可断言的事实**。
 HISTORY_KNOWN = os.path.join(ROOT, 'audit', 'history_mode_known.json')
+# 🔑 第一百零八轮：基准变更史上限（保留最早 1 条 + 最近 N-1 条）
+BASELINE_FP_HISTORY_MAX = 20
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -316,6 +318,85 @@ def cmd_assert_baseline_fp():
     print('=' * 70)
     return 0
 
+def cmd_assert_fp_history():
+    """🔑 G401：**基准变更史**必须可答"哪一轮变的、为什么变"。
+
+    🔴 第一百零七轮诚实结论②③（本轮要解决的两条）：
+       ② 基准指纹不记"是什么时候变的" —— 只知道"变了"，
+          不知道"哪一轮变的、为什么变"；
+       ③ 台账不记历史基准指纹列表 —— 只留最新一个。
+
+    🔑 三条判据：
+       ① `baseline_fp_history` **必须存在**（缺字段 → 拒绝给结论）
+          —— 🔴 "没有变更史"与"还没发生过变更"必须能区分（107 轮③）
+       ② 每条必须含 round / from_fp / to_fp / legacy_from / legacy_to
+          —— 🔴 缺任一字段则"为什么变"答不了
+       ③ 🔑 **链条闭合**：首条 from_fp 与后续每条的 from_fp
+          必须等于上一条的 to_fp
+          —— 🔴 否则中间某次变更被跳过/被删，"历史"就是编的
+    """
+    print('🔑 **基准变更史断言**（G401）')
+    print('=' * 70)
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{os.path.relpath(HISTORY_KNOWN, ROOT)}')
+        return 1
+    except ValueError as e:
+        print(f'🔴 台账解析失败：{e} —— 拒绝给结论')
+        return 1
+
+    if 'baseline_fp_history' not in rec:
+        print('🔴 台账**缺少 baseline_fp_history** —— '
+              '无法区分"没变更过"与"变更史被删"，拒绝给结论')
+        print('   🔑 修复：重跑 --audit-history')
+        print('=' * 70)
+        return 1
+
+    h = rec['baseline_fp_history']
+    if not isinstance(h, list):
+        print(f'🔴 baseline_fp_history 类型异常：{type(h).__name__} '
+              f'（应为 list）—— 拒绝给结论')
+        return 1
+    print(f'   变更史 {len(h)} 条')
+    need = ('round', 'from_fp', 'to_fp', 'legacy_from', 'legacy_to')
+    bad = []
+    prev_to = None
+    for i, e in enumerate(h):
+        miss = [k for k in need if k not in e]
+        if miss:
+            bad.append(f'第 {i} 条缺少字段 {miss} —— "为什么变"答不了')
+            continue
+        if not isinstance(e['round'], int) or e['round'] <= 0:
+            bad.append(f'第 {i} 条 round 非法：{e["round"]!r}')
+        # 🔑 链条闭合
+        if prev_to is not None and e['from_fp'] != prev_to:
+            bad.append(f'第 {i} 条 **链条断裂**：from_fp '
+                       f'{str(e["from_fp"])[:8]} ≠ 上一条 to_fp '
+                       f'{str(prev_to)[:8]} —— 中间变更被跳过或被删')
+        prev_to = e['to_fp']
+        print(f'   #{i}  第 {e["round"]} 轮  '
+              f'{str(e["from_fp"])[:8]} → {str(e["to_fp"])[:8]}  '
+              f'遗留 {e["legacy_from"]} → {e["legacy_to"]}')
+
+    # 🔑 最后一条的 to_fp 必须等于台账当前指纹
+    cur = rec.get('baseline_fp')
+    if h and cur and h[-1]['to_fp'] != cur:
+        bad.append(f'末条 to_fp {str(h[-1]["to_fp"])[:8]} '
+                   f'≠ 台账当前指纹 {str(cur)[:8]} —— 台账被手工改过')
+
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ 变更史闭合：{len(h)} 条 · 每条均含轮次与前后指纹')
+    print('=' * 70)
+    return 0
+
 def cmd_verify_push(report=False):
     """🔑 G391：**回读远端 tree** 并与本地逐条比对。
 
@@ -527,6 +608,59 @@ def cmd_check_symlink():
 
 
 
+def _doc_max_round():
+    """🔑 文档最大轮次 —— 用于给基准变更史标注"第几轮变的"。
+
+    🔴 探测不到时返回 0，**不猜**（与 G389 同源）：
+       一个猜出来的轮次会让变更史指向错误的轮次。
+
+    🔴 第一百零八轮实测：第一版用朴素 `partition('百')` 解析 ——
+       `一百零七` 被算成 **100**（"零七"不在字典里 → 0）。
+       🔴 这个错误**不会报错**，只会让变更史**悄悄记错轮次**。
+       ✅ 改为逐字符累计（与 claim_verify._cn2num 同算法）。
+    """
+    import re as _re
+    _cn = {'零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
+           '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+
+    def _c2n(t):
+        if t.isdigit():
+            return int(t)
+        total, sec, cur = 0, 0, None
+        for ch in t:
+            if ch in _cn:
+                cur = _cn[ch]
+            elif ch == '十':
+                sec += (cur if cur is not None else 1) * 10
+                cur = None
+            elif ch == '百':
+                sec += (cur if cur is not None else 1) * 100
+                cur = None
+            else:
+                return None                  # 🔴 未知字符：不猜
+        return total + sec + (cur or 0)
+
+    mx = 0
+    for dn in ('references', '.'):
+        dp = os.path.join(ROOT, dn)
+        if not os.path.isdir(dp):
+            continue
+        for f_ in os.listdir(dp):
+            if not f_.endswith('.md'):
+                continue
+            try:
+                for ln in open(os.path.join(dp, f_), encoding='utf-8'):
+                    m = _re.match(r'^#{1,4}\s*第([0-9]+|[零一二三四五六七八九十百]+)轮',
+                                  ln.strip())
+                    if m:
+                        v = _c2n(m.group(1))
+                        if v is not None:
+                            mx = max(mx, v)
+            except Exception:
+                pass
+    return mx
+
+
 def cmd_audit_history():
     """🔑 G394：**历史 commit 权限审计**（只读，不改写历史）。
 
@@ -629,6 +763,10 @@ def cmd_audit_history():
     rec = {
         'generated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
         'baseline_modes': want,
+        # 🔑 第一百零八轮：变更史**必须始终存在**（含首次）。
+        #    🔴 若只在漂移时建，"没有变更史"就无法与"还没发生过变更"区分
+        #       —— 这正是"没有 ≠ 读不到"的同一个病。
+        'baseline_fp_history': (prev or {}).get('baseline_fp_history', []) or [],
         # 🔑 第一百零七轮：**基准指纹** —— 让"基准是否被改过"可断言。
         #    🔴 只有 baseline_modes 时，"基准松了导致遗留消失"
         #       与"历史被修好导致遗留消失"**无法区分**。
@@ -661,6 +799,29 @@ def cmd_audit_history():
         else:
             print(f'⚠️ 遗留数量不变（{prev_n}），但**判定基准本身变了** '
                   f'—— 结论的含义已不同')
+        # 🔑 第一百零八轮：**变更史** —— 只留最新指纹时，
+        #    "哪一轮变的、为什么变"**无从回答**（107 轮诚实结论②③）。
+        _rnd = _doc_max_round()
+        rec['baseline_fp_history'] = list(
+            (prev or {}).get('baseline_fp_history', []) or [])
+        rec['baseline_fp_history'].append({
+            'round': _rnd,
+            'from_fp': prev_fp,
+            'to_fp': cur_fp,
+            'from_modes': (prev or {}).get('baseline_modes'),
+            'to_modes': want,
+            'legacy_from': prev_n,
+            'legacy_to': cur_n,
+            'at': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+        })
+        # 🔑 变更史**不得无界增长**：超过阈值时保留最早 + 最近 N 条
+        if len(rec['baseline_fp_history']) > BASELINE_FP_HISTORY_MAX:
+            rec['baseline_fp_history'] = (
+                rec['baseline_fp_history'][:1]
+                + rec['baseline_fp_history'][-(BASELINE_FP_HISTORY_MAX - 1):])
+        print(f'🔑 已记入基准变更史：第 {_rnd} 轮 · '
+              f'{prev_fp[:8]} → {cur_fp[:8]}'
+              f'（遗留 {prev_n} → {cur_n}）')
 
     try:
         os.makedirs(os.path.dirname(HISTORY_KNOWN), exist_ok=True)
@@ -1321,6 +1482,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-fp-history', action='store_true',
+                    help='G401：基准变更史须闭合且可答“哪一轮变的、为什么变”')
     ap.add_argument('--assert-baseline-fp', action='store_true',
                     help='G400：断言基准指纹未被改过（防遗留“消失”被误读成“修复”）')
     ap.add_argument('--assert-history-known', action='store_true',
@@ -1357,6 +1520,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_fp_history:
+        return cmd_assert_fp_history()
     if a.assert_baseline_fp:
         return cmd_assert_baseline_fp()
     if a.assert_history_known:
