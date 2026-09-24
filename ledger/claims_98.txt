@@ -1,0 +1,34 @@
+# 第九十八轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**推送完整性须回读验证**
+
+# ① 实现（只引代码标识符）
+grep:scripts/push_api.py::cmd_verify_push
+grep:scripts/push_api.py::local_blob_shas
+grep:scripts/push_api.py::verify_push
+grep:scripts/push_api.py::内容不一致
+grep:scripts/push_api.py::推送不完整
+grep:scripts/push_api.py::hash-object
+cmd:push_api.py --verify-push
+gate:G391
+# ② G391 移入人工门禁（关键结论）
+grep:scripts/run_all_gates.py::门禁自身写缓存会使其必然失败
+cmd:run_all_gates.py --self-check-noop
+# ③ 既有能力仍工作
+cmd:push_api.py --check-leak
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:gate_chaos.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+gate:G389
+gate:G390
+# ④ 历史清单不得被误删
+file:ledger/claims_95.txt
+file:ledger/claims_96.txt
+file:ledger/claims_97.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
