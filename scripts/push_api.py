@@ -126,54 +126,67 @@ def mk_blob(path):
 
 
 
-def local_blob_shas():
-    """🔑 本地文件的 **git blob sha**（内容寻址）。
+def local_index_entries():
+    """🔑 本地文件的 **(mode, sha)** —— 用 `git ls-files -s` 一次拿到。
 
-    🔑 用 `git hash-object` —— 与 GitHub 服务端算的是**同一个算法**
-       （`blob <len>\0<content>` 的 SHA-1）。两处一致 = 内容逐字节相同。
-    🔑 返回 dict {path: sha}；`None` 表示无法确定。
+    🔑 第九十九轮：从 `hash-object` 换成 `ls-files -s`。
+       🔴 旧实现只取 sha，**拿不到 mode** → 权限差异查不出来；
+          且对 **symlink**（mode 120000）结果不可靠。
+       🔑 `ls-files -s` 输出：`<mode> <sha> <stage>\t<path>`
+          —— mode 与 sha **同源**，不会出现"两者取自不同命令"的错位。
+
+    🔑 返回的 mode/sha 与 GitHub tree API 的字段**语义一致**：
+       100644 普通文件 · 100755 可执行 · 120000 symlink · 160000 gitlink
+    🔑 返回 dict {path: (mode, sha)}；`None` 表示无法确定。
     """
-    out = os.popen('git -c core.quotepath=false ls-files -z').read()
-    paths = [p for p in out.split('\0') if p.strip()]
-    if not paths:
-        return None
-    res = {}
-    # 🔑 批量调用，避免 N 次子进程
     import subprocess
     try:
-        proc = subprocess.run(['git', 'hash-object', '--stdin-paths'],
-                              input='\n'.join(paths), capture_output=True,
-                              text=True, timeout=120)
+        proc = subprocess.run(
+            ['git', '-c', 'core.quotepath=false', 'ls-files', '-s', '-z'],
+            capture_output=True, text=True, timeout=120)
         if proc.returncode != 0:
             return None
-        lines = proc.stdout.splitlines()
     except Exception:
         return None
-    if len(lines) != len(paths):
-        return None
-    for p_, sh in zip(paths, lines):
-        res[p_] = sh.strip()
-    return res
+    res = {}
+    for item in proc.stdout.split('\0'):
+        if not item.strip():
+            continue
+        # 格式 "mode sha stage\tpath"
+        meta, _, path = item.partition('\t')
+        parts = meta.split()
+        if len(parts) < 2 or not path:
+            return None
+        res[path] = (parts[0], parts[1])
+    return res or None
 
 
-def cmd_verify_push():
+def cmd_verify_push(report=False):
     """🔑 G391：**回读远端 tree** 并与本地逐条比对。
 
     🔴 第九十七轮诚实结论⑤：`push_api.py` 打印"已推送"，但**没有回读远端
        确认文件数一致** —— 这正是第五十三轮"自测 ≠ 取证"的同一类问题：
        **"我发了"不等于"对面收到了"。**
 
-    🔑 三层比对：
+    🔑 **四层比对**（第九十九轮新增第④层）：
       ① **缺失** —— 本地有、远端无（漏传）
       ② **多余** —— 远端有、本地无（脏远端 / 旧文件残留）
       ③ **内容不一致** —— 路径同名但 **blob sha 不同**（部分漏传）
+      ④ **权限不一致** —— 同名同内容但 **mode 不同**（100644 / 100755）
+
+    🔑 `report=True`（`--report`）：**只报告不阻断**。
+       🔴 第九十八轮诚实结论⑤：G391 移入人工门禁后，
+          **推送之外无人定期验证远端完整性** —— 本模式就是那个定期入口，
+          供人工定期跑，把"多余"这类**不阻断但会挂着的问题**看清楚。
     """
     print('=' * 70)
-    print('🔑 **推送完整性验证** —— 回读远端 tree 与本地逐条比对')
+    tag = '🔑 **远端完整性复核**（报告模式，不阻断）' if report \
+        else '🔑 **推送完整性验证** —— 回读远端 tree 与本地逐条比对'
+    print(tag)
     print('=' * 70)
-    loc = local_blob_shas()
+    loc = local_index_entries()
     if not loc:
-        print('🔴 **无法确定**本地文件 sha（git 不可用） —— 拒绝给结论')
+        print('🔴 **无法确定**本地文件 mode/sha（git 不可用） —— 拒绝给结论')
         return 1
     print(f'\n🔑 本地受管文件 {len(loc)} 个')
 
@@ -184,40 +197,57 @@ def cmd_verify_push():
     if d.get('truncated'):
         print('🔴 远端 tree **被截断**（文件过多） —— 无法完整比对')
         return 1
-    rem = {t['path']: t['sha'] for t in d['tree'] if t['type'] == 'blob'}
+    rem = {t['path']: (t.get('mode', ''), t['sha'])
+           for t in d['tree'] if t['type'] == 'blob'}
     print(f'🔑 远端 blob     {len(rem)} 个')
 
     missing = sorted(set(loc) - set(rem))
     extra = sorted(set(rem) - set(loc))
-    diff = sorted(p for p in set(loc) & set(rem) if loc[p] != rem[p])
+    both = set(loc) & set(rem)
+    diff = sorted(p for p in both if loc[p][1] != rem[p][1])
+    # 🔑 第九十九轮新增：mode 比对（本地 mode 可能只给 644/755 三位）
+    def _mode_eq(a, b):
+        if not a or not b:
+            return True          # 🔴 拿不到就不比，不当成"不一致"
+        return a[-3:] == b[-3:]
+    mode_diff = sorted(p for p in both
+                       if loc[p][1] == rem[p][1]
+                       and not _mode_eq(loc[p][0], rem[p][0]))
 
     print()
     if missing:
         print(f'🔴 **缺失**（本地有、远端无）{len(missing)} 个 —— 漏传：')
         for p_ in missing[:10]:
             print(f'   - {p_}')
-        if len(missing) > 10:
-            print(f'   … 另 {len(missing) - 10} 个')
     if extra:
         print(f'⚠️ **多余**（远端有、本地无）{len(extra)} 个 —— 远端残留：')
         for p_ in extra[:10]:
             print(f'   - {p_}')
     if diff:
-        print(f'🔴 **内容不一致**（同名但 sha 不同）{len(diff)} 个 —— 部分漏传：')
+        print(f'🔴 **内容不一致**（同名但 sha 不同）{len(diff)} 个：')
         for p_ in diff[:10]:
-            print(f'   - {p_}  本地 {loc[p_][:8]} ≠ 远端 {rem[p_][:8]}')
+            print(f'   - {p_}  本地 {loc[p_][1][:8]} ≠ 远端 {rem[p_][1][:8]}')
+    if mode_diff:
+        print(f'🔴 **权限不一致**（同名同内容但 mode 不同）{len(mode_diff)} 个：')
+        for p_ in mode_diff[:10]:
+            print(f'   - {p_}  本地 {loc[p_][0]} ≠ 远端 {rem[p_][0]}')
 
-    bad = len(missing) + len(diff)
+    bad = len(missing) + len(diff) + len(mode_diff)
     print()
+    print('=' * 70)
     if bad:
-        print('=' * 70)
-        print(f'🔴 **推送不完整**：缺失 {len(missing)} · '
-              f'内容不一致 {len(diff)}')
+        print(f'🔴 **{"远端与本地不一致" if report else "推送不完整"}**：'
+              f'缺失 {len(missing)} · 内容不一致 {len(diff)} · '
+              f'权限不一致 {len(mode_diff)}')
+        if report:
+            print('   🔑 报告模式：**只报告不阻断**，请人工判断')
+            print('=' * 70)
+            return 0
         print('   "已推送"是声称，逐条比对一致才是事实')
         print('=' * 70)
         return 1
-    print('=' * 70)
-    print(f'✅ 推送完整：{len(loc)} 个文件逐条 sha 一致'
+    print(f'✅ {"远端与本地一致" if report else "推送完整"}：'
+          f'{len(loc)} 个文件逐条 **mode + sha** 一致'
           f'{"（远端另有 " + str(len(extra)) + " 个残留）" if extra else ""}')
     print('=' * 70)
     return 0
@@ -241,7 +271,10 @@ def main():
     ap.add_argument('--allow-untracked', action='store_true',
                     help='明确接受漏传（不推荐）')
     ap.add_argument('--verify-push', action='store_true',
-                    help='G391：**回读远端 tree** 并与本地逐条比对 sha')
+                    help='G391：**回读远端 tree** 并与本地逐条比对')
+    ap.add_argument('--report', action='store_true',
+                    help='与 --verify-push 同用：**只报告不阻断**'
+                         '（定期人工复核入口）')
     a = ap.parse_args()
     msg = a.message
     dry = a.dry_run
@@ -249,7 +282,7 @@ def main():
 
     if a.verify_push:
         os.chdir(ROOT)
-        return cmd_verify_push()
+        return cmd_verify_push(report=a.report)
 
     if a.check_leak:
         # 🔑 G390：只做**漏传检查**，不统计不推送
@@ -310,15 +343,35 @@ def main():
         print('✅ --dry-run：未推送')
         return 0
 
+    # 🔴 第九十九轮修复：**mode 必须取自 git 索引，不能看磁盘 x 位**。
+    #    🔴 旧代码 `os.access(path, os.X_OK)` 在本沙盒里对**所有文件**
+    #       都返回 True → 266 个文件**全部**被推成 100755，
+    #       而 git 索引里其实全是 100644。
+    #       —— 这是**前几轮推送一直存在、直到加了权限比对才暴露**的缺陷。
+    #    🔑 判据：文件在仓库里"该是什么权限"由 **git 索引**决定，
+    #       不由当前文件系统的挂载/umask 决定。
+    idx = local_index_entries()
+    if not idx:
+        print('🔴 **无法确定** git 索引 mode —— 拒绝推送'
+              '（否则会重演"全部推成 100755"）')
+        sys.exit(1)
+
     tree, fails = [], []
     with ThreadPoolExecutor(max_workers=8) as ex:
         for path, sha, err in ex.map(mk_blob, files):
             if sha is None:
                 fails.append((path, err))
             else:
-                mode = '100755' if os.access(path, os.X_OK) else '100644'
+                mode = idx.get(path, (None, None))[0]
+                if not mode:
+                    print(f'🔴 索引里查不到 {path} 的 mode —— 拒绝推送')
+                    sys.exit(1)
                 tree.append({'path': path, 'mode': mode,
                              'type': 'blob', 'sha': sha})
+    _mc = {}
+    for it in tree:
+        _mc[it['mode']] = _mc.get(it['mode'], 0) + 1
+    print(f'🔑 权限取自 git 索引：{_mc}')
     print(f'🔑 blob 成功 {len(tree)} / 失败 {len(fails)}')
     for p, e in fails[:5]:
         print('  🔴', p, e)
@@ -355,7 +408,7 @@ def main():
 
     # 🔑 G391：推送后**必须回读验证** —— "我发了" ≠ "对面收到了"
     print()
-    vr = cmd_verify_push()
+    vr = cmd_verify_push(report=False)   # 🔴 推送后必须严格，不用报告模式
     if vr != 0:
         print('\n🔴 推送后验证未通过 —— 上面那句"已推送"不能当作完成')
         return vr
