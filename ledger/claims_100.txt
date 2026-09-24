@@ -1,0 +1,34 @@
+# 第一百轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**symlink（mode 120000）处理正确性自测**
+
+# ① 修复（只引代码标识符）
+grep:scripts/push_api.py::blob_content
+grep:scripts/push_api.py::os.readlink
+grep:scripts/push_api.py::120000
+cmd:push_api.py --check-symlink
+gate:G393
+# ② 既有能力仍工作
+cmd:push_api.py --check-leak
+cmd:push_api.py --verify-push
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:gate_chaos.py --self-check
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+gate:G387
+gate:G389
+gate:G390
+gate:G391
+gate:G392
+# ③ 历史清单不得被误删
+file:ledger/claims_97.txt
+file:ledger/claims_98.txt
+file:ledger/claims_99.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

@@ -112,9 +112,32 @@ def list_files():
     return [p for p in raw.split('\0') if p.strip()]
 
 
+def blob_content(path):
+    """🔑 路径在 **git 里的 blob 字节内容**（唯一实现）。
+
+    🔑 第一百轮修复：**symlink 不能用 open() 读**。
+       🔴 旧代码 `open(path,'rb').read()` 会**跟随链接**读目标文件内容，
+          而 git 索引里 symlink 的 blob 是**链接路径字符串**本身。
+          实测：链接指向 /tmp/target.txt 时
+            open()  → 28dd9395…（目标文件内容）
+            索引     → 69317bc9…（字符串 "/tmp/target.txt"）
+          两者**必然不一致** → 推上去内容与 git 索引不符。
+       🔑 判据：symlink 的"内容"就是它指向的路径（**git 的定义**）。
+
+    🔴 第一百轮第二个修复：此函数必须是**唯一实现**。
+       🔴 第一版 `--check-symlink` 在自测里**抄了一份同样的逻辑** →
+          回退 `mk_blob` 的修复后自测**仍然报"✅ 正确"** ——
+          **自测测的是自己抄的那份，不是真实实现**（自证循环）。
+       🔑 所以 `mk_blob` 与自测**都调用本函数**。
+    """
+    if os.path.islink(path):
+        return os.readlink(path).encode('utf-8')
+    return open(path, 'rb').read()
+
+
 def mk_blob(path):
     try:
-        raw = open(path, 'rb').read()
+        raw = blob_content(path)
     except Exception as e:
         return (path, None, f'读取失败: {e}')
     d = req('POST', f'{API}/git/blobs',
@@ -253,6 +276,103 @@ def cmd_verify_push(report=False):
     return 0
 
 
+
+def cmd_check_symlink():
+    """🔑 G393：symlink 处理正确性**自测**。
+
+    🔴 为什么要自测：symlink（mode 120000）在当前仓库里**一个都没有**，
+       所以 G391 的常规比对**永远不会碰到它**——
+       缺陷会一直潜伏到某天真有人加 symlink 才爆发。
+    🔑 所以造一个**临时** symlink，验证：
+       ① `local_index_entries()` 认出 mode = 120000
+       ② `mk_blob()` 算出的内容 sha == git 索引的 sha
+    🔑 自测结束**清理**临时文件，不留脏。
+    """
+    import hashlib, subprocess, tempfile, shutil
+
+    def gitsha(b):
+        return hashlib.sha1(b'blob %d\0' % len(b) + b).hexdigest()
+
+    print('=' * 70)
+    print('🔑 **symlink 处理自测**（G393）')
+    print('=' * 70)
+    link = 'scripts/_symlink_selftest_tmp'
+    subprocess.run(['git', 'rm', '-f', '--cached', link],
+                   capture_output=True)
+    try:
+        os.remove(link)
+    except OSError:
+        pass
+
+    tgt_name = '_symlink_target_selftest.txt'
+    tgt = os.path.join(tempfile.gettempdir(), tgt_name)
+    with open(tgt, 'w', encoding='utf-8') as f:
+        f.write('自测目标\n')
+    ok_all = True
+    try:
+        os.symlink(tgt, link)
+        subprocess.run(['git', 'add', '-A'], capture_output=True,
+                       cwd=ROOT)
+        idx = local_index_entries()
+        e = idx.get(link) if idx else None
+        print(f'\n① git 索引 mode/sha：{e}')
+        if not e:
+            print('🔴 索引里查不到该 symlink —— 无法自测')
+            return 1
+        got_mode = e[0] == '120000'
+        print(f'   {"✅" if got_mode else "🔴"} mode == 120000'
+              f'（实测 {e[0]}）')
+        ok_all &= got_mode
+
+        # 🔑 **调用真实实现** `blob_content`（不是抄一份），否则回退修复
+        #    也不会被测出（第一百轮实测教训）。
+        raw = blob_content(link)
+        sha_new = gitsha(raw)
+        same = sha_new == e[1]
+        print(f'\n② mk_blob 内容 sha：{sha_new[:12]}…')
+        print(f'   git 索引 sha      ：{e[1][:12]}…')
+        print(f'   {"✅" if same else "🔴"} 两者一致'
+              f'{"" if same else " —— 🔴 推上去会与 git 索引不符"}')
+        ok_all &= same
+
+        # 🔑 反证：展示 open() 会读到什么（证明修复前的 bug 真实存在）
+        raw_bad = open(link, 'rb').read()   # 🔑 显式复现**旧实现**，仅作反证
+        sha_bad = gitsha(raw_bad)
+        print(f'\n③ 反证（旧实现 open() 跟随链接）：')
+        print(f'   open() 读到   ：{raw_bad!r}')
+        print(f'   open() 的 sha ：{sha_bad[:12]}…')
+        if sha_bad != e[1]:
+            print(f'   🔑 与索引 sha 不同 —— 说明该 bug **真实存在**，'
+                  f'本修复确有必要')
+        else:
+            print(f'   ⚠️ 与索引 sha 相同（目标内容恰好等于链接路径？）')
+    finally:
+        # 清理
+        try:
+            subprocess.run(['git', 'rm', '-f', '--cached', link],
+                           capture_output=True, cwd=ROOT)
+        except Exception:
+            pass
+        try:
+            os.remove(link)
+        except OSError:
+            pass
+        try:
+            os.remove(tgt)
+        except OSError:
+            pass
+
+    print()
+    print('=' * 70)
+    if ok_all:
+        print('✅ symlink 处理正确：mode 120000 已识别、内容 sha 与索引一致')
+        print('=' * 70)
+        return 0
+    print('🔴 symlink 处理**不正确** —— 真加 symlink 时会推错内容')
+    print('=' * 70)
+    return 1
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -272,6 +392,8 @@ def main():
                     help='明确接受漏传（不推荐）')
     ap.add_argument('--verify-push', action='store_true',
                     help='G391：**回读远端 tree** 并与本地逐条比对')
+    ap.add_argument('--check-symlink', action='store_true',
+                    help='G393：symlink（mode 120000）处理正确性**自测**')
     ap.add_argument('--report', action='store_true',
                     help='与 --verify-push 同用：**只报告不阻断**'
                          '（定期人工复核入口）')
@@ -279,6 +401,10 @@ def main():
     msg = a.message
     dry = a.dry_run
     allow_untracked = a.allow_untracked
+
+    if a.check_symlink:
+        os.chdir(ROOT)
+        return cmd_check_symlink()
 
     if a.verify_push:
         os.chdir(ROOT)

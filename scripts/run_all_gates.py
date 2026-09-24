@@ -687,6 +687,12 @@ GATES = [
      # 🔴 第九十六轮诚实结论⑤：`push_api.py` 依赖 `git ls-files`，
      #    忘 add 的新文件会被悄悄漏传，而推送仍显示"成功"。
      ["{py}", "{s}/push_api.py", "--check-leak"], "hard", []),
+    # ---- 游戏第一百轮：symlink 处理正确性**自测** ----
+    ("G393", "**symlink 处理正确**（mode 120000 · 内容 = 链接路径）",
+     # 🔴 第九十九轮诚实结论③：symlink/gitlink **从未实测过**。
+     #    🔑 且仓库里**一个 symlink 都没有** → G391 永远碰不到它，
+     #       缺陷会潜伏到真有人加 symlink 才爆发 → 必须**造一个自测**。
+     ["{py}", "{s}/push_api.py", "--check-symlink"], "hard", []),
 ]
 
 MANUAL_GATES = [
