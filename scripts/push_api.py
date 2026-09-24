@@ -212,6 +212,20 @@ def local_index_entries():
     return res or None
 
 
+def _baseline_fp(want):
+    """🔑 **基准指纹**：当前 git 索引基准 `want` 的 sha1。
+
+    🔑 第一百零七轮：只记 `baseline_modes`（分布）**不够** ——
+       🔴 第一百零六轮实测暴露：把 README.md 在索引里改成 100755
+          → 100755 进入基准 → 历史遗留**集体消失**。
+       🔴 此时 `--assert-history-known` 会报"台账过期"，
+          但**没人解释"为什么突然没了"** —— 可能是修好了，
+          也可能是**基准松了**。两者必须区分。
+    """
+    return hashlib.sha1(json.dumps(want or {}, sort_keys=True,
+                                   ensure_ascii=False).encode()
+                        ).hexdigest()
+
 def _dirty_tracked():
     """🔑 返回**已跟踪但未提交修改**的文件列表；`None` 表示无法确定。
 
@@ -239,6 +253,68 @@ def _dirty_tracked():
         if st.strip():             # 已跟踪且有变化（含 M/A/D/R 等）
             out.append(path)
     return out
+
+def cmd_assert_baseline_fp():
+    """🔑 G400：**基准指纹断言** —— 防止"基准松了"被读成"历史被修好"。
+
+    🔴 第一百零六轮诚实结论⑥（本轮要解决的那一条）：
+       把 README.md 在 git 索引里改成 100755 → 100755 进入基准 →
+       **历史遗留集体消失**（异常文件数 0）。
+       此时 `--assert-history-known` 只会报"台账过期"，
+       🔴 **没有任何东西解释"为什么突然没了"**。
+       —— 可能是真的修好了，也可能是**基准松了**。
+
+    🔑 判据（两条，缺一不可）：
+       ① 台账**必须**有 `baseline_fp`（缺失 → 拒绝给结论，不静默）
+       ② `baseline_fp` 必须**等于**当前 git 索引基准的指纹
+          （不等 → 基准被改过，遗留数量变化的含义已不同）
+    """
+    print('🔑 **基准指纹断言**（G400）')
+    print('=' * 70)
+    idx = local_index_entries()
+    if not idx:
+        print('🔴 无法取得本地 git 索引 —— 拒绝给结论')
+        return 1
+    want = {}
+    for _pp, (_m, _h) in idx.items():
+        want[_m] = want.get(_m, 0) + 1
+    cur_fp = _baseline_fp(want)
+
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{os.path.relpath(HISTORY_KNOWN, ROOT)}')
+        print('   —— 尚未审计过，无法断言基准是否被改过')
+        return 1
+    except ValueError as e:
+        print(f'🔴 台账解析失败：{e} —— 拒绝给结论')
+        return 1
+
+    fp = rec.get('baseline_fp')
+    if not fp:
+        print('🔴 台账**缺少 baseline_fp** —— 无法判断基准是否被改过，'
+              '拒绝给结论')
+        print('   🔑 修复：重跑 --audit-history')
+        print('=' * 70)
+        return 1
+
+    print(f'   台账基准指纹 {fp[:12]}')
+    print(f'   实测基准指纹 {cur_fp[:12]}')
+    print(f'   基准分布     {rec.get("baseline_modes")}')
+    if fp != cur_fp:
+        print(f'\n🔴 **基准已被改过**：{fp[:8]} → {cur_fp[:8]}')
+        print('   🔴 遗留数量的任何变化都**不能**读作"修复" ——')
+        print('      基准松了 → 旧异常不再算异常 → 遗留"消失"；')
+        print('      基准收紧 → 原本正常的文件变成异常 → 遗留"增加"。')
+        print('   🔑 必须重跑 --audit-history 重建台账后再下结论')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ 基准指纹一致（{cur_fp[:8]}）'
+          f' —— 遗留数量可安全比较')
+    print('=' * 70)
+    return 0
 
 def cmd_verify_push(report=False):
     """🔑 G391：**回读远端 tree** 并与本地逐条比对。
@@ -543,9 +619,20 @@ def cmd_audit_history():
     # 🔑 第一百零二轮：**写台账**，让遗留变成可断言的事实。
     #    🔴 上一轮问题：遗留只在 stdout 出现一次，G394 永远返回 0
     #       → "门禁绿但问题在"。写入台账后由 G396 双向断言。
+    prev = None
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            prev = json.load(f)
+    except (FileNotFoundError, ValueError):
+        pass
+    cur_fp = _baseline_fp(want)
     rec = {
         'generated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
         'baseline_modes': want,
+        # 🔑 第一百零七轮：**基准指纹** —— 让"基准是否被改过"可断言。
+        #    🔴 只有 baseline_modes 时，"基准松了导致遗留消失"
+        #       与"历史被修好导致遗留消失"**无法区分**。
+        'baseline_fp': cur_fp,
         'checked_commits': len(d),
         # 🔑 第一百零三轮：每条含**文件级**信息：
         #    odd_count（异常文件总数）· odd_sample（排序后前 N 个路径）
@@ -557,18 +644,30 @@ def cmd_audit_history():
                 ' 修正需 force push（破坏性），本脚本只读不改写。'
                 ' 本台账由 G396/G397 双向断言，不得手工静默删改。',
     }
+    # 🔑 第一百零七轮：**基准漂移**必须被明确报出
+    prev_fp = (prev or {}).get('baseline_fp') if prev is not None else None
+    prev_n = len((prev or {}).get('known_legacy', []) or [])
+    cur_n = len(bad)
+    if prev is not None and prev_fp and prev_fp != cur_fp:
+        print(f'\n🔴 **基准已变**：指纹 {prev_fp[:8]} → {cur_fp[:8]}')
+        print(f'   基准分布：{(prev or {}).get("baseline_modes")} → {want}')
+        if cur_n < prev_n:
+            print(f'🔴 遗留 {prev_n} → {cur_n} 条 **减少** —— '
+                  f'这是"**消失**"不是"**被修复**"：'
+                  f'基准松了，旧异常不再算异常')
+        elif cur_n > prev_n:
+            print(f'🔴 遗留 {prev_n} → {cur_n} 条 **增加** —— '
+                  f'基准收紧，原本正常的文件变成异常')
+        else:
+            print(f'⚠️ 遗留数量不变（{prev_n}），但**判定基准本身变了** '
+                  f'—— 结论的含义已不同')
+
     try:
         os.makedirs(os.path.dirname(HISTORY_KNOWN), exist_ok=True)
         # 🔑 幂等写入：除 generated_at 外内容一致 → **不重写**。
         #    🔴 上一轮问题③：generated_at 每次都变 → 台账**必然变脏**，
         #       但 G396 不比对它 → "跑一次就更新一次"永远发现不了。
         #    🔑 现在只在**内容真变**时才改时间戳。
-        prev = None
-        try:
-            with open(HISTORY_KNOWN, encoding='utf-8') as f:
-                prev = json.load(f)
-        except (FileNotFoundError, ValueError):
-            pass
         if prev is not None and _rec_body(prev) == _rec_body(rec):
             print(f'\n🔑 台账内容未变 —— **不重写**（避免时间戳抖动）：'
                   f'{os.path.relpath(HISTORY_KNOWN, ROOT)}')
@@ -1222,6 +1321,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-baseline-fp', action='store_true',
+                    help='G400：断言基准指纹未被改过（防遗留“消失”被误读成“修复”）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--check-gitlink', action='store_true',
@@ -1256,6 +1357,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_baseline_fp:
+        return cmd_assert_baseline_fp()
     if a.assert_history_known:
         os.chdir(ROOT)
         return cmd_assert_history_known()

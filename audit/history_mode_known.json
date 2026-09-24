@@ -1,9 +1,10 @@
 {
-  "generated_at": "2026-09-25T04:38:39+0800",
+  "generated_at": "2026-09-25T05:09:03+0800",
   "baseline_modes": {
     "100644": 280
   },
-  "checked_commits": 15,
+  "baseline_fp": "b375095cd44a4be09f11cb568071019be612dbf5",
+  "checked_commits": 17,
   "known_legacy": [
     {
       "sha": "444515de4b42",

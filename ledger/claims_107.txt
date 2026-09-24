@@ -1,0 +1,53 @@
+# 第一百零七轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**基准指纹** —— 让"遗留消失"与"遗留被修复"可区分
+
+# ① 基准指纹（只引代码标识符）
+grep:scripts/push_api.py::def _baseline_fp
+grep:scripts/push_api.py::baseline_fp
+grep:scripts/push_api.py::cmd_assert_baseline_fp
+cmd:push_api.py --assert-baseline-fp
+cmd:push_api.py --audit-history
+gate:G400
+# ② 基准漂移判定（只引代码标识符）
+grep:scripts/push_api.py::prev_fp
+grep:scripts/push_api.py::基准已变
+grep:scripts/push_api.py::cur_fp
+# ③ 既有能力仍工作
+cmd:push_api.py --assert-history-known
+cmd:push_api.py --assert-legacy-files
+cmd:push_api.py --assert-legacy-dump
+cmd:push_api.py --dump-legacy-files
+cmd:push_api.py --show-legacy-files
+cmd:push_api.py --verify-push
+cmd:push_api.py --check-leak
+cmd:push_api.py --check-symlink
+cmd:push_api.py --check-gitlink
+cmd:run_all_gates.py --check-both-layers
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:gate_chaos.py --self-check
+gate:G387
+gate:G389
+gate:G390
+gate:G391
+gate:G392
+gate:G393
+gate:G394
+gate:G395
+gate:G396
+gate:G397
+gate:G398
+gate:G399
+# ④ 产物不得被误删
+file:audit/history_mode_known.json
+file:audit/history_mode_files/444515de4b42.txt
+file:ledger/claims_106.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
