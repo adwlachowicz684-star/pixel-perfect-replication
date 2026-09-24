@@ -678,6 +678,10 @@ GATES = [
      # 🔑 第八十九轮"子进程 rc 合法域"与第九十二轮"audit-all 值域锚点"
      #    是同一判据的两处实现 → 合并为 GATE_RC_DOMAIN，防再次分裂。
      ["{py}", "{s}/claim_verify.py", "--check-rc-domain"], "hard", []),
+    # ---- 游戏第九十六轮：豁免清单本身必须被守 ----
+    ("G389", "**豁免须带批准轮次**（不得静默增删、不得僵尸）",
+     # 🔴 第九十五轮诚实结论②：两条 allowlist 的增删不触发任何检查。
+     ["{py}", "{s}/claim_verify.py", "--check-allowlist"], "hard", []),
 ]
 
 MANUAL_GATES = [

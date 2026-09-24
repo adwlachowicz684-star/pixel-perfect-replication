@@ -1,0 +1,33 @@
+# 第九十六轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**豁免清单本身必须被守** + **仓库创建与同步**
+
+# ① G389 实现（只引代码标识符）
+grep:scripts/claim_verify.py::cmd_check_allowlist
+grep:scripts/claim_verify.py::ALLOWLIST_FILES
+grep:scripts/claim_verify.py::僵尸豁免
+grep:scripts/claim_verify.py::批准轮次不可追溯
+grep:scripts/claim_verify.py::大于文档最大轮次
+grep:scripts/claim_verify.py::零一二三四五六七八九十百千
+cmd:claim_verify.py --check-allowlist
+gate:G389
+# ② 豁免已补批准轮次
+file:ledger/rc_domain_allowlist.txt
+file:ledger/scan_doc_allowlist.txt
+# ③ 推送脚本
+file:scripts/push_api.py
+grep:scripts/push_api.py::core.quotepath=false
+grep:scripts/push_api.py::ls-files -z
+# ④ 既有能力仍工作
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+gate:G387
+# ⑤ 历史清单不得被误删
+file:ledger/claims_93.txt
+file:ledger/claims_94.txt
+file:ledger/claims_95.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
+file:scripts/gate_chaos.py

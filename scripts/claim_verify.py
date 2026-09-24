@@ -635,6 +635,130 @@ def _load_rc_domain_allowlist():
     return out
 
 
+
+# 🔑 第九十六轮：**豁免清单本身必须被守**。
+#    🔴 第九十五轮诚实结论②：`ledger/rc_domain_allowlist.txt` 与
+#       `ledger/scan_doc_allowlist.txt` 的增删**不触发任何检查** ——
+#       人可以悄悄加一条豁免，而没有任何门禁会问一句"为什么"。
+#    🔑 三条判据：批准轮次 / 僵尸豁免 / 理由充分。
+ALLOWLIST_FILES = {
+    'rc_domain_allowlist.txt': 'file',   # 键 = 文件名 → 须存在于 scripts/
+    'scan_doc_allowlist.txt': 'gate',    # 键 = 门禁号 → 须在文档里出现
+}
+
+
+def cmd_check_allowlist():
+    """🔑 G389：豁免清单须**带批准轮次**，且不得有"僵尸豁免"。
+
+    🔑 三条判据：
+      ① **批准轮次** —— 理由必须以 `NN轮` 开头，让"何时批准"可查；
+         且轮次不得大于文档最大轮次（🔴 不能写未来的轮次）。
+      ② **僵尸豁免** —— 豁免的键在代码/文档里**根本不存在**，
+         说明它掩盖了一个已经消失的问题，应删除而不是继续挂着。
+      ③ **理由充分** —— ≥ 10 字符（沿用既有判据）。
+    """
+    import re as _re
+    print('=' * 70)
+    print('🔑 **豁免清单审计** —— 批准轮次 / 僵尸豁免 / 理由')
+    print('=' * 70)
+    # 🔑 文档最大轮次（不得写未来的轮次）
+    max_round = 0
+    for dn in ('references', '.'):
+        dp = os.path.join(ROOT, dn)
+        if not os.path.isdir(dp):
+            continue
+        for fn_ in os.listdir(dp):
+            if not fn_.endswith('.md'):
+                continue
+            try:
+                for ln in open(os.path.join(dp, fn_), encoding='utf-8'):
+                    # 🔑 第九十六轮修：中文数字字符类**必须含 十/百** ——
+                    #    🔴 否则 `第九十五轮` 匹配不到（"九"后是"十"），
+                    #       最大轮次被误算成 9。
+                    m = _re.match(r'^#{1,4}\s*第([0-9]+|[零一二三四五六七八九十百千]+)轮',
+                                  ln.strip())
+                    if m:
+                        v = (_cn2num(m.group(1)) if not m.group(1).isdigit()
+                             else int(m.group(1)))
+                        max_round = max(max_round, v)
+            except Exception:
+                pass
+    print(f'\n🔑 文档最大轮次 = {max_round}（豁免批准轮次不得大于它）')
+
+    # 收集文档里出现的门禁号（用于僵尸检测）
+    all_doc = ''
+    for dn in ('references', 'audit', 'flow', 'guide', 'method', 'assets',
+               '_inactive', '.'):
+        dp = os.path.join(ROOT, dn)
+        if not os.path.isdir(dp):
+            continue
+        for fn_ in os.listdir(dp):
+            if fn_.endswith('.md'):
+                try:
+                    all_doc += open(os.path.join(dp, fn_),
+                                    encoding='utf-8').read()
+                except Exception:
+                    pass
+
+    bad = 0
+    for fname, kind in ALLOWLIST_FILES.items():
+        ap_ = os.path.join(ROOT, 'ledger', fname)
+        print(f'\n### {fname}（键类型: {kind}）')
+        if not os.path.exists(ap_):
+            print(f'  🔴 文件不存在')
+            bad += 1
+            continue
+        n = 0
+        for ln in open(ap_, encoding='utf-8'):
+            ln = ln.strip()
+            if not ln or ln.startswith('#'):
+                continue
+            if ':' not in ln:
+                print(f'  🔴 缺冒号: {ln!r}')
+                bad += 1
+                continue
+            k, r = ln.split(':', 1)
+            k, r = k.strip(), r.strip()
+            n += 1
+            # ③ 理由充分
+            if len(r) < 10:
+                print(f'  🔴 `{k}` 理由过短（{len(r)} 字符）')
+                bad += 1
+            # ① 批准轮次
+            m = _re.match(r'^(\d+)轮', r)
+            if not m:
+                print(f'  🔴 `{k}` 理由未以 `NN轮` 开头 —— '
+                      f'**批准轮次不可追溯**')
+                bad += 1
+            elif int(m.group(1)) > max_round:
+                print(f'  🔴 `{k}` 批准轮次 {m.group(1)} '
+                      f'**大于文档最大轮次 {max_round}**')
+                bad += 1
+            else:
+                print(f'  ✅ `{k}` 批准于第 {m.group(1)} 轮')
+            # ② 僵尸豁免
+            if kind == 'file':
+                if not os.path.exists(os.path.join(ROOT, 'scripts', k)):
+                    print(f'  🔴 `{k}` **僵尸豁免** —— scripts/ 下无此文件')
+                    bad += 1
+            elif kind == 'gate':
+                gid = 'G' + k if not k.startswith('G') else k
+                if gid not in all_doc:
+                    print(f'  🔴 `{gid}` **僵尸豁免** —— 文档中未出现')
+                    bad += 1
+        print(f'  共 {n} 条豁免')
+    print()
+    if bad:
+        print('=' * 70)
+        print(f'🔴 豁免清单存在 {bad} 处问题 —— 豁免不得静默增删')
+        print('=' * 70)
+        return 1
+    print('=' * 70)
+    print('✅ 守卫成立：豁免均带批准轮次，无僵尸豁免')
+    print('=' * 70)
+    return 0
+
+
 def cmd_check_rc_domain():
     """🔑 G388：rc 合法域必须是**单一常量**，不得有第二处硬编码。"""
     print('=' * 70)
@@ -1152,6 +1276,8 @@ def main():
                     help='自报本脚本提供的能力（供 G387 双向校验）')
     ap.add_argument('--check-content', action='store_true',
                     help='G386：自校验 ALL_CONTENT 特征串是否段体独有')
+    ap.add_argument('--check-allowlist', action='store_true',
+                    help='G389：豁免清单须**带批准轮次**且不得有僵尸豁免')
     ap.add_argument('--check-rc-domain', action='store_true',
                     help='G388：rc 合法域不得有**第二处硬编码**')
     ap.add_argument('--self-test', action='store_true',
@@ -1173,6 +1299,8 @@ def main():
         return cmd_declare_capability(a)
     if a.check_content:
         return cmd_check_content(a)
+    if getattr(a, 'check_allowlist', False):
+        return cmd_check_allowlist()
     if getattr(a, 'check_rc_domain', False):
         return cmd_check_rc_domain()
     if a.scan_doc:
