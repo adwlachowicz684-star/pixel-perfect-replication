@@ -28,12 +28,15 @@ import base64
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+# 🔑 第一百零二轮：历史遗留台账 —— 让"已知遗留"成为**可断言的事实**。
+HISTORY_KNOWN = os.path.join(ROOT, 'audit', 'history_mode_known.json')
 OWNER = 'adwlachowicz684-star'
 REPO = 'pixel-perfect-replication'
 
@@ -435,11 +438,33 @@ def cmd_audit_history():
         print('   🔑 这些是**历史遗留**，当前 HEAD 已正确（见 G391）。')
         print('   🔴 修正需**改写历史（force push）** —— 破坏性操作，')
         print('      本脚本**只读不改写**，须人工显式决定。')
-        print('=' * 70)
-        # 🔑 审计发现已知历史问题**不算失败** —— 它不被掩盖即算达标
-        return 0
-    print('✅ 全部历史 commit 的 mode 与当前索引基准一致')
+    else:
+        print('✅ 全部历史 commit 的 mode 与当前索引基准一致')
+
+    # 🔑 第一百零二轮：**写台账**，让遗留变成可断言的事实。
+    #    🔴 上一轮问题：遗留只在 stdout 出现一次，G394 永远返回 0
+    #       → "门禁绿但问题在"。写入台账后由 G396 双向断言。
+    rec = {
+        'generated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+        'baseline_modes': want,
+        'checked_commits': len(d),
+        'known_legacy': [{'sha': h, 'msg': m, 'odd_modes': o}
+                         for h, m, o, _ in bad],
+        'note': '历史 commit 的 mode 与当前 git 索引基准不一致。'
+                ' 修正需 force push（破坏性），本脚本只读不改写。'
+                ' 本台账由 G396 双向断言，不得手工静默删改。',
+    }
+    try:
+        os.makedirs(os.path.dirname(HISTORY_KNOWN), exist_ok=True)
+        with open(HISTORY_KNOWN, 'w', encoding='utf-8') as f:
+            json.dump(rec, f, ensure_ascii=False, indent=2)
+        print(f'\n🔑 台账已写：{os.path.relpath(HISTORY_KNOWN, ROOT)}'
+              f' · known_legacy {len(rec["known_legacy"])} 条')
+    except Exception as e:
+        print(f'\n🔴 台账写入失败：{e} —— 遗留无法被 G396 断言')
+        return 1
     print('=' * 70)
+    # 🔑 审计本身不算失败 —— 它**不被掩盖**即算达标（由 G396 守）
     return 0
 
 
@@ -514,6 +539,101 @@ def cmd_check_gitlink():
     return 1
 
 
+
+def cmd_assert_history_known():
+    """🔑 G396：历史遗留台账必须与**实测**一致（双向断言）。
+
+    🔴 第一百零一轮诚实结论③：G394 **返回 0 即使发现问题**
+       → 作为门禁它**永远通过**，靠人工读输出才发现，
+       🔴 存在"门禁绿但问题在"的风险。
+    🔑 本入口把遗留变成**可断言的事实**：台账 vs 实测，双向比对。
+
+    | 方向 | 含义 | 处置 |
+    |---|---|---|
+    | 实测有 · 台账无 | 🔴 **新出现的遗留** | 阻断 |
+    | 台账有 · 实测无 | 🔴 **台账过期**（遗留已消失＝历史被改写） | 阻断 |
+    """
+    print('=' * 70)
+    print('🔑 **历史遗留台账断言**（G396 · 台账 vs 实测）')
+    print('=' * 70)
+
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{HISTORY_KNOWN}')
+        print('   先跑 `push_api.py --audit-history` 生成')
+        return 1
+    except Exception as e:
+        print(f'🔴 台账不可读：{e} —— 拒绝给结论')
+        return 1
+    known = {r['sha']: r for r in rec.get('known_legacy', [])}
+    print(f'\n🔑 台账 known_legacy {len(known)} 条'
+          f' · 生成于 {rec.get("generated_at", "?")}')
+
+    idx = local_index_entries()
+    if not idx:
+        print('🔴 无法确定 git 索引 mode —— 拒绝给结论')
+        return 1
+    want = {}
+    for _m, _ in idx.values():
+        want[_m] = want.get(_m, 0) + 1
+    d = req('GET', f'{API}/commits?per_page=100')
+    if '__err' in d or not isinstance(d, list):
+        print('🔴 无法读取远端 commit 列表 —— **拒绝给结论**'
+              '（远端不可达 ≠ 没有遗留）')
+        return 1
+
+    actual = {}
+    for c in d:
+        t = req('GET', f'{API}/git/trees/{c["sha"]}?recursive=1')
+        if '__err' in t:
+            print(f'⚠️ {c["sha"][:12]} 树读取失败 —— 跳过')
+            continue
+        dist = {}
+        for it in t.get('tree', []):
+            if it['type'] == 'blob':
+                dist[it['mode']] = dist.get(it['mode'], 0) + 1
+        odd = {m: n for m, n in dist.items() if m not in want}
+        if odd:
+            actual[c['sha'][:12]] = odd
+    print(f'🔑 实测遗留 {len(actual)} 条（远端 {len(d)} commit）')
+
+    new_ = sorted(set(actual) - set(known))
+    gone = sorted(set(known) - set(actual))
+    print()
+    ok = True
+    if new_:
+        print(f'🔴 **新出现的遗留** {len(new_)} 条（实测有 · 台账无）：')
+        for h in new_[:10]:
+            print(f'   - {h}  {actual[h]}')
+        print('   🔑 处置：跑 `--audit-history` 更新台账，'
+              '并确认这不是**新引入**的推送缺陷')
+        ok = False
+    if gone:
+        print(f'🔴 **台账过期** {len(gone)} 条（台账有 · 实测无）：')
+        for h in gone[:10]:
+            print(f'   - {h}  {known[h].get("msg", "")}')
+        print('   🔑 含义：遗留**已消失** → 历史被改写过（force push）')
+        print('      → 台账必须同步更新，否则它永远声称问题还在')
+        ok = False
+
+    print()
+    print('=' * 70)
+    if ok and actual:
+        print(f'✅ 台账与实测一致：{len(actual)} 条已知遗留**未被掩盖**'
+              f'（仍待人工决定是否 force push 修正）')
+        print('=' * 70)
+        return 0
+    if ok and not actual:
+        print('✅ 台账与实测一致：无历史遗留')
+        print('=' * 70)
+        return 0
+    print('🔴 台账与实测**不一致** —— 遗留台账已失去断言能力')
+    print('=' * 70)
+    return 1
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -535,6 +655,8 @@ def main():
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
                     help='G394：历史 commit 权限审计（**只读**，不改写历史）')
+    ap.add_argument('--assert-history-known', action='store_true',
+                    help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--check-gitlink', action='store_true',
                     help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
@@ -550,6 +672,10 @@ def main():
     if a.audit_history:
         os.chdir(ROOT)
         return cmd_audit_history()
+
+    if a.assert_history_known:
+        os.chdir(ROOT)
+        return cmd_assert_history_known()
 
     if a.check_gitlink:
         os.chdir(ROOT)
