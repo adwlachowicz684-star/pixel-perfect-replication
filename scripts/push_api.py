@@ -42,6 +42,8 @@ HISTORY_KNOWN = os.path.join(ROOT, 'audit', 'history_mode_known.json')
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
 LEGACY_SHOW_N = 20
+# 🔑 第一百零四轮：完整异常文件清单**落盘目录**（使"哪些文件不对"离线可答）
+LEGACY_FILES_DIR = os.path.join(ROOT, 'audit', 'history_mode_files')
 _LAST_DETAILS = {}
 
 
@@ -90,6 +92,13 @@ def req(method, url, data=None):
         except Exception:
             b = ''
         return {'__err': e.code, '__body': b}
+    except Exception as e:
+        # 🔑 第一百零四轮：**网络层不可达**（DNS 失败 / 超时 / 连接重置）
+        #    必须返回 `__err`，而不是抛出。
+        #    🔴 断网实测时发现：只捕 HTTPError → URLError 直接抛出 →
+        #       脚本**崩溃**而非"拒绝给结论"，调用方无法区分
+        #       "远端不可达"与"代码有 bug"。
+        return {'__err': f'NET:{type(e).__name__}:{e}'}
 
 
 
@@ -730,15 +739,29 @@ def cmd_show_legacy_files(a):
 
     total = 0
     for t in targets:
-        # 🔑 用 **完整 sha 查远端**（台账里存的是 12 位前缀，tree API 也接受）
-        d = req('GET', f'{API}/git/trees/{t["sha"]}?recursive=1')
-        if '__err' in d:
-            print(f'\n⚠️ {t["sha"]} 树读取失败 HTTP {d["__err"]} —— 跳过')
-            continue
-        paths = sorted(it['path'] for it in d.get('tree', [])
-                       if it['type'] == 'blob' and it['mode'] not in want)
+        # 🔑 第一百零四轮：**优先读本地落盘清单**（离线可答）。
+        #    🔴 上一轮问题：完整清单只在远端 → 远端不可达就回答不了。
+        fp = os.path.join(LEGACY_FILES_DIR, t['sha'] + '.txt')
+        if os.path.isfile(fp):
+            try:
+                with open(fp, encoding='utf-8') as f:
+                    paths = [ln for ln in f.read().splitlines() if ln]
+                src = '本地落盘'
+            except Exception as e:
+                print(f'\n🔴 {t["sha"]} 落盘清单不可读：{e} —— 拒绝给结论')
+                return 1
+        else:
+            print(f'\n⚠️ {t["sha"]} 无落盘清单 —— 回退远端查询'
+                  f'（离线时此处将失败；用 --dump-legacy-files 生成）')
+            d = req('GET', f'{API}/git/trees/{t["sha"]}?recursive=1')
+            if '__err' in d:
+                print(f'🔴 远端也不可达 HTTP {d["__err"]} —— 拒绝给结论')
+                return 1
+            paths = sorted(it['path'] for it in d.get('tree', [])
+                           if it['type'] == 'blob' and it['mode'] not in want)
+            src = '远端'
         total += len(paths)
-        print(f'\n### {t["sha"]}  {t.get("msg", "")}')
+        print(f'\n### {t["sha"]}  {t.get("msg", "")}   [来源：{src}]')
         print(f'    mode 异常文件 **{len(paths)} 个**'
               f'（台账记 odd_count={t.get("odd_count", "?")}）')
         if t.get('odd_count') != len(paths):
@@ -844,6 +867,190 @@ def cmd_assert_legacy_files():
     return 0
 
 
+
+def cmd_dump_legacy_files():
+    """🔑 把每个遗留 commit 的**完整**异常文件清单**落盘**。
+
+    🔴 第一百零三轮诚实结论①：`odd_sample` 只存前 10 个，
+       完整清单**只在远端** —— 远端不可达时「哪些文件不对」**又回答不了**。
+    🔑 本入口把完整清单写到 `audit/history_mode_files/<sha>.txt`，
+       使该问题**离线可答**。
+
+    🔑 判据：落盘内容 = 全部异常路径**排序**后逐行。
+       与 `odd_paths_sha` 同源（同一份排序列表），故二者可互相校验。
+    """
+    print('=' * 70)
+    print('🔑 **落盘：遗留文件完整清单**（使"哪些文件不对"离线可答）')
+    print('=' * 70)
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{HISTORY_KNOWN} —— 先跑 --audit-history')
+        return 1
+    except Exception as e:
+        print(f'🔴 台账不可读：{e} —— 拒绝给结论')
+        return 1
+
+    idx = local_index_entries()
+    if not idx:
+        print('🔴 无法确定 git 索引 mode 基准 —— 拒绝给结论')
+        return 1
+    want = {}
+    for _m, _ in idx.values():
+        want[_m] = want.get(_m, 0) + 1
+
+    d = req('GET', f'{API}/commits?per_page=100')
+    if '__err' in d or not isinstance(d, list):
+        print('🔴 无法读取远端 commit 列表 —— **拒绝给结论**'
+              '（远端不可达 ≠ 没有遗留）')
+        return 1
+
+    known = {r['sha']: r for r in rec.get('known_legacy', [])}
+    os.makedirs(LEGACY_FILES_DIR, exist_ok=True)
+    n_write = 0
+    bad_fp = []
+    for h in sorted(known):
+        t = req('GET', f'{API}/git/trees/{h}?recursive=1')
+        if '__err' in t:
+            print(f'   ⚠️ {h} 树读取失败 HTTP {t["__err"]} —— 跳过')
+            continue
+        paths = sorted(it['path'] for it in t.get('tree', [])
+                       if it['type'] == 'blob' and it['mode'] not in want)
+        fp = hashlib.sha1('\n'.join(paths).encode('utf-8')).hexdigest()
+        # 🔑 与台账指纹**同源校验**：不一致说明两者不是同一份数据
+        if known[h].get('odd_paths_sha') != fp:
+            bad_fp.append(h)
+        fp_out = os.path.join(LEGACY_FILES_DIR, h + '.txt')
+        # 🔑 幂等：内容一致不重写
+        body = '\n'.join(paths) + '\n'
+        try:
+            prev = None
+            if os.path.isfile(fp_out):
+                with open(fp_out, encoding='utf-8') as f:
+                    prev = f.read()
+            if prev == body:
+                print(f'   🔑 {h}  清单未变 —— 不重写（{len(paths)} 个）')
+            else:
+                with open(fp_out, 'w', encoding='utf-8') as f:
+                    f.write(body)
+                print(f'   ✅ {h}  已落盘 {len(paths)} 个路径')
+                n_write += 1
+        except Exception as e:
+            print(f'   🔴 {h} 落盘失败：{e}')
+            return 1
+
+    print()
+    print('=' * 70)
+    # 🔑 清理**僵尸清单**：目录里有但台账没有（遗留已消失）
+    try:
+        have = {f[:-4] for f in os.listdir(LEGACY_FILES_DIR)
+                if f.endswith('.txt')}
+    except Exception as e:
+        print(f'🔴 无法读取落盘目录：{e}')
+        return 1
+    zombie = sorted(have - set(known))
+    if zombie:
+        print(f'🔴 **僵尸清单** {len(zombie)} 个（目录有 · 台账无）：'
+              f'{zombie[:5]}')
+        print('   🔑 含义：遗留已消失（历史被改写），清单必须同步删除')
+        print('=' * 70)
+        return 1
+    if zombie == [] and have:
+        print(f'🔑 无僵尸清单（目录 {len(have)} 个 == 台账 '
+              f'{len(known)} 条）')
+    if bad_fp:
+        print(f'🔴 落盘内容指纹与台账 odd_paths_sha 不一致：{bad_fp[:5]}')
+        print('   🔑 两者必须**同源**（同一份排序列表）')
+        print('=' * 70)
+        return 1
+    print(f'✅ 落盘完成：{len(have)} 份清单，本次重写 {n_write} 份')
+    print('=' * 70)
+    return 0
+
+
+def cmd_assert_legacy_dump():
+    """🔑 G398：**落盘清单**与实测一致（且离线可答）。
+
+    🔴 第一百零三轮诚实结论①：完整清单只在远端 → 离线回答不了。
+    🔑 G398 断言三件事：
+       ① 台账每条**必须有**对应落盘清单（不得缺）
+       ② 落盘内容指纹 == 台账 `odd_paths_sha`（**同源**）
+       ③ 落盘行数 == 台账 `odd_count`
+    🔑 与 G397 的区别：G397 查**远端**，G398 查**本地落盘** ——
+       🔴 二者不可互相替代：G397 防台账撒谎，G398 防"离线答不了"。
+    """
+    print('=' * 70)
+    print('🔑 **落盘清单断言**（G398 · 离线可答 + 与台账同源）')
+    print('=' * 70)
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{HISTORY_KNOWN}')
+        return 1
+    except Exception as e:
+        print(f'🔴 台账不可读：{e} —— 拒绝给结论')
+        return 1
+    known = {r['sha']: r for r in rec.get('known_legacy', [])}
+    print(f'\n① 台账 {len(known)} 条')
+
+    # ② 目录必须可读（不可读 ≠ 没有）
+    if not os.path.isdir(LEGACY_FILES_DIR):
+        print(f'🔴 落盘目录不存在：{LEGACY_FILES_DIR}')
+        print('   先跑 `push_api.py --dump-legacy-files`')
+        return 1
+    try:
+        have = sorted(f[:-4] for f in os.listdir(LEGACY_FILES_DIR)
+                      if f.endswith('.txt'))
+    except Exception as e:
+        print(f'🔴 落盘目录不可读：{e} —— 拒绝给结论')
+        return 1
+    print(f'② 落盘清单 {len(have)} 份')
+
+    miss = sorted(set(known) - set(have))
+    extra = sorted(set(have) - set(known))
+    print('\n③ 逐份比对（落盘 vs 台账）')
+    ok = True
+    if miss:
+        print(f'   🔴 **缺清单** {len(miss)} 份：{miss[:10]}')
+        ok = False
+    if extra:
+        print(f'   🔴 **僵尸清单** {len(extra)} 份：{extra[:10]}')
+        ok = False
+
+    for h in sorted(set(known) & set(have)):
+        fp = os.path.join(LEGACY_FILES_DIR, h + '.txt')
+        try:
+            with open(fp, encoding='utf-8') as f:
+                lines = [ln for ln in f.read().splitlines() if ln]
+        except Exception as e:
+            print(f'   🔴 {h} 不可读：{e}')
+            ok = False
+            continue
+        fp_sha = hashlib.sha1('\n'.join(lines).encode('utf-8')).hexdigest()
+        c_ok = known[h].get('odd_count') == len(lines)
+        s_ok = known[h].get('odd_paths_sha') == fp_sha
+        if c_ok and s_ok:
+            print(f'   ✅ {h}  {len(lines)} 行 · 指纹 {fp_sha[:8]} 一致')
+        else:
+            print(f'   🔴 {h}  行数 台账{known[h].get("odd_count")}'
+                  f'/落盘{len(lines)}  指纹 '
+                  f'{str(known[h].get("odd_paths_sha"))[:8]}/{fp_sha[:8]}')
+            ok = False
+
+    print()
+    print('=' * 70)
+    if ok:
+        print(f'✅ {len(known)} 条遗留的完整清单**已落盘且与台账同源**'
+              f' —— 离线可答"哪些文件不对"')
+        print('=' * 70)
+        return 0
+    print('🔴 落盘清单与台账不一致 —— "哪些文件不对"无法离线回答')
+    print('=' * 70)
+    return 1
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -865,6 +1072,10 @@ def main():
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
                     help='G394：历史 commit 权限审计（**只读**，不改写历史）')
+    ap.add_argument('--dump-legacy-files', action='store_true',
+                    help='把遗留 commit 的**完整**异常文件清单落盘')
+    ap.add_argument('--assert-legacy-dump', action='store_true',
+                    help='G398：落盘清单与台账同源（离线可答）')
     ap.add_argument('--show-legacy-files', nargs='?', const='',
                     metavar='SHA前缀',
                     help='列出历史 commit 中 **mode 异常的具体文件**')
@@ -887,6 +1098,14 @@ def main():
     if a.audit_history:
         os.chdir(ROOT)
         return cmd_audit_history()
+
+    if a.dump_legacy_files:
+        os.chdir(ROOT)
+        return cmd_dump_legacy_files()
+
+    if a.assert_legacy_dump:
+        os.chdir(ROOT)
+        return cmd_assert_legacy_dump()
 
     if a.show_legacy_files is not None:
         os.chdir(ROOT)
