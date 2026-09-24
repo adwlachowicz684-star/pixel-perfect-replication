@@ -1,13 +1,19 @@
 # 第九十八轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 第九十九轮修订：`local_blob_shas` 已重命名为 `local_index_entries`，
+#    `hash-object` 已换成 `ls-files -s`（一次拿到 mode+sha）。
+#    🔴 这暴露一条张力：清单引**代码标识符**可被静态验证，
+#       但会随重构失效；引**能力契约**（cmd:）不会失效，但验不到实现。
+#    🔑 两者都要有 —— 本文件的 `cmd:push_api.py --verify-push` 始终通过，
+#       说明**能力未回退**，只是实现升级。
 # 🔑 本轮主题：**推送完整性须回读验证**
 
 # ① 实现（只引代码标识符）
 grep:scripts/push_api.py::cmd_verify_push
-grep:scripts/push_api.py::local_blob_shas
+grep:scripts/push_api.py::local_index_entries
 grep:scripts/push_api.py::verify_push
 grep:scripts/push_api.py::内容不一致
 grep:scripts/push_api.py::推送不完整
-grep:scripts/push_api.py::hash-object
+grep:scripts/push_api.py::ls-files', '-s'
 cmd:push_api.py --verify-push
 gate:G391
 # ② G391 移入人工门禁（关键结论）

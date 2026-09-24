@@ -1,0 +1,34 @@
+# 第九十九轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**权限比对 + 定期复核入口**
+
+# ① 权限比对（只引代码标识符）
+grep:scripts/push_api.py::local_index_entries
+grep:scripts/push_api.py::权限不一致
+grep:scripts/push_api.py::idx.get
+grep:scripts/push_api.py::local_index_entries
+cmd:push_api.py --verify-push
+gate:G391
+# ② 定期复核入口
+grep:scripts/push_api.py::report
+cmd:push_api.py --verify-push --report
+gate:G392
+# ③ 既有能力仍工作
+cmd:push_api.py --check-leak
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:gate_chaos.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+gate:G387
+gate:G389
+gate:G390
+# ④ 历史清单不得被误删
+file:ledger/claims_96.txt
+file:ledger/claims_97.txt
+file:ledger/claims_98.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
