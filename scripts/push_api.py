@@ -465,7 +465,14 @@ def cmd_audit_history():
                    'odd_count': len(flat),
                    'odd_sample': flat[:LEGACY_SAMPLE_N],
                    'odd_sample_truncated': len(flat) > LEGACY_SAMPLE_N,
-                   'odd_paths_sha': fp}
+                   'odd_paths_sha': fp,
+                   # 🔑 第一百零六轮：**应有 mode 基准**必须写进台账。
+                   #    🔴 破坏②实测发现：台账里没有这个字段 →
+                   #       "应有 mode 是否凭空捏造"**根本无从校验**，
+                   #       检查**静默跳过**（rc=0）而破坏**没被拦住**。
+                   #    🔑 这是"读不到 ≠ 没有"的镜像：
+                   #       不仅要区分，还必须在缺失时**拒绝给结论**。
+                   'baseline_modes': dict(want)}
             bad.append((sha[:12], msg, odd, dist, ent))
             details[sha[:12]] = flat
             print(f'🔴 {sha[:12]}  {msg}')
@@ -747,10 +754,12 @@ def cmd_show_legacy_files(a):
                 with open(fp, encoding='utf-8') as f:
                     _raw = [ln for ln in f.read().splitlines() if ln]
                 # 🔑 每行 = `mode\tpath`；兼容旧版纯 path
-                paths = [(ln.split('\t', 1)[1] if '\t' in ln else ln)
+                paths = [(ln.split('\t')[-1] if '\t' in ln else ln)
                          for ln in _raw]
-                modes = sorted({(ln.split('\t', 1)[0] if '\t' in ln
+                modes = sorted({(ln.split('\t')[0] if '\t' in ln
                                  else '?') for ln in _raw})
+                exp_modes = sorted({ln.split('\t')[1] for ln in _raw
+                                    if ln.count('\t') >= 2})
                 src = '本地落盘'
             except Exception as e:
                 print(f'\n🔴 {t["sha"]} 落盘清单不可读：{e} —— 拒绝给结论')
@@ -767,13 +776,15 @@ def cmd_show_legacy_files(a):
             modes = sorted({it['mode'] for it in d.get('tree', [])
                             if it['type'] == 'blob'
                             and it['mode'] not in want})
+            exp_modes = []
             src = '远端'
         total += len(paths)
         print(f'\n### {t["sha"]}  {t.get("msg", "")}   [来源：{src}]')
         print(f'    mode 异常文件 **{len(paths)} 个**'
               f'（台账记 odd_count={t.get("odd_count", "?")}）')
         if modes:
-            print(f'    异常 mode：{modes}')
+            print(f'    异常 mode：{modes}'
+                  + (f' → 应有 {exp_modes}' if exp_modes else ''))
         if t.get('odd_count') != len(paths):
             print(f'    🔴 与台账 odd_count **不一致** —— 台账已过期')
         for p_ in paths[:LEGACY_SHOW_N]:
@@ -929,18 +940,39 @@ def cmd_dump_legacy_files():
         #    🔴 上一轮只有 path —— 答不了"这个文件是 100755 还是 100664"。
         #    🔑 排序**只按 path**（不按 (mode,path)），因为台账的
         #       odd_paths_sha 也是按 path 排的 —— 两者必须**同源**。
-        entries = sorted(((it['mode'], it['path'])
-                          for it in t.get('tree', [])
-                          if it['type'] == 'blob' and it['mode'] not in want),
-                         key=lambda x: x[1])
-        paths = [pp for _m, pp in entries]
+        # 🔑 第一百零六轮（后半）：三列 `实际mode\t应有mode\tpath`
+        #    🔑 **逐文件**取自当前 git 索引 —— 不是"取最多的那个"。
+        #    🔴 第一百零六轮诚实结论②：基准若有两种 mode，
+        #       "取最多的"就是**猜的**。逐文件取才是证据。
+        #    🔑 文件已不在当前索引（历史新增/改名/删除）→ 回退到
+        #       "基准里出现最多"，并**计数透明报出**。
+        fallback = (max(want.items(), key=lambda kv: kv[1])[0]
+                    if want else '100644')
+        idx = local_index_entries() or {}
+        n_idx = n_fb = 0
+        entries = []
+        for it in t.get('tree', []):
+            if it['type'] != 'blob' or it['mode'] in want:
+                continue
+            pp = it['path']
+            w = idx.get(pp, (None, None))[0]
+            if w:
+                n_idx += 1
+            else:
+                w = fallback
+                n_fb += 1
+            entries.append((it['mode'], w, pp))
+        entries.sort(key=lambda x: x[2])
+        print(f'   🔑 {h} 应有 mode 来源：索引 {n_idx} 个 · '
+              f'回退(不在当前索引) {n_fb} 个 → {fallback}')
+        paths = [pp for _m, _w, pp in entries]
         fp = hashlib.sha1('\n'.join(paths).encode('utf-8')).hexdigest()
         # 🔑 与台账指纹**同源校验**：不一致说明两者不是同一份数据
         if known[h].get('odd_paths_sha') != fp:
             bad_fp.append(h)
         fp_out = os.path.join(LEGACY_FILES_DIR, h + '.txt')
         # 🔑 幂等：内容一致不重写
-        body = ''.join(f'{_m}\t{_p}\n' for _m, _p in entries)
+        body = ''.join(f'{_m}\t{_w}\t{_p}\n' for _m, _w, _p in entries)
         try:
             prev = None
             if os.path.isfile(fp_out):
@@ -1048,23 +1080,36 @@ def cmd_assert_legacy_dump():
         # ② 每行必须是 `mode\tpath`
         recs, bad_line = [], []
         for ln in lines:
-            if '\t' not in ln:
+            n_tab = ln.count('\t')
+            if n_tab < 2:
                 bad_line.append(ln[:60])
                 continue
-            _m, _pp = ln.split('\t', 1)
-            recs.append((_m, _pp))
-        paths = [_pp for _m, _pp in recs]
+            _m, _w, _pp = ln.split('\t', 2)
+            recs.append((_m, _w, _pp))
+        paths = [_pp for _m, _w, _pp in recs]
         fp_sha = hashlib.sha1('\n'.join(paths).encode('utf-8')).hexdigest()
         c_ok = known[h].get('odd_count') == len(paths)
         s_ok = known[h].get('odd_paths_sha') == fp_sha
         # ③ **内部自洽**：落盘里的 mode 必须是台账记录的 odd_modes 之一
         #    🔑 答得了"哪个文件的哪个权限不对"，且**不与台账自相矛盾**
         want_modes = set(known[h].get('odd_modes', {}).keys())
-        modes = sorted({_m for _m, _ in recs})
+        modes = sorted({_m for _m, _w, _pp in recs})
         unknown_modes = sorted(set(modes) - want_modes) if want_modes else []
+        # ④ 🔑 "应有 mode" 必须在台账 baseline_modes 内
+        #    🔴 否则"本应是什么"是凭空捏造的值
+        base_modes = set(known[h].get('baseline_modes') or {})
+        exp_modes = sorted({_w for _m, _w, _pp in recs})
+        # 🔴 字段缺失 → **拒绝给结论**，不得静默跳过
+        #    （第一百零六轮破坏②实测：静默跳过会让破坏 rc=0）
+        if not base_modes:
+            print(f'   🔴 {h} 台账**缺少 baseline_modes** —— '
+                  f'无法判断"应有 mode"是否凭空捏造，拒绝给结论')
+            ok = False
+            continue
+        bad_exp = sorted(set(exp_modes) - base_modes)
         if bad_line:
-            print(f'   🔴 {h}  {len(bad_line)} 行缺少制表符（应为 '
-                  f'mode\tpath）：{bad_line[:2]}')
+            print(f'   🔴 {h}  {len(bad_line)} 行格式不对（应为 '
+                  f'实际mode\t应有mode\tpath）：{bad_line[:2]}')
             ok = False
             continue
         if unknown_modes:
@@ -1072,9 +1117,14 @@ def cmd_assert_legacy_dump():
                   f'odd_modes {sorted(want_modes)} —— 落盘与台账自相矛盾')
             ok = False
             continue
+        if bad_exp:
+            print(f'   🔴 {h} "应有 mode" {bad_exp} **不在**台账 '
+                  f'baseline_modes {sorted(base_modes)} —— 是凭空捏造的值')
+            ok = False
+            continue
         if c_ok and s_ok:
             print(f'   ✅ {h}  {len(paths)} 行 · 指纹 {fp_sha[:8]} 一致'
-                  f' · mode {modes}')
+                  f' · 实际 {modes} → 应有 {exp_modes}')
         else:
             print(f'   🔴 {h}  行数 台账{known[h].get("odd_count")}'
                   f'/落盘{len(paths)}  指纹 '

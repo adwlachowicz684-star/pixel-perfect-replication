@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-25T04:19:20+0800",
+  "generated_at": "2026-09-25T04:38:39+0800",
   "baseline_modes": {
-    "100644": 279
+    "100644": 280
   },
-  "checked_commits": 14,
+  "checked_commits": 15,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -25,7 +25,10 @@
         "_inactive/agents/forensics-agent.md"
       ],
       "odd_sample_truncated": true,
-      "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a"
+      "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
+      "baseline_modes": {
+        "100644": 280
+      }
     },
     {
       "sha": "bf2b5d5a0b8c",
@@ -47,7 +50,10 @@
         "_inactive/agents/forensics-agent.md"
       ],
       "odd_sample_truncated": true,
-      "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b"
+      "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
+      "baseline_modes": {
+        "100644": 280
+      }
     },
     {
       "sha": "f8aace6a2919",
@@ -69,7 +75,10 @@
         "_inactive/agents/forensics-agent.md"
       ],
       "odd_sample_truncated": true,
-      "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b"
+      "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
+      "baseline_modes": {
+        "100644": 280
+      }
     },
     {
       "sha": "6ef64cc9eeb8",
@@ -91,7 +100,10 @@
         "_inactive/agents/forensics-agent.md"
       ],
       "odd_sample_truncated": true,
-      "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340"
+      "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
+      "baseline_modes": {
+        "100644": 280
+      }
     },
     {
       "sha": "55ecc68bea80",
@@ -113,7 +125,10 @@
         "_inactive/agents/forensics-agent.md"
       ],
       "odd_sample_truncated": true,
-      "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198"
+      "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
+      "baseline_modes": {
+        "100644": 280
+      }
     }
   ],
   "note": "历史 commit 的 mode 与当前 git 索引基准不一致。 修正需 force push（破坏性），本脚本只读不改写。 本台账由 G396/G397 双向断言，不得手工静默删改。"

@@ -1,0 +1,53 @@
+# 第一百零六轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**第二组双层登记 + 落盘三列**，并修掉一处真实漏网
+
+# ① 第二组登记（只引代码标识符）
+grep:scripts/run_all_gates.py::'G396', 'G398'
+grep:scripts/run_all_gates.py::BOTH_LAYERS
+cmd:run_all_gates.py --check-both-layers
+gate:G399
+# ② 落盘三列 + baseline_modes（只引代码标识符）
+grep:scripts/push_api.py::want_mode
+grep:scripts/push_api.py::baseline_modes
+grep:scripts/push_api.py::bad_exp
+grep:scripts/push_api.py::n_tab
+cmd:push_api.py --dump-legacy-files
+cmd:push_api.py --assert-legacy-dump
+cmd:push_api.py --audit-history
+cmd:push_api.py --show-legacy-files
+# ③ 既有能力仍工作
+cmd:push_api.py --assert-history-known
+cmd:push_api.py --assert-legacy-files
+cmd:push_api.py --check-leak
+cmd:push_api.py --check-symlink
+cmd:push_api.py --check-gitlink
+cmd:push_api.py --verify-push
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:gate_chaos.py --self-check
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+gate:G387
+gate:G389
+gate:G390
+gate:G391
+gate:G392
+gate:G393
+gate:G394
+gate:G395
+gate:G396
+gate:G397
+gate:G398
+# ④ 产物不得被误删
+file:audit/history_mode_known.json
+file:audit/history_mode_files/444515de4b42.txt
+file:ledger/claims_103.txt
+file:ledger/claims_104.txt
+file:ledger/claims_105.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py
