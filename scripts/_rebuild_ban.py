@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""从源文档重抽 audit/01-禁令总表.md。**只写"不能怎么做"**。"""
+import re,os,glob,hashlib
+STRONG=re.compile(r'(❌|禁止|不得|不许|不允许|不得擅自|不得直接|不得一律|不得静默|不得把|不得因|不应擅自|不能只|不得默认|不得据此|不得当作|不许擅自)')
+files=sorted(glob.glob('references/*.md')+glob.glob('method/*.md')+glob.glob('flow/*.md')+glob.glob('guide/*.md')+['SKILL.md'])
+seen=set(); items=[]
+for f in files:
+    for i,l in enumerate(open(f,encoding='utf-8'),1):
+        s=l.strip().strip('|').strip(); s=re.sub(r'^\s*[-*>]\s*','',s)
+        if len(s)<14 or len(s)>300 or not STRONG.search(s) or s.startswith('#'): continue
+        h=hashlib.md5(re.sub(r'[\s*`_>|-]','',s).encode()).hexdigest()[:12]
+        if h in seen: continue
+        seen.add(h); items.append((os.path.basename(f),i,s))
+AE=('AE 执行层诚实性',['kind','cli','可运行','不能 which','能力缺口','重复 key','dup_of','静默丢','后写覆盖先写','全绿','错觉','台账校验器','填得自洽','不表示原版行为已取证','发现仍依赖人工','真实缺口','缺失 N','去重','tool_missing','degraded','backend','降级特征','T_min','T_max','baseline_known','不计入通过','未验证','locally unique','全局唯一','buildId','buildStartTime','buildEndTime','hasInput','hasOutput','invokedBy','待核','先核','自测','冒充','取证','ground_truth','ffprobe','fps_guessed','不猜','混沌','改坏','拦截率','假门禁','黑名单','白名单','空表','静默通过','0 条','无阻断项','枚举','毒化','门禁数量','覆盖率','置信区间','不可断言','盲区','假设','证伪','如实记录','语义毒化','语法','行自洽','跨字段','矛盾','静默失效','冲成','抽查',
+ '白名单','ENUMS','归零','子命令','劫持','flag','gate_check','分裂',
+ 'md 台账','_is_md_table','摧毁结构','iface_mismatch','接口不匹配',
+ '未适配','现象可靠','原因正确','读代码','原因分解','观察假象',
+ 'INTERFACE_ADAPTERS','全参与','可信度','拦截率','覆盖率','汇总',
+ '静默 except','吞掉','打印失败','不传','根本不执行','推断','ENUMS',
+ '输入约束','行为事实','分母','98/98','skip','未闭合',
+ 'not_a_ledger','needs_external_input','物种','缺数据','在容差内',
+ '误杀','过度严格','双向验证','ENUMS_KIND','constraint','must_match',
+ '契约骨架','时序字段','抽帧','ffmpeg','路径参数','store_true',
+ '结构毒化','删键','值毒化','基线不干净','baseline_not_clean','测了个寂寞',
+ '完全接管','输入工件','合成视频','合成输入','门禁健康度','复刻完成度',
+ '101/101','skip 归零','顺序','init','prep','覆盖',
+ '强证据','弱证据','强证据率','strict','weak','测了个寂寞','基线干净',
+ '占位符','保留原值','清单项名','行身份','配对字段',
+ 'AST','literal_eval','ENUMS','白名单违例','合法枚举','fixture',
+ 'FIXTURE_OVERRIDES','strict_rate','VALID_OVERRIDE','match','yes','exact',
+ '目录完备型','weak_by_design','上限','没记全','自证循环','增量完备性',
+ '格式错配','_sniff','YAML','Markdown','CSV','写坏','毁文件','单列',
+ 'TODO','前缀','占位符','保留原值','口径冲突','evidence','7 级','未达标',
+ 'fault_matrix','install_contract','feature_matrix','game_replay',
+ '增量完备性','--completeness','单调下降','补齐一项','降一项','补满',
+ '永远无法满足','处置分布','误判','正常统计','缺失信号','TEXT_REPLACEMENTS',
+ '单元格内容','按列名','中文枚举','不适用','CATALOG','RESIDUE_LOCS',
+ '未打印','沿用上次值','抓不到','absent_zero_kw','平台期','模板已提及',
+ '删行','删行法','负结果','逐行校验','blocker 源','度量方向反',
+ '分类完备性','操作定义','基线无法干净','漏网风险','第三类','已封闭',
+ 'catalog-scan','候选题','只列候选','不下判定','真被遍历','真缺失统计',
+ '42 个脚本','统一采用','误记','记错','纠正','谨慎不能替代核实','待核',
+     '格式错配复核','format-audit','嗅探器','两个嗅探器','不一致','前 8 行',
+     '清单','写回','IsADirectoryError','isfile','毒化后崩溃','仍可解析',
+     '增量完备性','已合并写入','completeness','专用指标','格式分布',
+     '改瘦模板','catalog-probe','敏感型','不敏感型','基线变不干净','删一半',
+     '数据行 < 4','无法改瘦','探针覆盖度','全体覆盖度','11/98','没测',
+     '填充冒充毒化','真毒化','_poison_md','早就存在','自己没用',
+     '两阶段','毒化有效性','毒化无效','格式复核',
+     '合成改瘦','synthesize','复制成 6 行','idcol','回退到首列','exact_s3',
+     '假阳性','syn_dirty','重测基线','不适用','分类结论','不是覆盖盲区',
+     '关键词判不了','只能提示','假阴性','有效条目为 0','两种实现',
+     '维持 B','不升级','分类标签','固定清单','擅自升级',
+     '逐字符','字符串 tpl','No such file','静默失效','说明性门禁','noop',
+     '伪装成软警告','MANUAL_GATES','人工签字','问错对象','BinOp',
+     'literal_eval','某条路径','verify-guard','self-check','self-check-noop',
+     '不进 passed','不进 soft_warn','软警告 2→0','真命令',
+     '抽样模式','快速子集','limit','候选脚本','参与测试数 ≤',
+     '不写全量缓存','谎报全量','_j = None','except RuntimeError',
+     '固定字符数切片','截断','说明性门禁 0','从未执行','刻意不跑',
+     'self-check-limit',
+     '声称做了','代码里没有','回读代码','逐条核对','完成声明',
+     'assert-full','assert-no-pollute','full 口径','sampled 子对象',
+     '哨兵','真值字符串','not 判不出来','or 不会回退','未测',
+     '过时测量值','52 秒','3~5 分钟','守卫正确失败','先确认再改检查项',
+     '声明核实','claim_verify','scan-doc','声明清单','未兑现',
+     '文档有代码无','回读代码','正反两组','反例','假声明',
+     '让检查通过而改检查对象','忘了写清单','清单漏项',
+     '元规则','每轮结束前','不得声称完成',
+     'absent','防回退','必须不出现','verify-all','G383','claims_76',
+     '故意破坏','回退实测','反例选真实存在的串','空清单目录',
+     '说明行','docstring 行','仅在说明行命中','跳过 N 说明行',
+     'check-current','G384','有没有写清单','忘了写清单','cn2num',
+     '只扫标题行','下一轮计划','逐轮要求','require-since','claims_77',
+     '合并入口','--all','G385','DEFAULT_REQUIRE_SINCE','进程数',
+     '不再相互独立','漏跑','最小复现命令','刻意不删','claims_78',
+     'audit-all','自证循环','自打印标记','内容特征','ALL_CONTENT',
+     '段首','段尾','假的成功','第三次才成功','解耦','不看 rc','claims_79',
+     'check-content','G386','自校验','判据本身','存在性','唯一性',
+     'ALL_CONTENT_FN','坏尺子','措辞漂移','非独有','误报','漏报','claims_80',
+     'check-dup-cmds','G387','重复命令','刻意重复','误重复',
+     'INTENTIONAL_DUP_CMDS','逐个 ID','搭便车','粗粒度','claims_81',
+     'DUP_CMDS_GUARDIAN','相等性','完全相等','联动','完整性门禁',
+     '自己查自己','双向相等','中间态','临时编号','claims_82',
+     'guards','语义字段','存在但无关','子串匹配','自报 capability',
+     '三步','身份校验','claims_83',
+     'declare-capability','DECLARED_CAPABILITIES','双向声明','能力自报',
+     '自报撒谎','认错人','被动的巧合','主动的承诺','claims_84',
+     'probe-capability','CAPABILITY_PROBE','PROBE_OK','抽查','空函数',
+     '外部可观测副作用','claims_85',
+     'CAPABILITY_EFFECT','redirect_stdout','打印标记就走人','走个过场',
+     '文件系统产物','目录快照','规格说明','claims_86',
+     'CAPABILITY_ARTIFACT','generated_at_ns','运行前产物快照','产物未被重写',
+     '静默失效却不报错','只写个时间戳','claims_87',
+     'CAPABILITY_ARTIFACT_KEYS','产物在说谎','写对形状却写错值','独立真值',
+     '跨进程','一起错','claims_88',
+     'sub_cmds','跨进程取真值','合法域','不得当作真值','无法确认真跑过',
+     '入口路径','代码本身','另一套实现','边际收益递减','claims_89',
+     'chaos-full','_declare_capability','_probe_capability','低于下界',
+     '下界断言','量级','基线会被污染','外部锚点','claims_90',
+     'CAPABILITY_ANCHOR_FLOOR','外部锚点下界','没有正的锚点比率',
+     '台账型脚本数','误杀真实结果','同源性','claims_91',
+     '_anchor_denom','_ANCHOR_DENOM_MODE','CAPABILITY_ANCHOR_SPEC',
+     '不在合法域','未登记锚点','未登记合法域','值域锚点','claims_92',
+     'GATE_RC_DOMAIN','G388','cmd_check_rc_domain','不是 (0, 1)',
+     '常量被改值','自指','anchor_denom','claims_93',
+     '_scan_rc_domain','RC_DOMAIN_ALLOW','理由为空或过短','扫描范围',
+     '字面量相同','语义不同','语义豁免','claims_94',
+     '_load_rc_domain_allowlist','rc_domain_allowlist','豁免文件不存在',
+     '缺冒号','豁免清单不可读','外部化','claims_95'])
+CATS=[('A 流程与收工',['收工','不得声明','签字','批准','未读','未关闭','缺口','遗留','阶段','unknown','猜','受阻']),
+('B 取证与证据',['证据','取证','推测','推断','假设','源码','反编译','录像','截图','测量','不可复现','等级','采样','观测','实测']),
+('C 判定与偏离',['偏离','must-match','判定','分类','擅自','优化','改进','现代化','修复','清理','preserve','技术债']),
+('D 实现与迁移',['迁移','实现','引擎','默认','sanitize','clamp','统一','全局','抽象','合并','替换','重构','移植','写入规范','映射']),
+('E 体验细节',['手感','延迟','帧','相位','时序','音频','声音','输入','相机','动画','UI','反馈','沉默','提示','震动','纹理','渲染','画质','高亮','噪声','可见性','预览']),
+('F 门禁与脚本',['门禁','脚本','检查','校验','报告','CI','csv','表','字段','工具','封装','降级']),
+AE,
+('N 伪完成',['不能只','不只','不许只','不得只','仅靠','只靠','不能仅','只看','只比','只测','只写','只留','只记录','只迁移','只保存','只处理','只按']),
+('O 载体与权利',['触控','触点','pointerId','手势','摇杆','陀螺仪','模组','UGC','沙箱','内购','票据','权利','SIMD','ffast-math','AoS','SoA','缓存行','布局','WebView']),
+('P 意义层',['可辨','盲测','混淆矩阵','读出','听出','脚步','材质','威胁','步态','成长','变强','节拍','beat_clock','APM','坏味','穿模','梗','wiki','社群','高清化','Alt-Tab','焦点','多显示器','录屏','共享','多开']),
+('Q 确定性与顺序',['顺序','确定性','排序','索引','回滚','幂等','漏','事务','稳定','一致','权威','并发']),
+('R 认知与耐力',['心智地图','地标','捷径','迷路','垂直','后果','隐瞒','疲劳','习惯化','自动化','肌肉','注意力','耐力','上手','顿悟','包络','信任','归因','背锅','leaderboard','MVP','周目']),
+('S 推断层',['常识','符号','OOB','越界','穿墙','背面','天空盒','通道','伪因果','迷信','随机接口','RNG','可解释','counterfactual','静默失败','老化','校准','save_lineage','source_kind','撒谎']),
+('T 关系状态',['离开','弃坑','AFK','闲置','回归','断点','退出','未保存','第 N 次','第N次','幽灵','被砍','第一次','首通','初见','self_rules','笨拙','共谋','假选择','QTE','nostalgia','遗产','继承','缩略图','槽位','会话外']),
+('W 身份与时序',['同形','异质','instance_id','identity','身份','槽位','背包','方言','短语','intent','command','缓冲','取消窗口','无效输入','组合','接缝','惯例','WASD','Tank','键位','挂机','离线收益','失败演出','死亡动画','Game Over','稀缺','绝版','季节','服务器时间','seed_contract']),
+('X 社会层与版本地层',['教','传授','口传','攻略','直播','观战','假可玩','placebo','试玩','demo_only','教程临时','矿工','data_miner','速通','speedrunner','自动拆分','内存布局','PDB','RTTI','符号','日志格式','资源命名','地层','stratum','地区','日版','美版','欧版','构建哈希','载体','SKU','苦行','无伤','一级通关','challenge','个性化','称呼','玩家名','仪式性','绕路','不用传送','审美地层','代打','访客','旁观','继承契约']),
+('Y 外围层与身体接口',['启动器','launcher','覆盖层','overlay','成就面板','云存档','好友列表','通知中心','商店页','社区','工坊','workshop','排行榜','反作弊','DRM','模组管理器','Init','离线模式','自救','验证完整性','清缓存','回滚驱动','兼容模式','重装','方向盘','光枪','跳舞毯','街机','吉他','扭矩','力反馈','校准','客厅','电视','显示器','掌机','通勤','网吧','直播台','WCAG','元进度','照片模式','通关后','NG+','结局','EOS','GOG','账号合并']),
+('Z 生活层与文化层',['会话承诺','退出尾部','存档点','可暂停','闹钟','通勤','再来一局','生活接口污染','拟人','作弊','归因','PRD','pity','保底','隐藏分','MMR','透明度','文化','4 在','紫色','手势','历法','节气','笑点','区域变体','CLDR','LDML','ICU','翻译','排序稳定','平局','命名','截断','字节','emoji','双向文本','展示','删除权','去标识','receipt','分享码','精通','评级','遗忘','热身','第三空间','篝火','座椅','涂鸦','弱互动']),
+('AA 元协议层',['ping','emote','quick_chat','voice_macro','drawing','marker','signal_flare','radio','gesture','message_id','semantic_intent','intended_audience','ttl_policy','conflict_policy','径向轮盘','无线电','无语音','风险账本','commit_id','worst_case','irreversibility','confirmation_strength','preview_fidelity','risk_currency','行为记忆','observation_id','inference_rule','expires_at','opt_out','deletion_audit','被监视','黑箱读心','OpenAPI','JSON Schema','OpenTelemetry','surface_id','export_format','timezone','precision','坐标','混淆','加密','稀有度','tier_id','beam_duration','drop_delay','colorblind','通胀','认知地图','anchor_id','audio_landmark','light_direction','turning_signature','镜像','旋转','折叠空间','传送','沉默','unsaid_truth','discovery_channel','hint_authority','跨局','跨游戏','可携带','portable']),
+('AB 变体与载体层',['Demo','体验版','共享软件','Attract','投币','kiosk','评测版','sku','七态','继承','carry_over','勋章','奖杯','模式锁','platform_boundary','秘籍','cheat','testingcheats','作弊码','noclip','开发者菜单','调试控制台','IME','肩键','旁观','沙发','观众','代打','放映','字幕','on radio','无障碍','故事模式','辅助难度','说明书','纸质','布质','地图','折痕','回函卡','攻略本','OST','艺术集','包装','印刷','错字','错误画面','弹窗','请插入光盘','蓝屏','读盘','备份','存档槽','双写','Ludusavi','IPS','BPS','UPS','Asar','汉化','Romhack','制作人员','安装体积']),
+('AC 边缘状态层',['Kiosk','试玩机','展示机','展会','店员','后门键','看门狗','倒计时','续币','高分表','断电','贴纸','灯箱','投币口','键帽','磨平','防尘圈','烧残','手柄线','感谢试玩','水印','NOT FOR RESALE','禁运','反盗版','盗版','CD-KEY','序列号','0/O','1/I','B/8','G/6','激活','宽限','误报','区域锁','Insert Disc','多碟','换盘','Credits','署名','特别感谢','众筹','Kickstarter','支持者','勘误','滚动','跳过','原始团队','order_index','IGDA','Attract-Mode','Koala','Hawkthorne','verified','secondhand','unverified']),
+('AD 四路验收接入层',['统一时钟','sample_clock','build_id','构建矩阵','renderer','headless','baseline','整屏','逐帧','phase_match','pixelmatch','ODiff','Playwright','windowSize','mask','observed_durations','指纹','Chromaprint','audfprint','librosa','OLAF','Dejavu','LGPL','cross-correlation','切段','色卡','ArUco','CCTag','COLMAP','AliceVision','Meshroom','OpenCV','darktable','EXIF','measured LAB','camera pose','artifact_sha256','reviewer','SPDX','不可变','Mojira','评测版缺内容','盘面印刷','region code','self-test','端到端','合成真值','流水线']),
+('U 完成声明与诚实标注',['完成','声称','宣布','伪装','冒充','等效','近似','提交','通过','忽略','全仓','谎']),
+('V 存疑与不确定处置',['存疑','待确认','无法确定','看着像','先确认','无法识别','不确定','unknown','未验证','未核实','来源不确定']),
+('H 存档与状态',['存档','保存','读档','快照','状态','重置','复位','序列化']),
+('I 资产与资源',['资产','资源','贴图','模型','字体','二进制','素材','打包','依赖','许可']),
+('J 联机与信任',['联机','网络','同步','服务器','客户端','作弊']),
+('K 本地化与文本',['本地化','文本','文案','语言','翻译','字符串','语气','人格']),
+('L 无障碍',['无障碍','辅助','色盲','字幕','屏幕阅读']),
+('M 游戏系统',['战斗','AI','任务','对话','背包','商店','技能','经济','掉落','破坏','元素','绳索','物理','碰撞','关卡','教学','过场','奖励'])]
+def cls(t):
+    for n,kws in CATS:
+        for k in kws:
+            if re.search(k,t): return n
+    return 'Z 其他通用'
+b={}
+for f,i,t in items: b.setdefault(cls(t),[]).append((f,i,t))
+order=[c[0] for c in CATS]+['Z 其他通用']
+out=['# 禁令总表（只写"不能怎么做"）','','> **用途**：审核完成效果 · 约束边界。**正向"怎么做"见 `guide/`**。','',
+'> **来源**：自动抽取 `references/` · `method/` · `flow/` · `guide/` · `SKILL.md` 全文，去重后 **%d 条**。每条附**回溯行号**。'%len(items),
+'> ⚠️ 新增禁令请**先改源文档**再重跑抽取（`python3 scripts/_rebuild_ban.py`），**不要直接改本表**。','',
+'> 🔑 **优先看**：AE（执行层诚实性）· N（伪完成）· O · P · Q · R · S · T · W · X · Y · Z · AA · AB · AC · AD · U · V。','',
+'## 分布','','| 域 | 条数 |','|---|---|']
+for c in order: out.append(f'| **{c}** | {len(b.get(c,[]))} |')
+out.append('')
+for c in order:
+    v=b.get(c,[])
+    if not v: continue
+    out.append(f'\n---\n\n## {c}（{len(v)} 条）\n')
+    for f,i,t in v: out.append(f'- {t}  \n  <sub>↩ `{f}:{i}`</sub>')
+open('audit/01-禁令总表.md','w',encoding='utf-8').write('\n'.join(out)+'\n')
+print("AE:",len(b.get('AE 执行层诚实性',[])),"/ 总:",len(items))

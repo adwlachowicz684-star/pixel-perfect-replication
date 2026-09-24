@@ -1,0 +1,24 @@
+# 第八十五轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**抽查**（防"自报撒谎"）
+
+# ① 声明的能力必须登记实现入口
+grep:scripts/claim_verify.py::CAPABILITY_PROBE
+grep:scripts/claim_verify.py::def cmd_probe_capability
+cmd:claim_verify.py --probe-capability audit-all
+# ② 关键报错串
+grep:scripts/claim_verify.py::自报撒谎
+grep:scripts/claim_verify.py::PROBE_OK
+# ③ 门禁侧抽查
+# 🔑 第八十三轮已发现的规律：清单**只引代码标识符**，不引注释文案。
+grep:scripts/run_all_gates.py::not in pp.stdout
+grep:scripts/run_all_gates.py::真跑 rc=0 且输出 PROBE_OK
+# ④ 既有能力仍工作
+cmd:claim_verify.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ⑤ 历史清单不得被误删
+file:ledger/claims_82.txt
+file:ledger/claims_83.txt
+file:ledger/claims_84.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

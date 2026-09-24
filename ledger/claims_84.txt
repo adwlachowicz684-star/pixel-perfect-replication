@@ -1,0 +1,22 @@
+# 第八十四轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**能力自报**（从子串匹配升级为双向声明）
+
+# ① 脚本侧：声明的能力常量 + 自报入口
+grep:scripts/claim_verify.py::DECLARED_CAPABILITIES
+grep:scripts/claim_verify.py::def cmd_declare_capability
+cmd:claim_verify.py --declare-capability
+# ② 门禁侧：双向声明校验
+grep:scripts/run_all_gates.py::双向声明校验
+grep:scripts/run_all_gates.py::双向声明不一致
+grep:scripts/run_all_gates.py::无法做双向声明校验
+# ③ 既有能力仍工作
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+cmd:claim_verify.py --audit-all
+cmd:claim_verify.py --check-content
+# ④ 历史清单不得被误删
+file:ledger/claims_81.txt
+file:ledger/claims_82.txt
+file:ledger/claims_83.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

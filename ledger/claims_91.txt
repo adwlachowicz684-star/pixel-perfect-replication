@@ -1,0 +1,24 @@
+# 第九十一轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**外部锚点下界**（防基线被污染）
+
+# ① 外部锚点实现（只引代码标识符）
+grep:scripts/gate_chaos.py::CAPABILITY_ANCHOR_FLOOR
+grep:scripts/gate_chaos.py::没有正的锚点比率
+grep:scripts/gate_chaos.py::锚点下界算出来为
+grep:scripts/gate_chaos.py::_scripts()
+# ② 关键报错串
+grep:scripts/gate_chaos.py::疑似写假值
+grep:scripts/gate_chaos.py::锚点
+# ③ 既有能力仍工作
+cmd:gate_chaos.py --declare-capability
+cmd:claim_verify.py --declare-capability
+cmd:claim_verify.py --probe-capability audit-all
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_88.txt
+file:ledger/claims_89.txt
+file:ledger/claims_90.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
+file:scripts/gate_chaos.py

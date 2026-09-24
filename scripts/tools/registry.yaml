@@ -1,0 +1,5935 @@
+# 外部工具登记表 —— 收集到的工具都在这里，按需调用
+#
+# **为什么需要**：前几轮收集了上百个工具，但只写在文档里等于没有。
+# 本表让每个工具变成**可调用、可检测、可降级**的能力。
+#
+# **⚠️ 身份校验（最重要的一条）**：
+# `which sg` 命中的是 Unix 的 `sg`（set group ID）命令，它可执行但没有 `scan` 子命令
+# —— 只查"命令存在"会得到**永远 0 命中却显示成功**的假工具。
+# 所以每个工具必须配 `identity`：用 `--version` 输出特征 + 子命令双重校验。
+#
+# 缺失时行为：`degrade` 字段决定。
+#   必需 → 标 confidence=low 并进 unknown
+#   可选 → 标 skipped 并提示
+# **任何情况下不得静默跳过。**
+
+version: 1
+
+# 校验命令模板：{exe} 会替换为可执行名
+defaults:
+  timeout: 120
+  on_missing: "degrade        # degrade | fail | skip"
+
+tools:
+
+  # ---------- 文本排版（语义证据层 A）----------
+  harfbuzz:
+    name: HarfBuzz
+    kind: cli
+    repo: harfbuzz/harfbuzz
+    license: MIT
+    purpose: 文本 shaping 金标准（L1 字形簇合同：glyph/cluster/advance）
+    exe: hb-shape
+    identity:
+      version_args: [--version]
+      version_contains: [harfbuzz, HarfBuzz]
+      subcommand: --help
+    install:
+      apt: apt-get install -y harfbuzz-bin
+      brew: brew install harfbuzz
+      pip: pip install uharfbuzz
+    wrapper: tools/harfbuzz_shape.py
+    produces: ledger/glyphs.json
+    evidence_level: A
+    degrade: required
+    note: 自身不含 hinting；hinted rasterization 交给 FreeType/Skrifa
+
+  freetype:
+    name: FreeType
+    kind: cli
+    repo: freetype/freetype2
+    license: FTL/GPLv2+
+    purpose: hinting / gamma / LCD filter / stem darkening → 字形外观
+    exe: freetype-config
+    identity:
+      version_args: [--version]
+      version_contains: [freetype]
+    install:
+      apt: apt-get install -y libfreetype6-dev
+    produces: font_lock 证据
+    evidence_level: B
+    degrade: optional
+
+  # ---------- 树对齐与差异（A/C）----------
+  gumtree:
+    name: GumTree
+    kind: cli
+    repo: GumTreeDiff/gumtree
+    license: AGPL-3.0（**注意：AGPL，商业项目需法务确认**）
+    purpose: 树 diff，识别 move / rename / insert / delete（L3 结构细化）
+    exe: gumtree
+    identity:
+      version_args: [--version]
+      version_contains: [gumtree, GumTree]
+      subcommand: difftree
+    install:
+      manual: 下载 https://github.com/GumTreeDiff/gumtree/releases
+    wrapper: tools/gumtree_diff.py
+    produces: ledger/tree_edit_ops.json
+    evidence_level: A
+    degrade: optional
+    note: 借鉴三阶段算法；语言 parser 与 UI 树非一一对应，不原样当真值
+
+  apted:
+    name: APTED
+    kind: cli
+    repo: DatabaseGroup/apted
+    license: MIT
+    purpose: 树编辑距离与 node mapping（L4，仅未匹配连通块）
+    exe: python3
+    identity:
+      version_args: [-c, "import apted; print('APTED_OK')"]
+      version_contains: [APTED_OK]
+    install:
+      pip: pip install apted
+    produces: 编辑距离与映射
+    evidence_level: A
+    degrade: optional
+
+  odiff:
+    name: odiff
+    kind: cli
+    repo: dmtrKovalenko/odiff
+    license: MIT
+    purpose: 图像 diff，抗锯齿识别 / 区域忽略 / YIQ 阈值
+    exe: odiff
+    identity:
+      version_args: [--version]
+      subcommand: --help
+    install:
+      npm: npm i -g odiff-bin
+    wrapper: tools/odiff_image.py
+    produces: ledger/image_diff.json
+    evidence_level: B
+    degrade: optional
+    note: "**抗锯齿忽略是候选分类，不是默认豁免**"
+
+  # ---------- 不变量与差分（B/C）----------
+  daikon:
+    name: Daikon
+    kind: cli
+    repo: plse-cs-uw/daikon
+    license: MIT（BSD 风格）
+    purpose: 动态不变量检测 —— 原版运行时值序列 → 候选不变量清单
+    exe: java -cp daikon.jar daikon.Daikon
+    identity:
+      version_args: [--version]
+      version_contains: [daikon, Daikon]
+    install:
+      manual: https://plse.cs.washington.edu/daikon/download/
+    wrapper: tools/daikon_invariants.py
+    produces: ledger/invariants.txt
+    evidence_level: A
+    degrade: optional
+    note: "**输出是候选不是证明**；须以驱动覆盖率为置信度分母"
+    related:
+      celeriac: codespecs/daikon-dot-net-front-end（.NET 前端，C#/F#/VB）
+
+  difftest:
+    name: difftest
+    kind: cli
+    repo: nalediym/difftest
+    license: MIT
+    purpose: 同输入跑两程序，比对 stdout/exit/stderr
+    exe: difftest
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install difftest
+    produces: 成对输出 diff
+    evidence_level: A
+    degrade: optional
+
+  # ---------- 网络与故障注入（C）----------
+  toxiproxy:
+    name: Toxiproxy
+    kind: cli
+    repo: Shopify/toxiproxy
+    license: MIT
+    purpose: 传输层故障注入 latency/down/timeout/slicer/limit_data…
+    exe: toxiproxy-server
+    identity:
+      version_args: [--version]
+    install:
+      brew: brew install shopify/shopify/toxiproxy
+      go: go install github.com/Shopify/toxiproxy/cmd/toxiproxy-server@latest
+    wrapper: tools/toxiproxy_fault.py
+    produces: ledger/network_faults.json
+    evidence_level: A
+    degrade: optional
+    note: "**不能**模拟 NTFS ACL、磁盘配额、独占锁、COM；那是 Detours/IO shim 的活"
+
+  mitmproxy:
+    name: mitmproxy
+    kind: cli
+    repo: mitmproxy/mitmproxy
+    license: MIT
+    purpose: HTTP/1/2/WS 拦截、录制、重放、addon 故障注入（内容层）
+    exe: mitmproxy
+    identity:
+      version_args: [--version]
+      version_contains: [mitmproxy]
+    install:
+      pip: pip install mitmproxy
+    produces: captures/*.flow
+    evidence_level: A
+    degrade: optional
+    note: 与 Toxiproxy 分层 —— **互相不能替代**
+
+  libfiu:
+    name: libfiu
+    kind: cli
+    repo: blitiri/libfiu
+    license: MIT/BSD
+    purpose: POSIX 故障注入，LD_PRELOAD + errno，fiu-ctrl 运行时启停
+    exe: fiu-run
+    identity:
+      version_args: [--version]
+    install:
+      apt: apt-get install -y fiu-utils
+    wrapper: tools/fiu_fault.py
+    produces: ledger/posix_faults.json
+    evidence_level: A
+    degrade: optional
+    note: 仅 Linux/macOS；Windows 端用 Detours 或自有 IO shim 建等价层
+
+  # ---------- 原版取证（S0）----------
+  flaui:
+    name: FlaUI
+    kind: cli
+    repo: FlaUI/FlaUI
+    license: MIT
+    purpose: 原版 WPF 控件树驱动（UIA 封装）
+    exe: dotnet
+    identity:
+      version_args: [--version]
+      version_contains: [dotnet, ., NET]
+    install:
+      manual: NuGet FlaUI（Windows）
+    produces: original_capture/<state_id>.uia.json
+    evidence_level: A
+    degrade: required
+    note: 与 pywinauto 不一致 → 标 tree_conflict，**不自动选边**
+
+  pywinauto:
+    name: pywinauto
+    kind: cli
+    repo: pywinauto/pywinauto
+    license: BSD-3
+    purpose: 原版驱动交叉验证
+    exe: python3
+    identity:
+      version_args: [-c, "import pywinauto; print('PYWINAUTO_OK')"]
+      version_contains: [PYWINAUTO_OK]
+    install:
+      pip: pip install pywinauto
+    produces: 控件树（交叉验证）
+    evidence_level: B
+    degrade: optional
+
+  ilspycmd:
+    name: ilspycmd
+    kind: cli
+    repo: icsharpcode/ILSpy
+    license: MIT
+    purpose: .NET 反编译（**源码不全才启用**）
+    exe: ilspycmd
+    identity:
+      version_args: [--version]
+      version_contains: [ilspy, ILSpy]
+    install:
+      dotnet: dotnet tool install -g ilspycmd
+    produces: 反编译源码
+    evidence_level: B
+    degrade: optional
+    note: "**仅限合法拥有且授权的目标**；遇加密/DRM/许可证校验停止并咨询法务"
+
+  # ---------- 图像与资源（F）----------
+  resvg:
+    name: resvg
+    kind: cli
+    repo: linebender/resvg
+    license: MPL-2.0（**注意：非 MIT**）
+    purpose: SVG 确定性位图渲染
+    exe: resvg
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install resvg
+    wrapper: tools/resvg_render.py
+    produces: 基准位图（须记版本/DPI/背景/CSS/shaping 后端）
+    evidence_level: A
+    degrade: optional
+
+  imagemagick:
+    name: ImageMagick
+    kind: cli
+    repo: ImageMagick/ImageMagick
+    license: ImageMagick License
+    purpose: 图像转换、ICO 生成、比对
+    exe: magick
+    identity:
+      version_args: [--version]
+      version_contains: [ImageMagick]
+    install:
+      apt: apt-get install -y imagemagick
+    produces: 转换产物
+    evidence_level: C
+    degrade: optional
+
+  # ---------- 视频与动效 ----------
+  vmaf:
+    name: VMAF
+    kind: cli
+    repo: Netflix/vmaf
+    license: BSD-2
+    purpose: 感知视频质量（VIF/ADM/Motion/SSIM/MS-SSIM/CIEDE2000）
+    exe: vmaf
+    identity:
+      version_args: [--version]
+    install:
+      manual: 需编译 FFmpeg --enable-libvmaf
+    wrapper: tools/vmaf_quality.py
+    produces: 逐帧质量序列
+    evidence_level: B
+    degrade: optional
+    note: 回答"看起来多像"，**不能定位缺失按钮或错误焦点顺序**
+
+  ffmpeg:
+    name: FFmpeg
+    kind: cli
+    repo: FFmpeg/FFmpeg
+    license: LGPL/GPL
+    purpose: 抽帧、时间基对齐、转码
+    exe: ffmpeg
+    identity:
+      version_args: [-version]
+      version_contains: [ffmpeg]
+    install:
+      apt: apt-get install -y ffmpeg
+    produces: 帧集
+    evidence_level: A
+    degrade: optional
+
+  # ---------- 私有格式（E）----------
+  kaitai:
+    name: Kaitai Struct
+    kind: cli
+    repo: kaitai-io/kaitai_struct
+    license: GPLv3（compiler）/ MIT（runtime 部分）
+    purpose: 声明式 .ksy → 多语言 parser；私有格式考古
+    exe: ksc
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://kaitai.io/#download
+    wrapper: tools/kaitai_probe.py
+    produces: 解析结果 + round-trip 校验
+    evidence_level: A
+    degrade: optional
+    note: 验收要求 **round-trip 与原字节相等**；证据不足标 schema_inferred
+
+  # ---------- 崩溃（E）----------
+  minidump_stackwalk:
+    name: rust-minidump
+    kind: cli
+    repo: rust-minidump/rust-minidump
+    license: MIT/Apache-2.0
+    purpose: minidump 解析与符号化
+    exe: minidump-stackwalk
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install minidump-stackwalk
+    wrapper: tools/minidump_crash.py
+    produces: 归一化崩溃签名
+    evidence_level: B
+    degrade: optional
+    note: "**不比调用栈**（跨语言无相同函数）；比签名/阶段/输入/状态/恢复"
+
+  # ---------- 代码查询（S2M）----------
+  ast_grep:
+    name: ast-grep
+    kind: cli
+    repo: ast-grep/ast-grep
+    license: MIT
+    purpose: AST 精确查询（补正则的漏）
+    exe: sg
+    identity:
+      version_args: [--version]
+      version_contains: [ast-grep]
+      subcommand: scan
+    install:
+      cargo: cargo install ast-grep
+      npm: npm i -g @ast-grep/cli
+    wrapper: (已有 scripts/ast_query.py)
+    produces: ledger/findings.json
+    evidence_level: A
+    degrade: optional
+    note: ⚠️ **Unix 自带 `sg`（set group ID）命令会冒充** —— 必须校验身份
+
+  semgrep:
+    name: Semgrep
+    kind: cli
+    repo: semgrep/semgrep
+    license: LGPL-2.1
+    purpose: 语义模式查询
+    exe: semgrep
+    identity:
+      version_args: [--version]
+      version_contains: [semgrep]
+    install:
+      pip: pip install semgrep
+    produces: 查询结果
+    evidence_level: B
+    degrade: optional
+
+  jscpd:
+    name: jscpd
+    kind: cli
+    repo: kucherenko/jscpd
+    license: MIT
+    purpose: 多语言克隆检测（Type-1/2/3）
+    exe: jscpd
+    identity:
+      version_args: [--version]
+    install:
+      npm: npm i -g jscpd
+    wrapper: tools/jscpd_clone.py
+    produces: ledger/clones.json
+    evidence_level: B
+    degrade: optional
+    note: 目标是**发现历史分叉**，不是单纯删重复；单一哈希不得决定合并
+
+  # ---------- 安装与打包（D）----------
+  velopack:
+    name: Velopack
+    kind: cli
+    repo: velopack/velopack
+    license: MIT
+    purpose: Windows 安装包与更新（比 Omaha 更适合复刻）
+    exe: vpk
+    identity:
+      version_args: [--version]
+    install:
+      dotnet: dotnet tool install -g vpk
+    produces: 安装包 + Update.exe
+    evidence_level: B
+    degrade: optional
+
+  wix:
+    name: WiX Toolset
+    kind: cli
+    repo: wixtoolset/wix
+    license: MS-RL / WiX 许可
+    purpose: "**安装契约源码**（不是临时打包脚本）"
+    exe: wix
+    identity:
+      version_args: [--version]
+    install:
+      dotnet: dotnet tool install -g wix
+    produces: MSI
+    evidence_level: B
+    degrade: optional
+    note: 开始菜单 shortcut 需 Shortcut + RemoveFolder + KeyPath，否则卸载残留
+
+  # ---------- 编排与可复现（第七轮 A）----------
+  taskfile:
+    name: Task
+    kind: cli
+    repo: go-task/task
+    license: MIT
+    purpose: 任务编排（比 Make 易读，比 Bazel 轻）
+    exe: task
+    identity:
+      version_args: [--version]
+      version_contains: [Task, task]
+      subcommand: --list
+    install:
+      brew: brew install go-task/tap/go-task
+    produces: 可复现流水线
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 某些发行版有同名 `task`（taskwarrior）—— 必须校验身份
+
+  mise:
+    name: mise-en-place
+    kind: cli
+    repo: jdx/mise
+    license: MIT
+    purpose: 工具版本固定（比 asdf 快，支持 .mise.toml）
+    exe: mise
+    identity:
+      version_args: [--version]
+      version_contains: [mise]
+    install:
+      brew: brew install mise
+    produces: 锁定工具版本
+    evidence_level: C
+    degrade: optional
+
+  duckdb:
+    name: DuckDB
+    kind: cli
+    repo: duckdb/duckdb
+    license: MIT
+    purpose: 证据检索层 —— 上万条 JSON/CSV 直接 SQL 查询
+    exe: duckdb
+    identity:
+      version_args: [--version]
+      version_contains: [DuckDB, duckdb, v]
+    install:
+      pip: pip install duckdb
+    wrapper: tools/duckdb_evidence.py
+    produces: 证据查询与对账
+    evidence_level: C
+    degrade: optional
+    note: 嵌入式、零依赖；比 SQLite 更适合"直接查 Parquet/CSV/JSON"
+
+  sqlite_fts:
+    name: SQLite FTS5
+    kind: cli
+    repo: sqlite/sqlite
+    license: Public Domain
+    purpose: 全文检索证据（文案、BUG、unknown）
+    exe: sqlite3
+    identity:
+      version_args: [--version]
+      version_contains: [SQLite]
+    install:
+      apt: apt-get install -y sqlite3
+    produces: 证据索引
+    evidence_level: C
+    degrade: optional
+
+  cosign:
+    name: cosign
+    kind: cli
+    repo: sigstore/cosign
+    license: Apache-2.0
+    purpose: 产物签名（golden、安装包、证据包）
+    exe: cosign
+    identity:
+      version_args: [version]
+      subcommand: sign
+    install:
+      go: go install github.com/sigstore/cosign/v2/cmd/cosign@latest
+    produces: 签名与验证
+    evidence_level: A
+    degrade: optional
+    note: 与 Rekor 透明日志配合 → 签字可追溯、不可抵赖
+
+  # ---------- 差异报告与可视化（第七轮 D）----------
+  difftastic:
+    name: difftastic
+    kind: cli
+    repo: Wilfred/difftastic
+    license: MIT
+    purpose: 语法感知 diff（比行级 diff 少大量噪声）
+    exe: difft
+    identity:
+      version_args: [--version]
+      version_contains: [difftastic]
+    install:
+      cargo: cargo install difftastic
+    produces: 结构化 diff
+    evidence_level: C
+    degrade: optional
+    note: 呼应"Myers/Unified 行级 diff 对重排/移动产生噪声"的拒绝项
+
+  # ---------- 多模态（第七轮 F）----------
+  tesseract:
+    name: Tesseract OCR
+    kind: cli
+    repo: tesseract-ocr/tesseract
+    license: Apache-2.0
+    purpose: 从截图反推文案（**拿不到源码时的候选证据**）
+    exe: tesseract
+    identity:
+      version_args: [--version]
+      version_contains: [tesseract]
+    install:
+      apt: apt-get install -y tesseract-ocr
+    wrapper: tools/ocr_text.py
+    produces: 候选文案
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **OCR 结果只能作候选**，不能替代源码文案清单；须人工确认
+
+  # ---------- 编排与环境（第七轮 A，续）----------
+  devbox:
+    name: Devbox
+    kind: cli
+    repo: jetify-com/devbox
+    license: Apache-2.0
+    purpose: 宿主外工具与服务隔离（Nix 的友好包装）
+    exe: devbox
+    identity:
+      version_args: [version]
+      version_contains: [devbox]
+    install:
+      manual: curl -fsSL https://get.jetify.com/devbox | bash
+    produces: devbox.json / 隔离 shell
+    evidence_level: C
+    degrade: optional
+    note: 语言运行时用 mise，**宿主外工具与服务**用 devbox；Nix 仍负责二进制级可复现，不被替换
+
+  earthly:
+    name: Earthly
+    kind: cli
+    repo: earthly/earthly
+    license: MPL-2.0（**非 MIT**）
+    purpose: 容器化隔离构建/度量步骤
+    exe: earthly
+    identity:
+      version_args: [--version]
+      version_contains: [earthly]
+    install:
+      brew: brew install earthly
+    produces: Earthfile 目标与产物
+    evidence_level: C
+    degrade: optional
+    note: 只接管**需要干净容器**的步骤（Windows UI 采集、字体渲染、ICU/时区、视频编码）
+
+  # ---------- 签字与不可抵赖（第七轮 C）----------
+  rekor:
+    name: Rekor
+    kind: cli
+    repo: sigstore/rekor
+    license: Apache-2.0
+    purpose: 透明日志 —— 签字可追溯、不可抵赖
+    exe: rekor
+    identity:
+      version_args: [version]
+      subcommand: verify
+    install:
+      go: go install github.com/sigstore/rekor/cmd/rekor-cli@latest
+    produces: 透明日志条目（含 inclusion proof）
+    evidence_level: A
+    degrade: optional
+    note: 签的是 **manifest digest**，不是"某个看起来相同的网页"；任一证据哈希变化则签名失效
+
+  immudb:
+    name: immudb
+    kind: cli
+    repo: codenotary/immudb
+    license: Apache-2.0
+    purpose: 防篡改只增数据库（不信任存储或不能共用公网 Rekor 时）
+    exe: immudb
+    identity:
+      version_args: [version]
+    install:
+      manual: https://docs.immudb.io/
+    produces: 带密码学证明的状态
+    evidence_level: A
+    degrade: optional
+    note: 仅少量关键批准用 cosign+rekor 即可；批准事件持续进入内部系统才上 immudb
+
+  git_appraise:
+    name: git-appraise
+    kind: cli
+    repo: google/git-appraise
+    license: Apache-2.0
+    purpose: 离线评审历史（Git notes 存储，无需服务器）
+    exe: git-appraise
+    identity:
+      version_args: [--help]
+    install:
+      go: go install github.com/google/git-appraise@latest
+    produces: 评审记录
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 最新发布停留在 2021，且 accept 不提供签名/防删除 —— **只作历史记录层**，不能单独承担防抵赖
+
+  # ---------- 报告（第七轮 D）----------
+  allure:
+    name: Allure Report
+    kind: cli
+    repo: allure-framework/allure2
+    license: Apache-2.0
+    purpose: 可归档的逐张视觉验收报告（step/timing/attachment/metadata）
+    exe: allure
+    identity:
+      version_args: [--version]
+      version_contains: [allure]
+    install:
+      brew: brew install allure
+    produces: 静态 HTML 报告
+    evidence_level: C
+    degrade: optional
+    note: 比自建 Markdown 更适合承载"逐控件/逐状态/逐视口"的证据；**报告与附件目录分离**
+
+  vitepress:
+    name: VitePress
+    kind: cli
+    repo: vuejs/vitepress
+    license: MIT
+    purpose: 报告静态站点（base 可设相对路径，产物可迁移）
+    exe: vitepress
+    identity:
+      version_args: [--version]
+    install:
+      npm: npm i -D vitepress
+    produces: 静态站点
+    evidence_level: C
+    degrade: optional
+    note: 大型交互站才用 Docusaurus；**报告只引用内容寻址附件**，禁止把数 GB 截图编码进 HTML
+
+  # ---------- 多模态与数据（第七轮 E/F/G）----------
+  rrweb:
+    name: rrweb
+    kind: cli
+    repo: rrweb-io/rrweb
+    license: MIT
+    purpose: Web 端会话录制与回放（**仅复刻后的 WebView**）
+    exe: python3 -c "print('rrweb 是 JS 库，非 CLI')"
+    identity:
+      version_args: [-c, "print('RRWEB_INFO')"]
+      version_contains: [RRWEB_INFO]
+    install:
+      npm: npm i rrweb
+    produces: 事件流
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **rrweb 不能直接录制 Win32/WPF** —— 原版证据仍靠 FlaUI 自动化日志
+
+  presidio:
+    name: Microsoft Presidio
+    kind: cli
+    repo: microsoft/presidio
+    license: MIT
+    purpose: PII 识别与脱敏（测试真实数据前的降风险手段）
+    exe: python3
+    identity:
+      version_args: [-c, "import presidio_analyzer; print('PRESIDIO_OK')"]
+      version_contains: [PRESIDIO_OK]
+    install:
+      pip: pip install presidio-analyzer presidio-anonymizer
+    produces: 脱敏映射与验证报告
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 官方明确**不能保证找出全部 PII**；须走"自动识别→人工复核→替换→签名"流程
+
+  faker:
+    name: Faker
+    kind: cli
+    repo: joke2k/faker
+    license: MIT
+    purpose: 合成测试数据（姓名/地址/日期/路径）
+    exe: python3
+    identity:
+      version_args: [-c, "import faker; print('FAKER_OK')"]
+      version_contains: [FAKER_OK]
+    install:
+      pip: pip install faker
+    produces: 合成数据
+    evidence_level: C
+    degrade: optional
+    note: 合成分布**不能证明**原版对边界值/历史脏数据/本地化格式的行为正确
+
+  weblate:
+    name: Weblate
+    kind: cli
+    repo: WeblateOrg/weblate
+    license: GPLv3
+    purpose: 翻译协作与评审（**不是自动翻译**）
+    exe: weblate
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://docs.weblate.org/
+    produces: 翻译与评审记录
+    evidence_level: C
+    degrade: optional
+    note: 文案复刻应**先做结构化清单**；伪本地化须用确定性脚本，**不能用 LLM 改写替代原文证据**
+
+  # ================= 游戏引擎复刻（新增场景）=================
+  # 注：游戏场景的核心差异是"确定性 + GPU + 固定时间步"，
+  #     以下工具都服务于"把不可见状态变成验收对象"。
+
+  # ---------- A 确定性 / 回放 / desync ----------
+  libtas:
+    name: libTAS
+    kind: cli
+    repo: clementgallet/libTAS
+    license: GPLv3
+    purpose: "**原生 Linux 游戏**确定性录制回放（LD_PRELOAD 注入，帧边界同步输入）"
+    exe: libTAS
+    identity:
+      version_args: [--version]
+      version_contains: [libTAS]
+    install:
+      apt: apt-get install -y libtas
+    wrapper: (见 scripts/game_replay.py)
+    produces: .ltm 影片（配置+输入+元数据）、savestate、逐帧推进
+    evidence_level: A
+    degrade: optional
+    note: "拦截 XCB/SDL/Xlib、OpenGL、Vulkan、ALSA、**时钟**、线程、文件操作； 初始系统时间写进影片。⚠️ 回放失败≠游戏逻辑错误，可能是注入/驱动/容器问题"
+
+  bizhawk:
+    name: BizHawk
+    kind: cli
+    repo: TASEmulators/BizHawk
+    license: MIT
+    purpose: 多系统模拟器，输入录制/无限 savestate/逐帧编辑(TAStudio)/Lua 脚本
+    exe: EmuHawk
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://tasvideos.org/BizHawk/ReleaseHistory
+    produces: 影片 + 内存状态
+    evidence_level: A
+    degrade: optional
+    note: 价值在**可重录与平台级确定性**，不只是多模拟器；回放依赖精确核心+机器状态+输入+起始条件
+
+  ggpo:
+    name: GGPO
+    kind: reference
+    repo: poncet/ggpo
+    license: MIT
+    purpose: 回滚网络 —— **确定性要求的完整工程表达**
+    exe: (库，非 CLI)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/pond3r/ggpo
+    produces: 网络同步
+    evidence_level: A
+    degrade: optional
+    note: 要求 save/load_game_state + advance_frame。**即使不做联网也应实现同样的本地回放与重模拟**
+
+  jolt:
+    name: Jolt Physics
+    kind: reference
+    repo: jrouwe/JoltPhysics
+    license: MIT
+    purpose: 确定性物理（含 `CROSS_PLATFORM_DETERMINISTIC` 与 Check Determinism 模式）
+    exe: (库，非 CLI)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/jrouwe/JoltPhysics
+    produces: 物理状态（可 SaveState）
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 跨编译器/OS/架构需**相同源码定义+precise 模式+一致 FPU/DAZ/FTZ+Sin/Cos+排序哈希**； **SaveState 只记物理修改的位置速度** —— 摩擦改动/增删物体/约束触发须自行恢复"
+
+  box2d:
+    name: Box2D
+    kind: reference
+    repo: erincatto/box2d
+    license: MIT
+    purpose: 2D 物理，官方给出跨平台确定性条件
+    exe: (库，非 CLI)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/erincatto/box2d
+    produces: 物理状态
+    evidence_level: B
+    degrade: optional
+    note: "避免 fast-math、关 FMA（`-ffp-contract=off`）、替换平台不同 `atan2f`； 三角函数仍须谨慎"
+
+  # ---------- B GPU 渲染取证 ----------
+  renderdoc:
+    name: RenderDoc
+    kind: cli
+    repo: baldurk/renderdoc
+    license: MIT
+    purpose: "**交互式单帧取证**（原版渲染事实源）"
+    exe: renderdoccmd
+    identity:
+      version_args: [--version]
+      version_contains: [renderdoc, RenderDoc]
+      subcommand: capture
+    install:
+      apt: apt-get install -y renderdoc
+    wrapper: (见 scripts/game_render.py)
+    produces: .rdc 帧捕获（可跨平台共享）
+    evidence_level: A
+    degrade: required
+    note: 支持 Vulkan/D3D11-12/GL-ES；有 Python 接口。F12 捕获下一帧
+
+  gfxreconstruct:
+    name: GFXReconstruct
+    kind: cli
+    repo: LunarG/gfxreconstruct
+    license: Apache-2.0
+    purpose: Vulkan layer / D3D12 录制 API 调用 → `.gfxr` **可重放**（CI 首选）
+    exe: gfxrecon-capture
+    identity:
+      version_args: [--version]
+      version_contains: [gfxrecon]
+    install:
+      manual: https://github.com/LunarG/gfxreconstruct
+    produces: .gfxr（可 info/compress/extract SPIR-V/convert JSONL）
+    evidence_level: A
+    degrade: optional
+    note: "**自动化回放首选**，与 RenderDoc 互补（后者偏交互式单帧分析）"
+
+  apitrace:
+    name: apitrace
+    kind: cli
+    repo: apitrace/apitrace
+    license: MIT
+    purpose: 老 OpenGL/D3D 工作流 API 录制回放，可脚本化 diff、无头测试
+    exe: apitrace
+    identity:
+      version_args: [--version]
+    install:
+      apt: apt-get install -y apitrace
+    produces: .trace
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ 帧内资源检查不如 RenderDoc，**不得冒充 RenderDoc**
+
+  spirv_cross:
+    name: SPIRV-Cross
+    kind: cli
+    repo: KhronosGroup/SPIRV-Cross
+    license: Apache-2.0
+    purpose: SPIR-V 反转为可读 GLSL/MSL/HLSL 与 C++ 反射 JSON
+    exe: spirv-cross
+    identity:
+      version_args: [--version]
+      version_contains: [SPIRV-Cross]
+    install:
+      manual: https://github.com/KhronosGroup/SPIRV-Cross
+    produces: 可读着色器 + 反射
+    evidence_level: A
+    degrade: optional
+    note: 着色器取证要**从字节流回到可读语义**；记 dxc/FXC 版本、优化级别、签名
+
+  mesa_llvmpipe:
+    name: Mesa llvmpipe / lavapipe
+    kind: cli
+    repo: mesa/mesa
+    license: MIT
+    purpose: "**软件渲染基线**（消除 GPU 噪声）"
+    exe: glxinfo
+    identity:
+      version_args: [-B]
+      version_contains: [mesa, Mesa, OpenGL]
+    install:
+      apt: apt-get install -y mesa-utils libgl1-mesa-dri
+    produces: 可重复渲染结果
+    evidence_level: A
+    degrade: required
+    note: "没有软渲染基线就**无法区分游戏错误与驱动/GPU 差异**； llvmpipe=GL，lavapipe=Vulkan"
+
+  # ---------- C 匹配式反编译 ----------
+  decompme:
+    name: decomp.me
+    kind: reference
+    repo: decompme/decomp.me
+    license: MIT
+    purpose: 协作式**函数匹配**服务（重编译并用 objdump 比较指令，给匹配分数）
+    exe: (Web 服务 + CLI 导出)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://decomp.me
+    produces: matching / non-matching 状态与匹配率
+    evidence_level: A
+    degrade: optional
+    note: ⚠️ matching=生成汇编一致；**equivalent 只有语义测试/形式化边界/契约证据充分时才用**
+
+  splat:
+    name: splat
+    kind: cli
+    repo: decompals/splat
+    license: MIT
+    purpose: 二进制切分，输出符号/段/目标汇编/上下文
+    exe: splat
+    identity:
+      version_args: [--help]
+    install:
+      pip: pip install splat64
+    produces: 汇编与符号
+    evidence_level: A
+    degrade: optional
+    note: "当前明确支持 **N64 / PSX / PS2 / PSP**；GameCube/Wii 应转 decomp-toolkit， **不应把 splat 宣称成通用方案**"
+
+  reccmp:
+    name: reccmp
+    kind: cli
+    repo: isledecomp/reccmp
+    license: AGPL-3.0（**注意**）
+    purpose: 原版二进制 vs 重编译二进制，比对函数/全局数据/栈布局/vtable/导出
+    exe: reccmp
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/isledecomp/reccmp
+    produces: 匹配率报告
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 明确支持 **32 位 x86 + 旧版 MSVC（如 4.20）**；新版 MSVC 开发中， 其他编译器/语言/架构暂不支持 —— **不许误称支持 IL2CPP/Unreal/ARM**"
+
+  decomp_permuter:
+    name: decomp-permuter
+    kind: cli
+    repo: simonlindholm/decomp-permuter
+    license: MIT
+    purpose: 自动生成候选 C 代码变体，汇编并比较输出（95-99% 匹配时找寄存器分配/声明顺序）
+    exe: permuter
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/simonlindholm/decomp-permuter
+    produces: 候选变体
+    evidence_level: B
+    degrade: optional
+    note: "**是搜索器不是最终证明**；不应把在线服务或随机搜索结果当单一事实源"
+
+  # ---------- D 资产提取 ----------
+  quickbms:
+    name: QuickBMS
+    kind: cli
+    repo: (官方站点分发，非 GitHub 主仓)
+    license: 闭源免费工具 / 脚本引擎
+    purpose: "**通用游戏归档提取**（脚本驱动，覆盖大量格式）"
+    exe: quickbms
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://aluigi.altervista.org/quickbms.htm
+    produces: 提取结果
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ 每个版本/加密/压缩/平台都可能失效 —— **只作兜底**，不作事实源
+
+  assetripper:
+    name: AssetRipper
+    kind: cli
+    repo: AssetRipper/AssetRipper
+    license: GPLv3
+    purpose: Unity 资产与 AssetBundle 恢复
+    exe: AssetRipper
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AssetRipper/AssetRipper/releases
+    produces: Unity 资产
+    evidence_level: B
+    degrade: optional
+
+  cue4parse:
+    name: CUE4Parse
+    kind: reference
+    repo: FabianFG/CUE4Parse
+    license: Apache-2.0
+    purpose: UE4/UE5 归档、包、纹理、网格、动画、音频解析
+    exe: (库 / FModel 前端)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/FabianFG/CUE4Parse
+    produces: UE 资产
+    evidence_level: B
+    degrade: optional
+    note: FModel（GPLv3）是基于它的浏览器；**umodel/FModel 是提取器不是反编译器**
+
+  il2cppdumper:
+    name: Il2CppDumper
+    kind: cli
+    repo: Perfare/Il2CppDumper
+    license: MIT
+    purpose: 从 libil2cpp.so + 元数据恢复类型、字符串、方法表
+    exe: Il2CppDumper
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Perfare/Il2CppDumper
+    produces: 类型与符号
+    evidence_level: A
+    degrade: optional
+    note: 现代 Unity IL2CPP 的重点路径；MelonLoader/BepInEx 是运行时加载器，不作离线事实源
+
+  gdsdecomp:
+    name: gdsdecomp
+    kind: cli
+    repo: bruvzg/gdsdecomp
+    license: GPLv3
+    purpose: Godot PCK / GDNative / GDExtension 与脚本恢复
+    exe: gdsdecomp
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/bruvzg/gdsdecomp
+    produces: Godot 资产与脚本
+    evidence_level: B
+    degrade: optional
+
+  undertalemodtool:
+    name: UndertaleModTool
+    kind: cli
+    repo: UnderminersTeam/UndertaleModTool
+    license: GPLv3
+    purpose: "GameMaker: Studio 1.4 与 GMS2 bytecode 13-17；可重建**字节级精确副本**并反汇编"
+    exe: UndertaleModTool
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/UnderminersTeam/UndertaleModTool
+    produces: 数据文件副本 + 反汇编
+    evidence_level: A
+    degrade: optional
+
+  vgmstream:
+    name: vgmstream
+    kind: cli
+    repo: vgmstream/vgmstream
+    license: LGPL / MIT 混合
+    purpose: 游戏音频流解码 —— **数百种**游戏编码与循环信息
+    exe: vgmstream-cli
+    identity:
+      version_args: [--version]
+      version_contains: [vgmstream]
+    install:
+      manual: https://github.com/vgmstream/vgmstream
+    produces: PCM + 循环信息
+    evidence_level: A
+    degrade: optional
+    note: "覆盖 ADX/DSP ADPCM/PSX VAG/XMA/HCA/Opus/Vorbis 等。 ⚠️ **不能**复现游戏内重采样、滤波、音量与 DSP —— 门禁应验事件与调度"
+
+  # ---------- F 输入 ----------
+  sdl:
+    name: SDL
+    kind: cli
+    repo: libsdl-org/SDL
+    license: zlib
+    purpose: 跨平台输入抽象（SDL_GameController / SDL_Joystick）
+    exe: sdl2-config
+    identity:
+      version_args: [--version]
+      version_contains: [2]
+    install:
+      apt: apt-get install -y libsdl2-dev
+    produces: 输入抽象
+    evidence_level: B
+    degrade: optional
+    note: SDL_GameControllerDB 输出 `GUID,name,mapping,platform`，兼容 SDL 2.0.10+
+
+  antimicrox:
+    name: AntiMicroX
+    kind: cli
+    repo: AntiMicroX/antimicrox
+    license: GPLv3
+    purpose: 键鼠到手柄重映射（GUI）
+    exe: antimicrox
+    identity:
+      version_args: [--version]
+    install:
+      apt: apt-get install -y antimicrox
+    produces: 映射配置
+    evidence_level: C
+    degrade: optional
+
+  # ---------- G 音频 ----------
+  openal_soft:
+    name: OpenAL Soft
+    kind: cli
+    repo: kcat/openal-soft
+    license: LGPL-2.1
+    purpose: 跨平台软件音频基线（HRTF/距离衰减/多普勒/EFX 混响/Ambisonics/loopback）
+    exe: openal-info
+    identity:
+      version_args: [--version]
+      version_contains: [OpenAL]
+    install:
+      apt: apt-get install -y libopenal-dev
+    produces: 音频输出 / WAV writer
+    evidence_level: A
+    degrade: optional
+    note: 作为**软件基线**；FMOD/Wwise 若持合法授权应从原工程导出事件/bus/参数/快照/DSP
+
+  # ========= 第八轮：运行时取证 / 二进制覆盖 / AI 门禁 =========
+
+  # ---------- A 运行时取证 ----------
+  frida:
+    name: Frida
+    kind: cli
+    repo: frida/frida
+    license: 多数组件为 LGPL-2.1 / wxWindows，部分工具 MIT（**按子组件确认**）
+    purpose: "**跨平台动态插桩主入口**（黑盒注入脚本、钩任意函数、监视私有代码）"
+    exe: frida
+    identity:
+      version_args: [--version]
+      version_contains: [frida]
+      subcommand: --help
+    install:
+      pip: pip install frida-tools
+    wrapper: (见 scripts/runtime_forensics.py)
+    produces: 探针样本（入参/出参/副作用/monotonic 时间戳）
+    evidence_level: A
+    degrade: required
+    note: "支持 Win/macOS/Linux/Android/iOS/FreeBSD/QNX。 ⚠️ **Frida 脚本不得修改状态后声称观察到原版** —— 只读与受控桩必须分开。 移动端/DRM 场景采样失败要以**失败计数**收口，不能以\"脚本运行成功\"替代覆盖"
+
+  qiling:
+    name: Qiling Framework
+    kind: cli
+    repo: qilingframework/qiling
+    license: GPLv2
+    purpose: "**完整执行环境**模拟（可执行文件加载/动态链接/系统调用/IO/异常钩子）"
+    exe: python3
+    identity:
+      version_args: [-c, "import qiling; print('QILING_OK')"]
+      version_contains: [QILING_OK]
+    install:
+      pip: pip install qiling
+    produces: 隔离复现的函数行为
+    evidence_level: A
+    degrade: optional
+    note: "支持 PE/ELF/Mach-O、Win/Linux/macOS/Android/BSD。 适合答「给定环境和文件系统时这个原版子程序返回什么」"
+
+  unicorn:
+    name: Unicorn Engine
+    kind: cli
+    repo: unicorn-engine/unicorn
+    license: GPLv2
+    purpose: "**只模拟 CPU** —— 把已恢复状态放入单元测试验算法片段"
+    exe: python3
+    identity:
+      version_args: [-c, "import unicorn; print('UNICORN_OK')"]
+      version_contains: [UNICORN_OK]
+    install:
+      pip: pip install unicorn
+    produces: 纯逻辑片段执行结果
+    evidence_level: A
+    degrade: optional
+    note: ⚠️ **不理解动态库/系统调用/可执行格式** —— 与 Qiling 分工不同
+
+  dynamorio:
+    name: DynamoRIO
+    kind: cli
+    repo: DynamoRIO/dynamorio
+    license: BSD-3-Clause（**按仓库确认**）
+    purpose: 运行时代码操纵（函数/指令追踪、覆盖率、内存追踪、缓存模拟）
+    exe: drrun
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://dynamorio.org/
+    produces: 细粒度追踪
+    evidence_level: A
+    degrade: optional
+    note: Frida 不能稳定附加时的后手，**不是通用替代品**
+
+  bpftrace:
+    name: bpftrace
+    kind: cli
+    repo: bpftrace/bpftrace
+    license: Apache-2.0
+    purpose: 临时 eBPF 追踪（Linux）
+    exe: bpftrace
+    identity:
+      version_args: [--version]
+      version_contains: [bpftrace]
+    install:
+      apt: apt-get install -y bpftrace
+    produces: 追踪输出
+    evidence_level: B
+    degrade: optional
+    note: "低开销结构化追踪用 **LTTng**；Windows 原版应映射为 **ETW/WPR**， **不许宣称 eBPF 可直接观察 Windows**"
+
+  # ---------- B 二进制 diff 与符号执行 ----------
+  bindiff:
+    name: BinDiff
+    kind: cli
+    repo: google/bindiff
+    license: Apache-2.0
+    purpose: 函数级二进制 diff（识别相同/相似/改名函数）
+    exe: bindiff
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/google/bindiff/releases
+    produces: 函数匹配（含相似度与置信度）
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ **要求 IDA 9.0+** —— **不许宣传成无商业依赖的开源工具**； 作为 Ghidra/radare2 之上的**交叉验证器**"
+
+  diaphora:
+    name: Diaphora
+    kind: reference
+    repo: joxeankoret/diaphora
+    license: "**AGPL-3.0**（**需法务确认**）"
+    purpose: 汇编/CFG/符号/注释迁移、手动匹配、调用图、微码、伪代码启发
+    exe: (IDA 插件)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/joxeankoret/diaphora
+    produces: 匹配与迁移
+    evidence_level: A
+    degrade: optional
+    note: ⚠️ **要求 IDA 7.4+**（支持 6.8–9.4）；AGPL 需法务确认
+
+  ghidriff:
+    name: ghidriff
+    kind: cli
+    repo: clearbluejar/ghidriff
+    license: （**按仓库确认**）
+    purpose: "**基于 Ghidra** 的二进制 diff，命令行/批量/CI 化"
+    exe: ghidriff
+    identity:
+      version_args: [--help]
+    install:
+      pip: pip install ghidriff
+    produces: 结构化差异
+    evidence_level: A
+    degrade: optional
+    note: "✅ **降低 IDA 依赖的关键候选**；以 Ghidra 分析质量为前提。 不替代 BinDiff/Diaphora 的启发式能力"
+
+  retdec:
+    name: RetDec
+    kind: cli
+    repo: avast/retdec
+    license: MIT（含 zlib/libpng 第三方组件）
+    purpose: 基于 LLVM 的**可重定向反编译器** —— 第二套伪代码交叉验证
+    exe: retdec-decompiler
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/avast/retdec
+    produces: 第二套伪代码
+    evidence_level: B
+    degrade: optional
+    note: 三套解释不同时，**回到运行样本或符号执行**，不是投票选"最可读"的
+
+  angr:
+    name: angr
+    kind: cli
+    repo: angr/angr
+    license: BSD-2-Clause
+    purpose: 符号执行 / IR 提升 / 控制流 / 数据依赖 / 值集分析
+    exe: python3
+    identity:
+      version_args: [-c, "import angr; print('ANGR_OK')"]
+      version_contains: [ANGR_OK]
+    install:
+      pip: pip install angr
+    produces: 路径约束与反例
+    evidence_level: A
+    degrade: optional
+    note: ⚠️ 只能证明**有限语义**；「等价」必须写成**可证伪命题**
+
+  triton:
+    name: Triton
+    kind: cli
+    repo: JonathanSalwan/Triton
+    license: Apache-2.0
+    purpose: 动态符号执行、污点分析、AST、ISA 语义、SMT 转换
+    exe: python3
+    identity:
+      version_args: [-c, "import triton; print('TRITON_OK')"]
+      version_contains: [TRITON_OK]
+    install:
+      manual: https://github.com/JonathanSalwan/Triton
+    produces: 约束与污点
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ **同名也可能是商业 AI 平台** —— 只吸收此仓库
+
+  klee:
+    name: KLEE
+    kind: cli
+    repo: klee/klee
+    license: NCSA（**按仓库确认**）
+    purpose: LLVM 上的符号虚拟机
+    exe: klee
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://klee.github.io/
+    produces: 路径与反例
+    evidence_level: B
+    degrade: optional
+
+  # ---------- C 上下文打包 ----------
+  repomix:
+    name: repomix
+    kind: cli
+    repo: yamadashy/repomix
+    license: MIT
+    purpose: 代码库 → 单文件上下文（含令牌估算与敏感扫描选项）
+    exe: repomix
+    identity:
+      version_args: [--version]
+    install:
+      npm: npm i -g repomix
+    wrapper: (见 scripts/context_pack.py)
+    produces: 打包输出 + manifest
+    evidence_level: C
+    degrade: optional
+    note: "同类：gitingest、code2prompt、yek、files-to-prompt。 **任何被打包目录都必须生成 context-manifest.json**"
+
+  # ---------- D 代码检索 ----------
+  zoekt:
+    name: Zoekt
+    kind: cli
+    repo: sourcegraph/zoekt
+    license: Apache-2.0
+    purpose: 大规模低延迟代码搜索
+    exe: zoekt-index
+    identity:
+      version_args: [--help]
+    install:
+      go: go install github.com/sourcegraph/zoekt/cmd/zoekt-index@latest
+    produces: 搜索索引
+    evidence_level: C
+    degrade: optional
+    note: 与 Livegrep 提供字面量/正则搜索；**精确调用关系用 ctags/stack graphs/SCIP**
+
+  universal_ctags:
+    name: Universal Ctags
+    kind: cli
+    repo: universal-ctags/ctags
+    license: GPL-2.0
+    purpose: 符号表（定义、调用点、覆写）
+    exe: ctags
+    identity:
+      version_args: [--version]
+      version_contains: [ctags, Universal]
+    install:
+      apt: apt-get install -y universal-ctags
+    produces: tags
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ C/C++ 宏与模板、C# partial 类、动态加载、反射调用**可能漏报**； 运行时插桩发现的符号应回灌搜索"
+
+  # ---------- F 帧时间与性能 ----------
+  tracy:
+    name: Tracy Profiler
+    kind: reference
+    repo: wolfpld/tracy
+    license: BSD-3-Clause
+    purpose: "**帧级 profiler**（游戏首选）"
+    exe: (需编译，含 capture 工具)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/wolfpld/tracy
+    produces: 帧时间轨迹
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 门禁要比较 **p50/p95/p99 与卡顿频率**，**不能只比均值** —— 只测平均帧率会把\"偶尔卡顿\"平均掉"
+
+  hyperfine:
+    name: hyperfine
+    kind: cli
+    repo: sharkdp/hyperfine
+    license: MIT（或 Apache-2.0）
+    purpose: 命令行程序基准（含统计与异常值检测）
+    exe: hyperfine
+    identity:
+      version_args: [--version]
+      version_contains: [hyperfine]
+    install:
+      apt: apt-get install -y hyperfine
+    produces: 基准结果
+    evidence_level: C
+    degrade: optional
+    note: "新实现与原版**不应直接比较原始毫秒数**（硬件/驱动/调度不可控）； 应比**相对帧时间分布、卡顿频率、资源加载阶段**"
+
+  # ---------- G 兼容层 ----------
+  wine:
+    name: Wine
+    kind: cli
+    repo: wine-mirror/wine
+    license: LGPL-2.1
+    purpose: Windows 原版在 Linux 上跑起来取证
+    exe: wine
+    identity:
+      version_args: [--version]
+      version_contains: [wine]
+    install:
+      apt: apt-get install -y wine
+    produces: 可运行原版
+    evidence_level: B
+    degrade: optional
+    note: "兼容层只能作为\"**可获得运行样本**\"的工具， **不能自动成为像素或音频真值**"
+
+  dxvk:
+    name: DXVK
+    kind: reference
+    repo: doitsujin/dxvk
+    license: zlib/libpng
+    purpose: D3D11 → Vulkan（旧 DirectX 原版取证）
+    exe: (DLL，随 Wine/Proton 使用)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/doitsujin/dxvk
+    produces: 可运行原版
+    evidence_level: C
+    degrade: optional
+    note: 兄弟项目 vkd3d-proton（D3D12）、MoltenVK（Metal）、Zink（GL→Vulkan）
+
+  # ======= 第九轮：WPF/.NET/Win32 取证 + 目标栈 =======
+  dotnet_diagnostics:
+    name: .NET diagnostics
+    kind: cli
+    repo: dotnet/diagnostics
+    license: MIT
+    purpose: dotnet-counters / trace / dump / gcdump 的**跨平台 EventPipe 来源**
+    exe: dotnet-counters
+    identity:
+      version_args: [--version]
+    install:
+      dotnet: dotnet tool install -g dotnet-counters
+    produces: EventPipe 轨迹 / 转储 / GC 快照
+    evidence_level: A
+    degrade: required
+    note: "⚠️ 对原版 **.NET Framework** 不能假设 .NET Core 工具全部适用； 必要时改用性能计数器、ETW、CLR Profiler API"
+
+  perfview:
+    name: PerfView
+    kind: cli
+    repo: microsoft/perfview
+    license: "**来源不确定**：本次未能从官方页面取得许可证原文"
+    purpose: Windows ETW 分析器（CPU/GC/堆/WPF 事件）
+    exe: PerfView
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/microsoft/perfview
+    produces: ETW 分析
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ **只作可选取证，不写入强制许可门禁**
+
+  miri:
+    name: Miri
+    kind: cli
+    repo: rust-lang/miri
+    license: MIT / Apache-2.0
+    purpose: Rust UB 解释器
+    exe: cargo-miri
+    identity:
+      version_args: [--version]
+    install:
+      manual: cargo +nightly component add miri
+    produces: UB 检测
+    evidence_level: A
+    degrade: optional
+    note: "🚨 **只能从 rust-lang/miri 吸收** —— crates.io 上的同名占位包是**抢注的 yanked dummy，绝不可作为依赖**"
+
+  cargo_deny:
+    name: cargo-deny
+    kind: cli
+    repo: EmbarkStudios/cargo-deny
+    license: MIT / Apache-2.0
+    purpose: 依赖图 / 许可 / 安全公告门禁
+    exe: cargo-deny
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install cargo-deny
+    produces: 依赖审计
+    evidence_level: B
+    degrade: optional
+
+  cargo_nextest:
+    name: cargo-nextest
+    kind: cli
+    repo: nextest-rs/nextest
+    license: MIT / Apache-2.0
+    purpose: 并发测试与重试
+    exe: cargo-nextest
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install cargo-nextest
+    produces: 测试结果
+    evidence_level: B
+    degrade: optional
+
+  cargo_llvm_cov:
+    name: cargo-llvm-cov
+    kind: cli
+    repo: taiki-e/cargo-llvm-cov
+    license: MIT / Apache-2.0
+    purpose: LLVM 源级覆盖（行/区域/分支），兼容 nextest
+    exe: cargo-llvm-cov
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install cargo-llvm-cov
+    produces: 覆盖率
+    evidence_level: B
+    degrade: optional
+
+  cargo_geiger:
+    name: cargo-geiger
+    kind: cli
+    repo: rust-secure-code/cargo-geiger
+    license: Apache-2.0 / MIT
+    purpose: 统计 unsafe 用量
+    exe: cargo-geiger
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install cargo-geiger
+    produces: unsafe 统计
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **不直接判断安全**，应与 crev / safety-dance 结合
+
+  ryu:
+    name: ryu
+    kind: reference
+    repo: dtolnay/ryu
+    license: Apache-2.0 / Boost
+    purpose: "**最短往返浮点格式化**（Ulf Adams 算法，有 PLDI'18 正确性证明）"
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add ryu
+    produces: 浮点文本
+    evidence_level: A
+    degrade: optional
+    note: f32 约 21ns、f64 约 31ns。**不能默认 JSON 能无损保真** —— 须记 float_format
+
+  icu4x:
+    name: ICU4X
+    kind: reference
+    repo: unicode-org/icu4x
+    license: Unicode-3.0
+    purpose: Unicode 官方 Rust 国际化库（数字分组/货币/日期历法/双向文本）
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add icu
+    produces: 本地化格式化
+    evidence_level: A
+    degrade: optional
+    note: Rust 端须**固定 locale provider 与数据版本**；React 端固定 Intl 数据回退
+
+  chrono:
+    name: chrono
+    kind: reference
+    repo: chronotope/chrono
+    license: MIT / Apache-2.0
+    purpose: 日期时间（纳秒精度，纪元前后约 26.2 万年）
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add chrono
+    produces: 时间处理
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ **能表示但不完全支持闰秒** —— MSRV 1.62
+
+  vitest:
+    name: Vitest
+    kind: cli
+    repo: vitest-dev/vitest
+    license: MIT
+    purpose: 单元/组件测试（配 @testing-library/react）
+    exe: vitest
+    identity:
+      version_args: [--version]
+    install:
+      npm: npm i -D vitest
+    produces: 测试结果
+    evidence_level: C
+    degrade: optional
+
+  web_vitals:
+    name: web-vitals
+    kind: reference
+    repo: GoogleChrome/web-vitals
+    license: Apache-2.0
+    purpose: INP / LCP / CLS 测量（**仅作参考**）
+    exe: (JS 库)
+    identity:
+      version_args: [--help]
+    install:
+      npm: npm i web-vitals
+    produces: 体验指标
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **桌面没有 DOMContentLoaded 或首屏最大元素语义** —— 直接照搬 200ms INP / 2.5s LCP / 0.1 CLS 会误伤或放过"
+
+  git_cliff:
+    name: git-cliff
+    kind: cli
+    repo: orhun/git-cliff
+    license: （**按仓库确认**）
+    purpose: Conventional Commits 驱动的 changelog
+    exe: git-cliff
+    identity:
+      version_args: [--version]
+    install:
+      cargo: cargo install git-cliff
+    produces: changelog
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **只能提取提交事实，不能证明设计意图**；须关联代码位置与测试证据
+
+  # ======= 第十轮：状态迁移 / IPC / 可观测性 =======
+  atlas:
+    name: Atlas
+    kind: cli
+    repo: ariga/atlas
+    license: Apache-2.0
+    purpose: 声明式/版本化 schema 迁移；diff、apply、**lint**、dev URL
+    exe: atlas
+    identity:
+      version_args: [--version]
+      version_contains: [atlas]
+    install:
+      manual: https://github.com/ariga/atlas
+    wrapper: (见 scripts/state_migration.py)
+    produces: schema diff / lint / apply 计划
+    evidence_level: A
+    degrade: required
+    note: ⚠️ **DDL 相同 ≠ 数据无损** —— 必须再做四层对账（尤其 content 层）
+
+  sqldef:
+    name: sqldef
+    kind: cli
+    repo: sqldef/sqldef
+    license: MIT
+    purpose: 从目标 SQL 导出/生成幂等 DDL；**`--check` 漂移门禁** + `--dry-run`
+    exe: sqlite3def
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/sqldef/sqldef
+    produces: 幂等 DDL
+    evidence_level: A
+    degrade: optional
+    note: 适合从旧库导出当前 DDL 后与目标 SQL 比对
+
+  refinery:
+    name: Refinery
+    kind: reference
+    repo: rust-db/refinery
+    license: MIT / Apache-2.0
+    purpose: "**Rust 内嵌** SQL 迁移、版本与历史校验"
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add refinery
+    produces: 迁移历史表
+    evidence_level: A
+    degrade: optional
+    note: 历史表用于确认哪些迁移已应用；**回滚 ≠ 无条件反向执行 DDL**
+
+  dbmate:
+    name: dbmate
+    kind: cli
+    repo: amacneil/dbmate
+    license: MIT
+    purpose: 单一二进制、事务迁移、schema dump
+    exe: dbmate
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/amacneil/dbmate
+    produces: 迁移与 dump
+    evidence_level: B
+    degrade: optional
+
+  interprocess:
+    name: interprocess
+    kind: reference
+    repo: kotauskas/interprocess
+    license: MIT / Apache-2.0
+    purpose: "**跨平台 IPC**（Windows Named Pipe / Unix UDS），同步+异步 API"
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add interprocess
+    produces: IPC 通道
+    evidence_level: A
+    degrade: optional
+    note: "比自行 `match cfg(windows)` 更安全。 🚫 **不要用 servo/ipc-channel 做通用服务** —— 服务器一次只接受一个客户端"
+
+  tracing_test:
+    name: tracing-test
+    kind: reference
+    repo: dbrgn/tracing-test
+    license: MIT / Apache-2.0
+    purpose: Rust 单测中捕获多线程 tracing 输出并断言
+    exe: (dev-dependency)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add --dev tracing-test
+    produces: 日志断言
+    evidence_level: A
+    degrade: optional
+    note: 断言模板**出现 / 不出现 / 次数 / 字段**
+
+  tracing_fluent_assertions:
+    name: tracing-fluent-assertions
+    kind: reference
+    repo: tobz/tracing-fluent-assertions
+    license: MIT
+    purpose: 断言 **span 生命周期**（创建/进入/关闭及次数）
+    exe: (dev-dependency)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add --dev tracing-fluent-assertions
+    produces: span 断言
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ 自 2022-02 后未确认新版 —— **仅 dev-dependency，不进生产闭包**
+
+  otel_semconv:
+    name: OpenTelemetry Semantic Conventions
+    kind: reference
+    repo: open-telemetry/semantic-conventions
+    license: Apache-2.0
+    purpose: 稳定异常/事件字段与命名规范
+    exe: (规范)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/open-telemetry/semantic-conventions
+    produces: 字段命名与语义
+    evidence_level: A
+    degrade: optional
+    note: "异常事件预留 `error.type` / `exception.message` / `exception.stacktrace` / `exception.type`。 ⚠️ **动态值不得进事件名**"
+
+  dunce:
+    name: dunce
+    kind: reference
+    repo: Yandros/dunce
+    license: MIT / Apache-2.0
+    purpose: 把 Windows UNC 转为尽量兼容形式；不可无损转换时保留 UNC
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add dunce
+    produces: 路径规范化
+    evidence_level: B
+    degrade: optional
+    note: 跨平台 no-op。配合 `normpath` 做词法清理（避免 `canonicalize` 的 I/O 副作用）
+
+  normpath:
+    name: normpath
+    kind: reference
+    repo: six-p/normpath
+    license: Apache-2.0 / MIT
+    purpose: "**词法**路径规范化（不做 I/O、不解析符号链接）"
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add normpath
+    produces: 规范化路径
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ `canonicalize` 会做 I/O、解析符号链接并**可能失败**
+
+  trash:
+    name: trash
+    kind: reference
+    repo: ArturKovacs/trash
+    license: MIT / Apache-2.0
+    purpose: 跨平台回收站（Windows / macOS / FreeDesktop）
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add trash
+    produces: 移到回收站
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ **不应把所有"删除"默认改成永久删除** —— 须保留原版行为对照
+
+  extism:
+    name: Extism
+    kind: reference
+    repo: extism/extism
+    license: BSD-3-Clause
+    purpose: 多语言 PDK / WASM 插件运行时（支持燃料限制、计时器、宿主控制）
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add extism
+    produces: 插件沙箱
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 若原版是 Lua 而非 WASM，**只能提供边界设计，不能声称脚本语言对等**。 没有原版脚本接口证据时，不应包装成\"像素级增强\""
+
+  clap:
+    name: clap
+    kind: reference
+    repo: clap-rs/clap
+    license: MIT / Apache-2.0
+    purpose: CLI 参数解析（**仅当原版确有 CLI**）
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add clap
+    produces: CLI
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **没有原版 CLI 就不应编造**；须维护 cli-matrix.csv（含退出码与 stdout 格式）
+
+  # ======= 第十一轮：安全信任 / 网络韧性 / 无障碍与 IME =======
+  tuf:
+    name: TUF
+    kind: reference
+    repo: theupdateframework/tuf
+    license: MIT / Apache-2.0（CNCF 托管）
+    purpose: 更新框架规范与 Python 参考实现（root/targets/snapshot/timestamp 四角色）
+    exe: (Python ref impl)
+    identity:
+      version_args: [--version]
+    install:
+      pip: pip install tuf
+    wrapper: (见 scripts/security_trust.py --update)
+    produces: 更新信任模型
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ **参考实现不是稳定 API，不应成为生产依赖** —— 真正可落地的是把**威胁模型**转成 update-scenarios/ 目录"
+
+  cosign_dup2:
+    name: cosign
+    kind: cli
+    dup_of: cosign
+    repo: sigstore/cosign
+    license: Apache-2.0
+    purpose: 制品与证据链签名（keyless、Fulcio、Rekor、KMS；2.x 稳定）
+    exe: cosign
+    identity:
+      version_args: [version]
+      version_contains: [cosign]
+    install:
+      manual: https://github.com/sigstore/cosign
+    produces: 签名 bundle / Rekor entry
+    evidence_level: A
+    degrade: optional
+    note: "默认 ECDSA-P256 + SHA-256。⚠️ **与 TUF 职责必须分开**； 不能替代原生安装器签名（Authenticode / notary / 包签名）"
+
+  zap:
+    name: ZAP
+    kind: cli
+    repo: zaproxy/zaproxy
+    license: Apache-2.0
+    purpose: Web 应用安全扫描（**人工 + 基线**）
+    exe: zap-cli
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://www.zaproxy.org/download/
+    produces: 安全扫描报告
+    evidence_level: B
+    degrade: optional
+    note: "应覆盖桌面应用暴露的 **localhost/loopback API**、DevTools 端口、 更新下载器、WebView 加载的本地或远程页面"
+
+  nuclei:
+    name: Nuclei
+    kind: cli
+    repo: projectdiscovery/nuclei
+    license: MIT
+    purpose: YAML DSL 版本化漏洞模板回归
+    exe: nuclei
+    identity:
+      version_args: [-version]
+    install:
+      manual: https://github.com/projectdiscovery/nuclei
+    produces: 模板扫描结果
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 官方明确提示\"积极开发中，发布时可能有破坏性变更\" —— **模板与 CI 必须锁 commit/版本**，升级时 diff 模板与 baseline。 模板建议：update-manifest-tamper / unsigned-update-asset / ipc-command-injection / webview-file-origin / postmessage-origin-missing / deep-link-scheme-injection / privileged-api-exposed"
+
+  nvda:
+    name: NVDA
+    kind: cli
+    repo: nvaccess/nvda
+    license: GPL-2.0+
+    purpose: Windows 免费开源屏幕阅读器；**Speech Viewer 产出朗读事件序列**
+    exe: nvda
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/nvaccess/nvda
+    wrapper: (见 scripts/a11y_ime.py --screen-reader)
+    produces: 朗读事件序
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ **不应把语音文本等同于完整可访问性** —— 候选窗口位置、 IME 组合更新与键盘操作还需另录。⚠️ **必须保留原始 trace**"
+
+  accesskit:
+    name: AccessKit
+    kind: reference
+    repo: AccessKit/accesskit
+    license: MIT / Apache-2.0
+    purpose: "**跨平台可序列化辅助树**（整数 ID + role + 可选属性；Rust 为规范定义）"
+    exe: (Rust crate)
+    identity:
+      version_args: [--help]
+    install:
+      cargo: cargo add accesskit
+    wrapper: (见 scripts/a11y_ime.py --tree)
+    produces: 可比较辅助树
+    evidence_level: A
+    degrade: optional
+    note: "作为 WPF UIA / AT-SPI 桥 / Web AOM / Tauri WebView 的**中立桥接**。 ⚠️ **不替代真实屏幕阅读器**"
+
+  comcast:
+    name: comcast
+    kind: cli
+    repo: alexei-led/comcast
+    license: MIT（**需核验**）
+    purpose: Linux 网络故障注入（延迟/丢包/带宽）
+    exe: comcast
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/alexei-led/comcast
+    produces: 网络故障注入
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **来源不确定**，需核验精确全名、许可证、平台要求与构建状态； **只作探索与注入，不进默认门禁**"
+
+  fides:
+    name: Fides
+    kind: cli
+    repo: ethyca/fides
+    license: Apache-2.0
+    purpose: 隐私工程平台（数据发现/映射、Privacy Access Request）
+    exe: fides
+    identity:
+      version_args: [--version]
+    install:
+      pip: pip install ethyca-fides
+    produces: 数据地图
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ **CI 可检查证据存在，不能输出"GDPR 合规"或"中国法合规"结论**
+
+  # ======= 主场景：跨游戏引擎迁移 =======
+  spirv_cross_dup2:
+    name: SPIRV-Cross
+    kind: cli
+    dup_of: spirv_cross
+    repo: KhronosGroup/SPIRV-Cross
+    license: Apache-2.0
+    purpose: "**着色器中间表示** —— HLSL ↔ GLSL ↔ MSL ↔ WGSL ↔ SPIR-V"
+    exe: spirv-cross
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/KhronosGroup/SPIRV-Cross
+    wrapper: (见 scripts/engine_migration.py --shader)
+    produces: 着色器翻译
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 可视化着色器（Shader Graph / Material Editor / VisualShader） **节点语义不完全等价**，需逐个验证输出"
+
+  godot_engine:
+    name: Godot Engine
+    kind: cli
+    repo: godotengine/godot
+    license: MIT
+    purpose: 目标/源引擎（**右手系 Y-up, -Z 前**）
+    exe: godot
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://godotengine.org/download
+    produces: 目标工程
+    evidence_level: A
+    degrade: optional
+    note: 🔴 **-Z 前向**与 Unity 相反；单位为米
+
+  assimp:
+    name: Assimp
+    kind: cli
+    repo: assimp/assimp
+    license: BSD-3-Clause
+    purpose: 模型/动画格式导入导出（FBX/glTF/OBJ…）
+    exe: assimp
+    identity:
+      version_args: [--version]
+    install:
+      pip: pip install pyassimp
+    produces: 资产转换
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ **法线贴图绿通道** OpenGL(+Y) vs DirectX(-Y) 反了光照全错； 单位与轴向（Unreal 厘米 / Godot -Z 前向）必须显式处理"
+
+  gltf_validator:
+    name: glTF Validator
+    kind: cli
+    repo: KhronosGroup/glTF-Validator
+    license: Apache-2.0
+    purpose: glTF 资产规范化校验（**跨引擎交换的推荐中间格式**）
+    exe: gltf_validator
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/KhronosGroup/glTF-Validator
+    produces: 资产校验报告
+    evidence_level: B
+    degrade: optional
+    note: 规范为**右手 Y-up**；导出 `+Y up` 选项必须一致
+
+  # ======= 游戏深化：内容/战斗/AI/数值/存档 =======
+  bizhawk_dup2:
+    name: BizHawk
+    kind: cli
+    dup_of: bizhawk
+    repo: TASEmulators/BizHawk
+    license: MIT（**需复核**）
+    purpose: 多系统模拟器；**内存查看/搜索/编辑 + TAS 输入记录**
+    exe: EmuHawk
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/TASEmulators/BizHawk
+    wrapper: (见 scripts/game_combat_ai.py --framedata)
+    produces: 可重放输入 + 逐帧内存状态
+    evidence_level: A
+    degrade: optional
+    note: "可作为**原版取证基线** —— 同一模拟核心产生可重放输入并导出 逐帧内存状态，避免\"人类试玩样本\"的不确定性"
+
+  behaviortree_cpp:
+    name: BehaviorTree.CPP
+    kind: reference
+    repo: BehaviorTree/BehaviorTree.CPP
+    license: MIT
+    purpose: C++17 行为树框架，支持**状态转移记录、回放、可视化与分析**
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/BehaviorTree/BehaviorTree.CPP
+    wrapper: (见 scripts/game_combat_ai.py --ai)
+    produces: AI 状态转移记录
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 吸收的是**AI 取证流程**，不是把其机器人语义照搬进游戏。 原版 AI 先用**状态转移表**描述，再保留实现选择"
+
+  recastnavigation:
+    name: Recast Navigation
+    kind: reference
+    repo: recastnavigation/recastnavigation
+    license: "**需复核 License.txt**"
+    purpose: 导航网格与寻路工具集（Recast / Detour / DetourCrowd）
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/recastnavigation/recastnavigation
+    wrapper: (见 scripts/game_combat_ai.py --nav)
+    produces: NavMesh 对比
+    evidence_level: A
+    degrade: optional
+    note: 三阶段：几何 → 单条路径 → 群集。⚠️ 许可证需复核
+
+  tiled:
+    name: Tiled
+    kind: cli
+    repo: mapeditor/tiled
+    license: GPL-2.0（**需复核**）
+    purpose: 灵活的关卡编辑器；可作为**归一化中间格式**
+    exe: tiled
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://www.mapeditor.org/
+    wrapper: (见 scripts/game_content.py --level)
+    produces: 关卡中间格式
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 是**目标/中间格式**，不天然等于原版反序列化器 —— 应先提取再 schema 归一化。许可证与活跃度需复核"
+
+  ldtk:
+    name: LDtk
+    kind: cli
+    repo: deepnight/ldtk
+    license: MIT（**需复核**）
+    purpose: 现代 2D 关卡编辑器；强调易用性
+    exe: LDtk
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://ldtk.io/
+    wrapper: (见 scripts/game_content.py --level)
+    produces: 关卡中间格式
+    evidence_level: B
+    degrade: optional
+    note: 与 Tiled 同为**中间格式**。许可证与活跃度需复核
+
+  # ======= 游戏第三轮：功能表面 / 网络 / 模组 =======
+  game_networking_sockets:
+    name: GameNetworkingSockets
+    kind: reference
+    repo: ValveSoftware/GameNetworkingSockets
+    license: BSD-3-Clause
+    purpose: 可靠 UDP 传输；**价值在连接质量指标，不只是传输**
+    exe: (C lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/ValveSoftware/GameNetworkingSockets
+    wrapper: (见 scripts/game_net_mod.py --metrics)
+    produces: 连接质量与 RTT 抖动指标
+    evidence_level: A
+    degrade: optional
+    note: "对验收要输出 RTT 抖动、队列长度、连接质量等级、重传数 —— 不只是\"能连通\""
+
+  enet:
+    name: ENet
+    kind: reference
+    repo: lsalzman/enet
+    license: MIT
+    purpose: UDP 连接、可靠/不可靠通道、分片
+    exe: (C lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/lsalzman/enet
+    produces: 网络通道参考
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 只覆盖连接与通道层 —— **不是整个网络层**； 权威/预测/插值/回滚是不同故障域"
+
+  bepinex:
+    name: BepInEx
+    kind: reference
+    repo: BepInEx/BepInEx
+    license: LGPL-2.1-or-later
+    purpose: Unity 运行时注入与插件生命周期参考
+    exe: (Unity plugin)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/BepInEx/BepInEx
+    wrapper: (见 scripts/game_net_mod.py --mod)
+    produces: 模组生命周期参考
+    evidence_level: B
+    degrade: optional
+    note: "吸收其**概念**（注册点/生命周期/依赖/资源覆盖/版本协商）， 不是必须采用相同注入方式"
+
+  icu:
+    name: ICU
+    kind: reference
+    repo: unicode-org/icu
+    license: ICU 许可族（**需复核 LICENSE 与再分发**）
+    purpose: Unicode 排序、字符集转换、日期时间格式化、**双向文本**
+    exe: (C/C++/Java lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/unicode-org/icu
+    wrapper: (见 scripts/game_surface.py --loc)
+    produces: 本地化区域数据
+    evidence_level: A
+    degrade: optional
+    note: ICU4C/ICU4J 长期维护；⚠️ 发布前应复核目标仓库 LICENSE
+
+  steamworks_net:
+    name: Steamworks.NET
+    kind: reference
+    repo: rlabrecque/Steamworks.NET
+    license: MIT
+    purpose: C# Steamworks 封装参考（平台集成表面）
+    exe: (C# lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/rlabrecque/Steamworks.NET
+    wrapper: (见 scripts/game_net_mod.py --platform)
+    produces: 平台集成参考
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 平台集成**不能只记录\"调用成功\"** —— 要记可用/离线/token/账户切换/跨平台。选型须读最新发布说明"
+
+  # ======= 游戏第四轮：延迟 / 音频 / 渲染 / 可玩性 =======
+  openal_soft_dup2:
+    name: OpenAL Soft
+    kind: reference
+    dup_of: openal_soft
+    repo: kcat/openal-soft
+    license: LGPL
+    purpose: 跨平台音频底座；**HRTF、B-Format/Ambisonics、EFX occlusion/obstruction/reverb**
+    exe: (C lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/kcat/openal-soft
+    wrapper: (见 scripts/game_audio_render.py --spatial)
+    produces: 空间音频参考
+    evidence_level: A
+    degrade: optional
+    note: "🔴 **空间音频最容易因默认 HRTF 而\"看起来迁移成功、戴上耳机即错\"** —— 必须记录 HRTF on/off/auto 与 dataset"
+
+  miniaudio:
+    name: miniaudio
+    kind: reference
+    repo: mackron/miniaudio
+    license: MIT / public domain（**需复核**）
+    purpose: 单文件 C 音频库；播放、解码、混音、输出
+    exe: (single header)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/mackron/miniaudio
+    produces: 音频后端参考
+    evidence_level: B
+    degrade: optional
+    note: 不是完整 Wwise 式音乐状态机 —— 动态音乐需另建状态层
+
+  reflex:
+    name: NVIDIA Reflex
+    kind: reference
+    repo: NVIDIA-RTX/REFLEX
+    license: "**需复核**"
+    purpose: 引擎埋点：sleep mode、PC latency、flash indicator
+    exe: (SDK)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/NVIDIA-RTX/REFLEX
+    wrapper: (见 scripts/game_latency_camera.py --timeline)
+    produces: 延迟测量埋点
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 依赖 NVIDIA GPU/驱动/兼容显示器 —— **不是跨平台标准**。 AMD Anti-Lag、Intel、主机、移动端、WebGPU 无等价统一 API。 **可以验证，但不得替代跨平台 InputTimeline 取证协议**"
+
+  open_source_ldat:
+    name: Open-Source-LDAT
+    kind: reference
+    repo: S4N-T0S/Open-Source-LDAT
+    license: "**许可证待最终确认**"
+    purpose: DIY click-to-photon 测量（Teensy 4.1 + TEMT6000 + OLED + 按键）
+    exe: (firmware)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/S4N-T0S/Open-Source-LDAT
+    produces: 输入到光子延迟
+    evidence_level: A
+    degrade: optional
+    note: "✅ 平台中立的冒烟测量。⚠️ 闭环法**必须先把 LED 与传感器直触 测得零点并扣除偏移**"
+
+  gametest:
+    name: GameTest
+    kind: reference
+    repo: luppichristian/GameTest
+    license: MIT
+    purpose: C/C++ **确定性 record/replay + inline assertions**
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/luppichristian/GameTest
+    wrapper: (见 scripts/game_audio_render.py --playability)
+    produces: 冒烟回归
+    evidence_level: A
+    degrade: optional
+    note: 不绑定 Unity/Godot —— 适合自建引擎
+
+  godot_e2e:
+    name: GodotE2E
+    kind: reference
+    repo: godot-e2e/godot-e2e
+    license: Apache-2.0
+    purpose: "**外进程 TCP** E2E：输入、属性、帧同步、截图"
+    exe: (Python)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/godot-e2e/godot-e2e
+    wrapper: (见 scripts/game_audio_render.py --playability)
+    produces: E2E 回归
+    evidence_level: A
+    degrade: optional
+    note: 真实 Godot 进程（非模拟），可并行；要求 Godot 4.5+ / Python 3.9+
+
+  fastnoise2:
+    name: FastNoise2
+    kind: reference
+    repo: Auburn/FastNoise2
+    license: MIT
+    purpose: PCG 主噪声库；SIMD、node graph、encoded tree
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/Auburn/FastNoise2
+    wrapper: (见 scripts/game_audio_render.py --pcg)
+    produces: 程序化生成
+    evidence_level: B
+    degrade: optional
+    note: "🔴 **默认 `FASTNOISE2_STRICT_FP=OFF` 不保证跨 SIMD 复现** —— 跨引擎复现同一世界必须显式开启并锁定 SIMD 等级"
+
+  # ======= 游戏第五轮：编辑器 / 构建 / 配置 / 输入设备 =======
+  luban:
+    name: Luban
+    kind: reference
+    repo: focus-creative-games/Luban
+    license: MIT
+    purpose: 游戏配置解决方案；schema + 校验 + **多语言代码生成**
+    exe: (dotnet / Luban.Agent CLI)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/focus-creative-games/Luban
+    wrapper: (见 scripts/game_editor_data.py --config)
+    produces: 配置管线
+    evidence_level: B
+    degrade: optional
+    note: "覆盖 csv/tsv/xls/xlsx/xlsm/json/xml/yaml/lua；支持 OOP 类型继承与 C#/Java/Go/C++/Lua/Python/JS/TS/Rust/PHP/Erlang/Godot 代码生成； 5.0.0 起有机器可读 schema 与 CLI。✅ **配置管线候选**， ❌ 不是\"能自动还原原版数据\""
+
+  o3de:
+    name: O3DE
+    kind: reference
+    repo: o3de/o3de
+    license: Apache-2.0
+    purpose: 开源 3D 引擎；明确把 project + **Asset Processor** + Editor 一起构建
+    exe: (CMake)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/o3de/o3de
+    wrapper: (见 scripts/game_editor_data.py --build)
+    produces: 资产处理管线参考
+    evidence_level: B
+    degrade: optional
+    note: "使用 Git LFS 存大二进制；可吸收**资产处理管线、依赖图、 增量烘焙、确定性构建**概念"
+
+  stride:
+    name: Stride
+    kind: reference
+    repo: stride3d/stride
+    license: MIT（个别文件另有说明）
+    purpose: 带 **Game Studio** 的 C# 引擎；编辑器—运行时同源
+    exe: (CLI / GameStudio)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/stride3d/stride
+    wrapper: (见 scripts/game_editor_data.py --editor)
+    produces: 编辑器与构建参考
+    evidence_level: B
+    degrade: optional
+    note: "CLI 可管理引擎版本与项目模板；`Stride.GameStudio` 位于 `60-Editor`。 可吸收**编辑器—运行时同源、资产编译器、模板与 CLI**"
+
+  sdl_dup2:
+    name: SDL
+    kind: reference
+    dup_of: sdl
+    repo: libsdl-org/SDL
+    license: zlib
+    purpose: 跨平台设备抽象；`SDL_GameControllerGetBindForAxis` 区分逻辑轴与设备轴
+    exe: (C lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/libsdl-org/SDL
+    wrapper: (见 scripts/game_input_ops.py --gamepad)
+    produces: 输入设备抽象
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 价值在**统一设备层**，**不在替代原版手柄语义** —— 原始设备事件、HID usage、厂商驱动曲线、XInput 0-3 固定端口需单独取证"
+
+  protobuf:
+    name: Protocol Buffers
+    kind: cli
+    repo: protocolbuffers/protobuf
+    license: BSD-3-Clause
+    purpose: 语言中立序列化；配置传输格式或二进制布局候选
+    exe: protoc
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/protocolbuffers/protobuf
+    wrapper: (见 scripts/game_editor_data.py --formula)
+    produces: 配置二进制布局
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 建议**固定到 release 分支**（main 可能有破坏性变更）。 ⚠️ \"未知字段保留、编号兼容\"**不能替代业务层**对删除字段、 改单位、改计算公式的迁移"
+
+  defold:
+    name: Defold
+    kind: cli
+    repo: defold/defold
+    license: "**主许可证待确认**"
+    purpose: 官方仓库同时含 engine + editor + command line tools
+    exe: bob
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/defold/defold
+    wrapper: (见 scripts/game_editor_data.py --build)
+    produces: 轻量编辑器与构建参考
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ 仓库含 `editor` 与 `build_tools`，但本次**未取得主许可证完整文本** —— 标\"待确认\"，商业二次创作前不应直接下结论"
+
+  # ======= 游戏第六轮：动画 / UI / 物理深化 =======
+  acl:
+    name: Animation Compression Library
+    kind: reference
+    repo: nfrechette/acl
+    license: MIT
+    purpose: 动画压缩库与质量度量；可做**末端误差压力测试**
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/nfrechette/acl
+    wrapper: (见 scripts/game_animation.py --compress)
+    produces: 压缩误差度量
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 它是**压力测试器**，不是授权替代原项目设置 —— **不建议把 ACL 自动选中结果当作目标资产真相**"
+
+  harfbuzz_dup2:
+    name: HarfBuzz
+    kind: cli
+    dup_of: harfbuzz
+    repo: harfbuzz/harfbuzz
+    license: Old MIT
+    purpose: 文本整形；**决定文本长度与字符索引**
+    exe: hb-shape
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/harfbuzz/harfbuzz
+    wrapper: (见 scripts/game_ui_physics.py --font)
+    produces: 整形日志与 glyph run
+    evidence_level: A
+    degrade: optional
+    note: "🔑 **HarfBuzz 整形和像素度量决定文本长度，SDF 只决定栅格化质量**。 已有 text_layout.py 的 L1 字形簇也依赖它"
+
+  msdfgen:
+    name: msdfgen
+    kind: cli
+    repo: Chlumsky/msdfgen
+    license: MIT
+    purpose: 多通道带符号距离场字体图集生成
+    exe: msdfgen
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/Chlumsky/msdfgen
+    wrapper: (见 scripts/game_ui_physics.py --font)
+    produces: MSDF 图集
+    evidence_level: A
+    degrade: optional
+    note: ⚠️ SDF 只决定**栅格化质量**，不决定文本长度 —— 与 HarfBuzz 分工明确
+
+  assimp_dup2:
+    name: Assimp
+    kind: cli
+    dup_of: assimp
+    repo: assimp/assimp
+    license: BSD-3-Clause
+    purpose: 导入统一结构；骨骼/动画导入
+    exe: assimp
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/assimp/assimp
+    wrapper: (见 scripts/game_animation.py --retarget)
+    produces: 骨骼层级与动画导入
+    evidence_level: A
+    degrade: optional
+    note: "⚠️ 导入 glTF 若未 Apply Transform，节点**看起来正确但内部 Transform 不同** —— 重定向前必须先修复"
+
+  bullet3:
+    name: Bullet Physics
+    kind: reference
+    repo: bulletphysics/bullet3
+    license: zlib
+    purpose: 物理引擎参考；**层过滤与求解器行为**
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/bulletphysics/bullet3
+    wrapper: (见 scripts/game_ui_physics.py --matrix)
+    produces: 物理行为参考
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 跨引擎骨骼长度、质量、约束求解器不同 —— **不能直接复用配置**"
+
+  physx:
+    name: PhysX
+    kind: reference
+    repo: NVIDIA-Omniverse/PhysX
+    license: BSD-3-Clause
+    purpose: 物理引擎；**enhanced determinism**、CCD、substep 参考
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/NVIDIA-Omniverse/PhysX
+    wrapper: (见 scripts/game_ui_physics.py --substep)
+    produces: 物理确定性参考
+    evidence_level: B
+    degrade: optional
+    note: 确定性项目需记录**容器顺序、并行调度、增强确定性**
+
+  # ======= 游戏第七轮：流式 / 并发 / 热更新 / 内存 =======
+  unitycsreference:
+    name: UnityCsReference
+    kind: lib
+    repo: Unity-Technologies/UnityCsReference
+    license: "**Unity 参考源码许可（需复核）**"
+    purpose: 核实引擎**默认行为与版本差异**
+    exe: (source)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/Unity-Technologies/UnityCsReference
+    wrapper: (见 scripts/game_hotfix_mem.py --defaults)
+    produces: 默认值核实
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ 适合**源码阅读核实**，**不是运行时取证工具**
+
+  flatbuffers:
+    name: FlatBuffers
+    kind: cli
+    repo: google/flatbuffers
+    license: Apache-2.0
+    purpose: 序列化格式；table、可选字段、默认值
+    exe: flatc
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/google/flatbuffers
+    wrapper: (见 scripts/game_hotfix_mem.py --serialize)
+    produces: 版本化序列化参考
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ **兼容只保证能读，不保证游戏行为一致** —— 默认值变化、 字段解释变化、未知字段丢弃都会影响 must-match"
+
+  spark:
+    name: Spark
+    kind: reference
+    repo: WorldLabs/Spark
+    license: "**需复核 LICENSE**"
+    purpose: 大世界预算化流式；连续 LoD、渐进流、固定 GPU 内存页
+    exe: (research)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/WorldLabs/Spark
+    wrapper: (见 scripts/game_stream_thread.py --stream)
+    produces: 页式资源置换参考
+    evidence_level: C
+    degrade: optional
+    note: "可补\"预算化流式\"与\"页式置换\"测试思路；⚠️ **不是传统关卡块加载**， **不应直接写进 World Partition 等效字段**"
+
+  dreamx_world:
+    name: DreamX-World
+    kind: reference
+    repo: AMAP-ML/DreamX-World
+    license: "**需复核 LICENSE**"
+    purpose: 重访持久性与相机轨迹；"离开视口后是否保留语义"测试灵感
+    exe: (research)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/AMAP-ML/DreamX-World
+    produces: 流式持久性测试灵感
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **不是传统游戏流式实现**，只作测试灵感
+
+  # ======= 游戏第八轮：手感 / 会话 / 粒子 / 超分 =======
+  p1proto:
+    name: p1proto
+    kind: reference
+    repo: h2cone/p1proto
+    license: MIT
+    purpose: Godot 4 + Rust GDExtension 2D 平台示例；**coyote time、jump buffering、jump cut、snappy ground turning**
+    exe: (Godot project)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/h2cone/p1proto
+    wrapper: (见 scripts/game_feel.py --coyote)
+    produces: 移动手感参考实现
+    evidence_level: B
+    degrade: optional
+    note: "✅ 已把四类跳跃宽容机制变成**可运行参考**。 ⚠️ 个人小型项目，**不应直接吸收为完整生产控制器**； ⚠️ **没有公开统一参数值，不能补成固定毫秒或像素数**"
+
+  fidelityfx:
+    name: FidelityFX
+    kind: reference
+    repo: GPUOpen-LibrariesAndSDKs/FidelityFX-SDK
+    license: "**按具体 release 复核**（历史公开版本曾采用 MIT）"
+    purpose: AMD 开源超分与画质 SDK；FSR 实现
+    exe: (SDK)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK
+    wrapper: (见 scripts/game_session.py --upscale)
+    produces: 超分实现参考
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ **版本与子项目许可证需按具体发布版本复核** —— 不能把整个组织仓库统一标成 MIT"
+
+  open_match:
+    name: Open Match
+    kind: reference
+    repo: googleforgames/open-match
+    license: Apache-2.0
+    purpose: 匹配框架；前后端/可定制编排分层
+    exe: (K8s)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/googleforgames/open-match
+    wrapper: (见 scripts/game_session.py --session)
+    produces: 匹配架构参考
+    evidence_level: C
+    degrade: optional
+    note: "🔑 只吸收**前后端/编排分层架构**， ❌ **不吸收通用队列默认值**"
+
+  # ======= 游戏第九轮：关卡 / 教程 / 存档 / 渲染 =======
+  tiled_dup2:
+    name: Tiled
+    kind: cli
+    dup_of: tiled
+    repo: mapeditor/tiled
+    license: "**多许可**（仓库可见 LICENSE.APACHE / LICENSE.BSD / LICENSE.GPL）"
+    purpose: 2D 关卡编辑器；导出 tile、对象层与自定义属性
+    exe: tiled
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mapeditor/tiled
+    wrapper: (见 scripts/game_level_balance.py --level)
+    produces: 关卡布局取证
+    evidence_level: B
+    degrade: optional
+    note: "✅ 社区长期维护。❌ **不适合直接承担\"体验参数\"建模** —— 正确用法是 Tiled/LDtk 存原始布局，`LevelExperience` schema 存设计意图"
+
+  ludusavi:
+    name: Ludusavi
+    kind: cli
+    repo: mtkennerly/ludusavi
+    license: MIT
+    purpose: 游戏存档备份/恢复；**存档可见性与损坏恢复取证**
+    exe: ludusavi
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mtkennerly/ludusavi
+    wrapper: (见 scripts/game_level_balance.py --savestate)
+    produces: 存档清单与恢复验证
+    evidence_level: B
+    degrade: optional
+    note: "✅ 可用于核对存档位置与可恢复性。⚠️ 它是**生产工具不是设计标准** —— 不能替代逐条读取原游戏行为"
+
+  filament:
+    name: Filament
+    kind: reference
+    repo: google/filament
+    license: Apache-2.0
+    purpose: 跨平台实时渲染引擎；研究 MSAA/FXAA/TAA、后处理栈、动态分辨率、HDR
+    exe: (C++ lib)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/google/filament
+    wrapper: (见 scripts/game_time_pacing.py --aa)
+    produces: AA 与渲染路径参考
+    evidence_level: B
+    degrade: optional
+    note: "⚠️ 是**渲染观察点，不是通用帧 pacing SDK** —— **帧 pacing 适配仍需在平台显示链路单独完成**"
+
+  yarn_spinner:
+    name: Yarn Spinner
+    kind: reference
+    repo: YarnSpinnerTool/YarnSpinner
+    license: MIT
+    purpose: 对话/叙事脚本；变量与命令模型
+    exe: (C# / Rust)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/YarnSpinnerTool/YarnSpinner
+    wrapper: (见 scripts/game_level_balance.py --tutorial)
+    produces: 教程/对话状态参考
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ 变量与命令模型、对话推进与游戏时间的交互**仅能作为架构参考** —— **不能代替时间系统**，标\"参考实现，不建议直接集成\""
+
+  # ======= 游戏第十轮：世界模拟 / 身体 / 社交 / 元游戏 / 浮点 =======
+  cataclysm_dda:
+    name: "Cataclysm: Dark Days Ahead"
+    kind: reference
+    repo: CleverRaven/Cataclysm-DDA
+    license: "**需逐文件核**（仓库含多个第三方字体许可证，不能假定统一协议）"
+    purpose: 身体部位、体温、口渴、睡眠、变异、阵营、生态字段**考古样本**
+    exe: (C++ source)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/CleverRaven/Cataclysm-DDA
+    wrapper: (见 scripts/game_world_body.py --bodypart / --need)
+    produces: 身体与需求字段样本
+    evidence_level: B
+    degrade: optional
+    note: ✅ 活跃。⚠️ **回合制语义必须重新映射为实时项目**
+
+  veloren:
+    name: Veloren
+    kind: reference
+    repo: veloren/veloren
+    license: "**需 fetch 核验 LICENSE 具体文本**"
+    purpose: 开放世界、持久化、社区架构参照
+    exe: (Rust)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/veloren/veloren
+    wrapper: (见 scripts/game_social_meta.py --party)
+    produces: 开放世界与社区架构参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 本报告**不替其断言完整协议义务**
+
+  openttd:
+    name: OpenTTD
+    kind: reference
+    repo: OpenTTD/OpenTTD
+    license: GPL-2.0（第三方代码另有许可证）
+    purpose: 多人、聊天、命令、社交平台插件、平台集成
+    exe: (C++)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/OpenTTD/OpenTTD
+    wrapper: (见 scripts/game_social_meta.py --expression)
+    produces: 多人社交字段参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 只有合作/竞争模型，**无现代好友图谱**
+
+  # ======= 游戏第十一轮：音频传播 / 可读性 / 感知性能 =======
+  steam_audio_ref:
+    name: Steam Audio
+    kind: reference
+    repo: "ValveSoftware/steam-audio（仓库名与组织**来源不确定**）"
+    license: "**需逐项复核**"
+    purpose: 射线、实时/烘焙传播、遮挡、反射、材质与空间化的**传播算法基准**
+    exe: (SDK)
+    identity:
+      version_args: [--help]
+    install:
+      manual: 以官方页面为准
+    wrapper: (见 scripts/game_audio_read.py --propagation)
+    produces: 传播算法参考
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **来源不确定** —— 只能作**参考实现**， **不能声称原作使用它**；采购或依赖审计前须逐项复核"
+
+  resonance_audio_ref:
+    name: Resonance Audio
+    kind: reference
+    repo: "resonance-audio/resonance-audio（**来源不确定**）"
+    license: "**需逐项复核**"
+    purpose: 高阶 Ambisonics、房间混响、跨引擎插件结构参考
+    exe: (SDK)
+    identity:
+      version_args: [--help]
+    install:
+      manual: 以官方页面为准
+    wrapper: (见 scripts/game_audio_read.py --reverb)
+    produces: Ambisonics 与房间混响参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **来源不确定**；只作接口参考
+
+  openal_soft_dup3:
+    name: OpenAL Soft
+    kind: cli
+    dup_of: openal_soft
+    repo: kcat/openal-soft
+    license: "**需仓库内复核**"
+    purpose: HRTF、直接路径、距离模型、滤波、声源速度的**基础 API 对照**
+    exe: openal-info
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/kcat/openal-soft
+    wrapper: (见 scripts/game_audio_read.py --attenuation)
+    produces: 距离模型与 HRTF 对照
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 许可证与当前维护状态需仓库内复核
+
+  # ======= 游戏第十二轮：任务/对话/库存/地图/死亡流程 =======
+  yarn_spinner_rt:
+    name: Yarn Spinner
+    kind: reference
+    dup_of: yarn_spinner
+    repo: YarnSpinnerTool/YarnSpinner
+    license: MIT
+    purpose: 对话运行时；**变量存储交由宿主游戏** —— 正适合记录"变量由谁写、何时写、是否持久化"
+    exe: (C# / Rust)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/YarnSpinnerTool/YarnSpinner
+    wrapper: (见 scripts/game_quest_dialog.py --variable)
+    produces: 对话图与变量边界参考
+    evidence_level: C
+    degrade: optional
+    note: "✅ 活跃且主仓 MIT。⚠️ 其\"未设置值为 null\"的设计 **不能默认等于原作的持久化模型**"
+
+  openmw:
+    name: OpenMW
+    kind: cli
+    repo: OpenMW/openmw
+    license: "**需仓库内复核**"
+    purpose: Morrowind 数据兼容的引擎重实现；**任务一次性语义与死亡重生的反例库**
+    exe: openmw
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/OpenMW/openmw
+    wrapper: (见 scripts/game_inventory_flow.py --respawn)
+    produces: 任务/死亡/重生的语义边界参考
+    evidence_level: C
+    degrade: optional
+    note: "🔑 社区记录的\"任务只能完成一次、奖励只给一人\"说明 **世界/任务状态必须与多人或重入场景分别取证**"
+
+  ags:
+    name: Adventure Game Studio
+    kind: reference
+    repo: adventuregamestudio/ags
+    license: Artistic License 2.0
+    purpose: 库存物品热区对齐与序列化的界面行为取证旁证
+    exe: (editor)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/adventuregamestudio/ags
+    wrapper: (见 scripts/game_inventory_flow.py --drag)
+    produces: 库存界面行为参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **不代表所有 AGS 游戏共享同一交互模型**
+
+  openxr_sdk:
+    name: OpenXR SDK Source
+    kind: reference
+    repo: KhronosGroup/OpenXR-SDK-Source
+    license: Apache-2.0
+    purpose: "**跨进程输入契约范式**：应用声明动作与动作集，运行时负责映射"
+    exe: (SDK)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/KhronosGroup/OpenXR-SDK-Source
+    wrapper: (见 references/游戏引擎复刻.md 第十二部分 H 类)
+    produces: 输入抽象层参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 与"逐设备扫描码表"冲突 —— **不应为了跨平台自动覆盖原设备语义**
+
+  presentmon:
+    name: PresentMon
+    kind: cli
+    repo: GameTechDev/PresentMon
+    license: MIT
+    purpose: 从 Windows 图形呈现管线采集 —— 扩展已有的端到端分段测量
+    exe: presentmon
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/GameTechDev/PresentMon
+    wrapper: (见 scripts/game_perf_interact.py --perf)
+    produces: 呈现管线时间戳
+    evidence_level: B
+    degrade: optional
+    note: ⚠️ **PresentMon 不等于视觉回归工具**
+
+  # ======= 游戏第十三轮：战斗规则 / BOSS / 解锁 / 输入反馈 =======
+  openenroth:
+    name: OpenEnroth
+    kind: reference
+    repo: OpenEnroth/OpenEnroth
+    license: "**需仓库内复核**"
+    purpose: Might and Magic VII 重实现；规则层与系统层**联合取证候选**
+    exe: (C++)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/OpenEnroth/OpenEnroth
+    wrapper: (见 scripts/game_combat_rules.py --pipeline)
+    produces: 战斗规则层取证样本
+    evidence_level: C
+    degrade: optional
+    note: "✅ 截至 2026-09 仍持续提交（nightly 活跃）。 ⚠️ 页面仅称 MM7 可玩，**不能据此认定已实现成熟多人重连**"
+
+  opendiablo2:
+    name: OpenDiablo2
+    kind: reference
+    repo: OpenDiablo2/OpenDiablo2
+    license: "**页面元数据不足以下载前确认，须 fetch LICENSE**"
+    purpose: ARPG 执行边界样本（d2game/d2common/d2core/d2networking 拆分）
+    exe: (Go)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/OpenDiablo2/OpenDiablo2
+    wrapper: (见 scripts/game_combat_rules.py --school)
+    produces: ARPG 模块边界参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **许可证与成熟度未充分确认** —— 必须下载 LICENSE 后标注
+
+  walt_latency:
+    name: WALT (Webpage/App Latency Tool)
+    kind: reference
+    repo: "google/walt（仓库名**来源不确定**，以官方发布为准）"
+    license: "**需核实**"
+    purpose: 外部硬件同步输入与输出，测点击/拖动/屏幕/**音频**延迟
+    exe: (hardware + tool)
+    identity:
+      version_args: [--help]
+    install:
+      manual: 以官方来源为准
+    wrapper: (见 scripts/game_progress_input.py --input)
+    produces: 输入到反馈延迟测量原型
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **来源不确定** —— 适合作为**测量原型**， **并非本方法论的通用规则**"
+
+  # ======= 游戏第十四轮：UI 音效 / 过渡 / UI 动态 / 镜头叙事 =======
+  castle_game_engine_ref:
+    name: Castle Game Engine
+    kind: cli
+    repo: castle-engine/castle-engine
+    license: LGPL-2.1-or-later（含静态链接例外）
+    purpose: 跨平台完整引擎；**跨引擎交叉验证对象**（场景切换/UI/相机/音频总线/资源加载）
+    exe: castle-editor
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/castle-engine/castle-engine
+    wrapper: (见 scripts/game_ui_sound_transition.py --transition)
+    produces: 过渡与音频总线交叉验证
+    evidence_level: C
+    degrade: optional
+    note: "✅ 仓库页可确认 LGPL-2.1-or-later 且 2026 年仍活跃。 ⚠️ **商业项目的代码使用方式需落地前复核**，不应仅依据摘要结论"
+
+  godot_audio_bus_ref:
+    name: Godot（AudioBus / Tween / Camera3D 参照）
+    kind: cli
+    repo: godotengine/godot（本轮未直接抓取官方发布页，**来源不确定**）
+    license: MIT（以官方为准）
+    purpose: AudioBus / Tween / AnimationPlayer / Camera3D 便于实现 A-D 模板
+    exe: godot
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/godotengine/godot
+    wrapper: (见 scripts/game_ui_motion_camera.py --easing)
+    produces: UI 动态与镜头实现参照
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **来源不确定** —— 其默认自动混合、内置缓动和时间线封装 **不能直接成为目标规格**"
+
+  # ======= 游戏第十五轮：时间推进/动态经济/声望/存档兼容/玩法耦合 =======
+  cdda_economy_ref:
+    name: Cataclysm-DDA（时间/季节/经济/派系/天气/光照/物理耦合样本）
+    kind: cli
+    repo: CleverRaven/Cataclysm-DDA
+    license: "LICENSE.txt 存在，**类型需读原件确认**"
+    purpose: 持久程序生成世界；**时间—天气—经济—派系—保存**耦合压力测试样本
+    exe: cataclysm
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/CleverRaven/Cataclysm-DDA
+    wrapper: (见 scripts/game_world_economy.py --jump)
+    produces: 多系统耦合取证样本
+    evidence_level: C
+    degrade: optional
+    note: "✅ 活跃维护。⚠️ 页面列出 LICENSE.txt 但**未返回完整文本**， **不能据此断言许可证类型**"
+
+  openmw_mechanics_ref:
+    name: OpenMW（机制层与对话层参考）
+    kind: cli
+    repo: OpenMW/openmw
+    license: GPLv3
+    purpose: 目录含 `mwmechanics` / `mwdialogue`，适合参考机制与派系副作用
+    exe: openmw
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/OpenMW/openmw
+    wrapper: (见 scripts/game_faction_save.py --matrix)
+    produces: 机制层与对话层参考
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ 它是**原作兼容项目**，**不能直接证明原作所有派系副作用**； **旧插件兼容性并非无缝**，不能把\"能加载原版\"写成\"逐行为完全等价\""
+
+  wesnoth_faction_ref:
+    name: Battle for Wesnoth（阵营/时代/战役参考）
+    kind: cli
+    repo: wesnoth/wesnoth
+    license: "源码 GNU GPLv2+；艺术与音乐主要同许可，新贡献 CC BY-SA v4.0"
+    purpose: 参考阵营、时代、战役与多人结构
+    exe: wesnoth
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/wesnoth/wesnoth
+    wrapper: (见 scripts/game_faction_save.py --axis)
+    produces: 阵营系统结构参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 它是**回合策略游戏，不是开放世界派系系统的完整模板**
+
+  veloren_ref:
+    name: Veloren
+    kind: cli
+    dup_of: veloren
+    repo: veloren/veloren（**GitHub 为镜像，主开发在 GitLab**）
+    license: "**需仓库内复核**"
+    purpose: 持续演进的开放世界机制参考
+    exe: veloren
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://gitlab.com/veloren/veloren
+    wrapper: (见 scripts/game_world_economy.py --price)
+    produces: 开放世界经济结构参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **PR 与 issue 应去 GitLab** —— 不能只维护 GitHub 镜像 issue 列表
+
+  opencolorio_ref:
+    name: OpenColorIO
+    kind: cli
+    repo: AcademySoftwareFoundation/OpenColorIO
+    license: BSD-3-Clause
+    purpose: 色彩管理规范与配置参考（工作色彩空间/显示变换/LUT）
+    exe: ocioconvert
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AcademySoftwareFoundation/OpenColorIO
+    wrapper: (见 references/游戏引擎复刻.md 第十五部分 H 类)
+    produces: 色彩管道参考
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ 面向**影视/跨应用管道**，**不天然覆盖实时游戏 HDR 输出** —— 必须逐项目验证工作空间、显示变换和 **UI 混合**"
+
+  # ======= 游戏第十六轮：联机延迟/AI 信任/节奏/信息架构/听觉认知 =======
+  ioquake3_netref:
+    name: ioquake3（命中回溯与快照插值实现参照）
+    kind: cli
+    repo: ioquake3/ioquake3
+    license: GPL-2.0（**维护状态需以仓库实时页面核验**）
+    purpose: 研究**命中时回退历史状态**与快照广播
+    exe: ioquake3
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/ioquake3/ioquake3
+    wrapper: (见 scripts/game_netfeel_ai_trust.py --rollback)
+    produces: 命中回溯协议对照样本
+    evidence_level: C
+    degrade: optional
+    note: "✅ 许可证 GPL-2.0 可确认。⚠️ **维护状态需逐页核验**。 Valve 公开资料的 15ms/100ms/1s 是**吸收项不是原项目默认规格**"
+
+  openra_netref:
+    name: OpenRA（固定步长/确定性/回放/延迟抽象分层）
+    kind: reference
+    repo: OpenRA/OpenRA
+    license: "GPL-3.0（历史）；**当前状态需再核**"
+    purpose: 观察策略游戏如何把固定步长、确定性、回放和延迟抽象分层
+    exe: (launcher)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/OpenRA/OpenRA
+    wrapper: (见 scripts/game_netfeel_ai_trust.py --tickrate)
+    produces: 确定性网络分层参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **维护状态需再核**
+
+  behavior3js_ref:
+    name: behavior3js
+    kind: reference
+    repo: behavior3/behavior3js
+    license: MIT
+    purpose: 保存节点/黑板/条件/随机种子/版本/**运行时追踪**（可导出行为）
+    exe: (npm)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/behavior3/behavior3js
+    wrapper: (见 scripts/game_netfeel_ai_trust.py --intent)
+    produces: AI 行为树可读性导出
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 前提是**原项目行为确实由行为树或兼容结构实现**
+
+  behaviortree_cpp_ref:
+    name: BehaviorTree.CPP
+    kind: reference
+    dup_of: behaviortree_cpp
+    repo: BehaviorTree/BehaviorTree.CPP
+    license: MIT
+    purpose: 行为树实现 + 可导出运行时追踪
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/BehaviorTree/BehaviorTree.CPP
+    wrapper: (见 scripts/game_netfeel_ai_trust.py --intent)
+    produces: AI 行为契约参考
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ 同上，需确认原项目结构兼容
+
+  mlagents_testonly:
+    name: Unity ML-Agents（**仅测试用途**）
+    kind: cli
+    repo: Unity-Technologies/ml-agents
+    license: "**需仓库内复核**"
+    purpose: 生成测试对手 / 模仿玩家行为 / 参数搜索
+    exe: mlagents-learn
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/Unity-Technologies/ml-agents
+    wrapper: (见 scripts/game_netfeel_ai_trust.py --stuck)
+    produces: 测试对手与模仿数据
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **禁止作为 must-match 行为真值** —— 策略可随时间、随机种子和训练集漂移， **无法承诺稳定 telegraph、固定失误率或可读边界**"
+
+  isaacsim_testonly:
+    name: NVIDIA Isaac Sim（**仅仿真基础设施**）
+    kind: cli
+    repo: isaac-sim/IsaacSim
+    license: "**需仓库内复核**"
+    purpose: 仿真与生成测试基础设施
+    exe: isaacsim
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/isaac-sim/IsaacSim
+    wrapper: (见 scripts/game_netfeel_ai_trust.py --stuck)
+    produces: 仿真测试数据
+    evidence_level: D
+    degrade: optional
+    note: 🔴 **不应成为复刻目标行为**；数据仅可进 ai/training_artifacts/
+
+  # ======= 游戏第十七轮：运气/技巧/重复可玩/玩家表达 =======
+  rand_portable_ref:
+    name: rust-random/rand
+    kind: reference
+    repo: rust-random/rand
+    license: "MIT/Apache-2.0"
+    purpose: "**可移植可复现**随机基元（运气层实现基线）"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/rust-random/rand
+    wrapper: (见 scripts/game_luck_skill.py --pseudo)
+    produces: 可复现随机基元
+    evidence_level: C
+    degrade: optional
+    note: "✅ 双许可 MIT/Apache-2.0 已核验。⚠️ 官方文档明确提醒 **平台细节会影响复现**。🔴 **不是概率审计工具，不能证明原版概率**"
+
+  gfxreconstruct_ref:
+    name: GFXReconstruct
+    kind: cli
+    dup_of: gfxreconstruct
+    repo: LunarG/gfxreconstruct
+    license: MIT
+    purpose: 捕获 Vulkan/D3D12 调用并**在同机或不同硬件重放**
+    exe: gfxrecon-capture
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/LunarG/gfxreconstruct
+    wrapper: (见 scripts/game_luck_skill.py --sweep)
+    produces: 图形调用序列取证
+    evidence_level: C
+    degrade: optional
+    note: "✅ MIT 且持续维护。🔴 **不能证明输入→模拟→技巧窗口一致** —— **必须与固定步长输入录像共同使用**"
+
+  univrm_ref:
+    name: UniVRM / VRM
+    kind: reference
+    repo: vrm-c/UniVRM
+    license: MIT
+    purpose: 人形角色导入导出、第一人称与注视设置、BlendShape、
+      **头发与配件物理**；外观数据**可导出/可交换/跨版本读取**参考
+    exe: (unity)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/vrm-c/UniVRM
+    wrapper: (见 scripts/game_replay_identity.py --slot)
+    produces: 外观往返与多场景基准
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **不保证美术质量或所有展示场景一致**；**不照搬 VRM 特有字段**
+
+  tes5edit_audit_ref:
+    name: TES5Edit
+    kind: cli
+    repo: TES5Edit/TES5Edit
+    license: MPL-2.0
+    purpose: "**记录式、冲突式内容检查**；可作\"字段逐项记录、冲突可审计\"范式"
+    exe: TES5Edit
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/TES5Edit/TES5Edit
+    wrapper: (见 scripts/game_replay_identity.py --ugc)
+    produces: 内容审计范式
+    evidence_level: C
+    degrade: optional
+    note: "✅ MPL-2.0 已核验，2025 年仍更新。⚠️ 它是 **Bethesda 插件编辑器**， **不是 UGC 运行时或安全沙箱**，不应直接照搬架构"
+
+  # ======= 游戏第十八轮：降级/失败/内容冗余/极限/等待/一致性 =======
+  unity_deps_hunter_ref:
+    name: Unity-Dependencies-Hunter
+    kind: reference
+    repo: AlexeyPerov/Unity-Dependencies-Hunter
+    license: MIT
+    purpose: 扫描 Unity 项目查找**未被引用的资产**（识别 Addressable /
+      AssetReference / 运行时引用盲点）
+    exe: (unity editor)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AlexeyPerov/Unity-Dependencies-Hunter
+    wrapper: (见 scripts/game_content_limit.py --trace)
+    produces: 疑似冗余候选清单
+    evidence_level: D
+    degrade: optional
+    note: "✅ MIT 已核验。🔴 **只能发现候选，不能证明可删** —— 会把**运行时字符串加载、反射、远程目录或代码生成引用**判为无引用， 故应设\"**待人工复核**\"而非自动删除"
+
+  unity_asset_danshari_ref:
+    name: UnityAssetDanshari
+    kind: reference
+    repo: akof1314/UnityAssetDanshari
+    license: MIT
+    purpose: 重复资源、引用关系与删除预览（基于 ripgrep）
+    exe: (unity editor)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/akof1314/UnityAssetDanshari
+    wrapper: (见 scripts/game_content_limit.py --filler)
+    produces: 重复资源候选
+    evidence_level: D
+    degrade: optional
+    note: "✅ MIT 已核验（1.0.0 发布于 2024-09）。🔴 同上， **不能证明被删资源是填充内容，更不能证明删除后节奏/密度/引导仍成立**"
+
+  tracy_profiler_ref:
+    name: Tracy Profiler
+    kind: cli
+    dup_of: tracy
+    repo: wolfpld/tracy
+    license: BSD-3-Clause
+    purpose: 帧级混合采样分析（帧时 P95/P99 长尾卡顿取证）
+    exe: tracy-profiler
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/wolfpld/tracy
+    wrapper: (见 scripts/game_degrade_fail.py --tier)
+    produces: 帧时分位数与卡顿取证
+    evidence_level: C
+    degrade: optional
+    note: "✅ BSD-3-Clause。🔑 帧取证应以 **P95/P99 和长尾卡顿**为主， **不是平均 FPS**"
+
+  perfetto_ref:
+    name: Perfetto
+    kind: cli
+    repo: google/perfetto
+    license: Apache-2.0
+    purpose: 系统级追踪（CPU/GPU/内存/IO 队列），配合降级链与流式卡顿取证
+    exe: perfetto
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/google/perfetto
+    wrapper: (见 scripts/game_degrade_fail.py --hitch)
+    produces: 系统级性能追踪
+    evidence_level: C
+    degrade: optional
+    note: "✅ Apache-2.0。🔑 用于区分**主线程阻塞 / IO 等待 / 解压 / 着色器编译 / 纹理上传 / GC**"
+
+  # ======= 游戏第十九轮：证据链/仲裁/演进治理/迁移 =======
+  meilisearch_ref:
+    name: Meilisearch
+    kind: cli
+    repo: meilisearch/meilisearch
+    license: MIT
+    purpose: "**证据检索**索引（\"问题→系统→证据→责任\"图谱的可检索层）"
+    exe: meilisearch
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/meilisearch/meilisearch
+    wrapper: (见 scripts/game_evidence_chain.py --merge)
+    produces: 证据可发现性索引
+    evidence_level: D
+    degrade: optional
+    note: "✅ MIT 已核验。🔑 用于解决\"**170 个文件找不到等于没有**\"， **只做检索层，不做证据判定**"
+
+  graphviz_ref:
+    name: Graphviz
+    kind: cli
+    repo: ellson/graphviz
+    license: EPL-2.0
+    purpose: 生成"**问题—系统—证据—责任**"图谱与偏离依赖图
+    exe: dot
+    identity:
+      version_args: [-V]
+    install:
+      manual: https://gitlab.com/graphviz/graphviz
+    wrapper: (见 scripts/game_evidence_chain.py --chain)
+    produces: 证据责任图谱
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ 仓库镜像较多，**许可证以官方 GitLab 页面为准（EPL-2.0）**； **只做可视化，不做判定**"
+
+  vcmi_compat_ref:
+    name: VCMI（长期兼容治理模式参考）
+    kind: cli
+    repo: vcmi/vcmi
+    license: GPL-2.0-or-later（**需仓库内核对**）
+    purpose: 长期兼容治理参考：原版基线树 / 兼容层 / 偏离账本分离模式
+    exe: vcmiclient
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/vcmi/vcmi
+    wrapper: (见 scripts/game_migration_govern.py --trees)
+    produces: 长期分支治理范式
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **只作模式参考**，其社区扩展与仓库保留历史 **不能自动证明原版行为**"
+
+  openra_compat_ref:
+    name: OpenRA（跨版本确定性治理参考）
+    kind: reference
+    repo: OpenRA/OpenRA
+    license: "GPL-3.0（历史；**当前需再核**）"
+    purpose: 固定步长 + 确定性 + 回放 + 延迟抽象分层的治理参考
+    exe: (launcher)
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/OpenRA/OpenRA
+    wrapper: (见 scripts/game_migration_govern.py --update)
+    produces: 兼容窗口范式
+    evidence_level: D
+    degrade: optional
+    note: ⚠️ **输入重放只能作模式参考**，不能自动证明原版行为
+
+  fheroes2_compat_ref:
+    name: fheroes2（原版行为重建参考）
+    kind: cli
+    repo: ihhub/fheroes2
+    license: GPL-2.0-or-later（**需仓库内核对**）
+    purpose: 原版逐行为重建的长期项目模式参考
+    exe: fheroes2
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/ihhub/fheroes2
+    wrapper: (见 scripts/game_evidence_chain.py --grade)
+    produces: 逐行为重建范式
+    evidence_level: D
+    degrade: optional
+    note: ⚠️ **只作模式参考**，不证明目标原版行为
+
+  # ======= 游戏第二十轮：可交付性/可观测性/组织/终止 =======
+  reproducible_builds_ref:
+    name: reproducible-builds.org（规范）
+    kind: reference
+    repo: reproducible-builds/reproducible-builds.org
+    license: "CC-BY-SA / 文档为主（**逐页核**）"
+    purpose: "**逐字节可复现**构建原则与构建环境锁定清单"
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://reproducible-builds.org
+    wrapper: (见 scripts/game_delivery_observe.py --repro)
+    produces: 构建可复现**三级标记**
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ 以文档为主，**逐页核许可**。🔴 **不能直接保证游戏可玩**；封闭工具链应标 `reproducible: partial`"
+
+  electron_builder_ref:
+    name: electron-builder
+    kind: cli
+    repo: electron-userland/electron-builder
+    license: MIT
+    purpose: 多平台安装包构建与**产物元数据**（latest.yml 等，含 SHA-512）
+    exe: electron-builder
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/electron-userland/electron-builder
+    wrapper: (见 scripts/game_delivery_observe.py --manifest)
+    produces: 交付清单与校验和
+    evidence_level: C
+    degrade: optional
+    note: "✅ MIT。🔑 **安装器的真实价值在脚本化验证，不在格式** —— 对原生引擎应把\"配置—产物—校验清单—签名\"链改造为自己的发布规范"
+
+  electron_forge_ref:
+    name: Electron Forge
+    kind: cli
+    repo: electron/forge
+    license: MIT
+    purpose: 同一配置输出 Windows/macOS/Linux 安装或分发包
+    exe: electron-forge
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/electron/forge
+    wrapper: (见 scripts/game_delivery_observe.py --manifest)
+    produces: 多平台分发基线
+    evidence_level: C
+    degrade: optional
+    note: ✅ MIT。⚠️ 主要适用 Electron/Web 复刻壳或独立启动器
+
+  crashpad_ref:
+    name: crashpad
+    kind: cli
+    repo: chromium/crashpad
+    license: "Apache-2.0 为主"
+    purpose: 崩溃 **minidump / 附件 / 数据库**收集器（最后一帧环的基础）
+    exe: crashpad_handler
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/chromium/crashpad
+    wrapper: (见 scripts/game_delivery_observe.py --lastframe)
+    produces: minidump 与附件
+    evidence_level: C
+    degrade: optional
+    note: "✅ 上游活跃，Apache-2.0 为主。🔴 **需补游戏线程与 GPU 上下文**； **不得访问可能已破坏的游戏堆**"
+
+  sentry_unity_ref:
+    name: Sentry Unity SDK
+    kind: reference
+    repo: getsentry/sentry-unity
+    license: MIT
+    purpose: Unity 复刻的**崩溃与附件基线**（错误样本/追踪/日志/附件）
+    exe: (unity package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/getsentry/sentry-unity
+    wrapper: (见 scripts/game_delivery_observe.py --diag)
+    produces: 线上错误聚合
+    evidence_level: D
+    degrade: optional
+    note: "✅ SDK 仓库 MIT 活跃，但**具体能力须逐版核对**。🔴 **不适合替代 本地首次崩溃诊断、GPU 状态和跨帧输入证据**"
+
+  game_doctor_ref:
+    name: Game Doctor
+    kind: reference
+    repo: twoCatMoon/game-doctor
+    license: "**未在权威页面确认**"
+    purpose: "**HTML5/WebGL** 玩家自助诊断报告原型"
+    exe: (web)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/twoCatMoon/game-doctor
+    wrapper: (见 scripts/game_delivery_observe.py --observe)
+    produces: 玩家自助诊断报告
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **维护状态与许可证未在权威 README 确认**，标来源不确定。 🔴 **只适合 HTML5/WebGL 原型；原生引擎不建议直接套用**"
+
+  # ======= 游戏第二十一轮：隐性耦合/资源生命周期/帧契约/脚本边界 =======
+  physx_ref:
+    name: PhysX
+    kind: reference
+    dup_of: physx
+    repo: NVIDIA-Omniverse/PhysX
+    license: "BSD-3-Clause（**以仓库 LICENSE 为准**）"
+    purpose: 刚体 · 布料 · 关节 · **连续碰撞阶段**的模拟阶段对照
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/NVIDIA-Omniverse/PhysX
+    wrapper: (见 scripts/game_sim_resource.py --ownership)
+    produces: 模拟阶段与所有权参照
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **本次未取得许可证文件原文**，不写入证据事实， **以仓库 LICENSE 实际内容为准**"
+
+  bullet3_ref:
+    name: Bullet Physics
+    kind: reference
+    dup_of: bullet3
+    repo: bulletphysics/bullet3
+    license: "Zlib（**以仓库 LICENSE 为准**）"
+    purpose: "**确定性** · 约束 · **碰撞事件排序**的最小复现参照"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/bulletphysics/bullet3
+    wrapper: (见 scripts/game_sim_resource.py --ownership)
+    produces: 碰撞事件排序证据
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **许可证未取得原文**，以仓库 LICENSE 为准。 🔑 适合把\"碰撞事件是否在同一固定步内全部消费\"做成**最小复现**"
+
+  box2d_ref:
+    name: Box2D
+    kind: reference
+    dup_of: box2d
+    repo: erincatto/box2d
+    license: "MIT（**以仓库 LICENSE 为准**）"
+    purpose: "**代码量小**，适合做碰撞事件消费时机的最小复现"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/erincatto/box2d
+    wrapper: (见 scripts/game_frame_script.py --queue)
+    produces: 事件队列时机最小复现
+    evidence_level: C
+    degrade: optional
+    note: ⚠️ **许可证未取得原文**，以仓库 LICENSE 为准
+
+  bevy_ref:
+    name: Bevy
+    kind: reference
+    repo: bevyengine/bevy
+    license: "MIT OR Apache-2.0（**以仓库为准**）"
+    purpose: ECS 的 **Asset/Handle 版本**与命令缓冲何时应用
+    exe: (engine)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/bevyengine/bevy
+    wrapper: (见 scripts/game_sim_resource.py --identity)
+    produces: 资源句柄版本参照
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **许可证未取得原文**，以仓库 LICENSE 为准。 🔑 用于研究 `Asset`/`Handle` **版本化**"
+
+  rune_script_ref:
+    name: Rune
+    kind: reference
+    repo: rune-rs/rune
+    license: "MIT OR Apache-2.0（**以仓库为准**）"
+    purpose: Rust 嵌入脚本语言的**宿主—脚本调用/异步/恢复**边界参照
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/rune-rs/rune
+    wrapper: (见 scripts/game_frame_script.py --script)
+    produces: 脚本边界规范来源
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **许可证未取得原文**。🔴 **不应原样移植**， 只作边界规范来源；❌ 避免吸收\"万能异常拦截器\""
+
+  torque3d_ref:
+    name: Torque 3D
+    kind: cli
+    repo: TorqueGameEngines/Torque3D
+    license: "MIT（**以仓库为准**）"
+    purpose: 老式脚本运行时 · 引擎对象 · **实时编辑**的边界参照
+    exe: Torque3D
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/TorqueGameEngines/Torque3D
+    wrapper: (见 scripts/game_frame_script.py --hotreload)
+    produces: 旧引擎资源状态机参照
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **许可证未取得原文**。🔑 适合复刻**老项目**时识别 旧引擎资源状态机，**不宜直接照抄 API**"
+
+  dear_imgui_ref:
+    name: Dear ImGui
+    kind: reference
+    repo: ocornut/imgui
+    license: MIT
+    purpose: 复刻**调试可视化与性能 HUD**的基线工具
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/ocornut/imgui
+    wrapper: (见 scripts/game_frame_script.py --debug)
+    produces: 调试覆盖层
+    evidence_level: D
+    degrade: optional
+    note: "✅ MIT 已核验。🔑 每项调试量**必须和主循环阶段绑定**， 否则 HUD 值与回放权威值**可能相差一帧**"
+
+  # ======= 游戏第二十二轮：触觉/数值/输入硬件/AI听觉/云存档 =======
+  sdl3_ref:
+    name: Simple DirectMedia Layer (SDL3)
+    kind: cli
+    repo: libsdl-org/SDL
+    license: "**仓库状态与许可需使用前自行核实**"
+    purpose: 物理扫描码/逻辑键码分离 · 多设备增删 · 原始轴采集 · rumble 与力反馈能力查询
+    exe: sdl3-config
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/libsdl-org/SDL
+    wrapper: (见 scripts/game_input_percept.py --hw 与 scripts/game_haptics_numbers.py --haptic)
+    produces: 输入硬件与触觉兼容底座
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **本轮来源未确认维护状态与许可证，标来源不确定**。🔑 具备 rumble、力反馈能力查询与多设备事件，可作为跨设备兼容封装；🔴 **不足以证明某一专有控制器报告格式**，DualSense 等专有输出须自行录制原始报告并维护自有契约"
+
+  icu_ref:
+    name: International Components for Unicode (ICU)
+    kind: cli
+    repo: unicode-org/icu
+    license: "Unicode License（**以仓库为准**）"
+    purpose: 本地化数字/日期/货币格式化底座
+    exe: icuinfo
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/unicode-org/icu
+    wrapper: (见 scripts/game_haptics_numbers.py --locale)
+    produces: 本地化格式化
+    evidence_level: C
+    degrade: optional
+    note: "🔑 作为**格式化底座，不是权威**；🔴 **规则须由原版测量覆盖**，不能从 ICU/CLDR 反推。不同库即使同一规范版本也可能因兼容模式与区域补丁不同而输出不同"
+
+  tracy_ref:
+    name: Tracy Profiler
+    kind: cli
+    dup_of: tracy
+    repo: wolfpld/tracy
+    license: "BSD-3-Clause"
+    purpose: 用**同一时间线**标记声音事件、视觉事件、逻辑事件与报告提交
+    exe: tracy-profiler
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/wolfpld/tracy
+    wrapper: (见 scripts/game_input_percept.py --hw)
+    produces: 跨通道时间线
+    evidence_level: C
+    degrade: optional
+    note: "✅ BSD-3-Clause。🔑 **不只测 CPU 耗时** —— 用于把输入时间戳与游戏帧时间对齐"
+
+  imgui_hud_ref:
+    name: Dear ImGui（调试 HUD 与波形回放）
+    kind: reference
+    repo: ocornut/imgui
+    license: MIT
+    purpose: 实时查看扫描码 · 轴值 · LOD · 死区 · **设备指纹** · 触觉事件时间线
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/ocornut/imgui
+    wrapper: (见 scripts/game_input_percept.py --hw)
+    produces: 调试覆盖层
+    evidence_level: D
+    degrade: optional
+    note: "✅ MIT 已核验。🔴 **即时模式控件不得成为玩家 UI 的焦点契约**，只作调试层"
+
+  egosound_ref:
+    name: EgoSound
+    kind: reference
+    repo: groolegend/EgoSound
+    license: "**需仓库内核对**"
+    purpose: 第一人称声音的"**哪里、何时、为何**"空间/时序/因果任务数据集
+    exe: (dataset)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/groolegend/EgoSound
+    wrapper: (见 scripts/game_input_percept.py --hearing)
+    produces: 声音因果任务基准
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **许可证需仓库内核对**。🔑 用于**验证**第一人称声音的空间/时序/因果；🔴 **不是游戏 AI 听觉实现**，与游戏 AI 听觉的语义映射须自行编写"
+
+  # ======= 游戏第二十三轮：程序生成/阴影契约/交互反作用力/资源冷却 =======
+  wfc_ref:
+    name: WaveFunctionCollapse
+    kind: reference
+    repo: mxgmn/WaveFunctionCollapse
+    license: "**官方 README 未显示，以仓库文件为准**"
+    purpose: 约束生成 · 局部相似 · **矛盾失败**的一手实现
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mxgmn/WaveFunctionCollapse
+    wrapper: (见 scripts/game_gen_shadow.py --fail)
+    produces: 生成失败语义参照
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ 许可证与页面可见性不足，**以仓库文件为准**。🔑 官方明确：传播可能使某像素**所有系数归零**形成**矛盾且不能继续**，NP-hard 背景意味着**不存在总能在快速时间内完成的通用解法**。🔴 **不作为原版取证证据**，只吸收生成约束与失败语义"
+
+  fastnoise_lite_ref:
+    name: FastNoiseLite
+    kind: reference
+    repo: Auburn/FastNoiseLite
+    license: "**页面未确认，核验不足**"
+    purpose: 跨平台噪声 · 分形 · domain warp · **float/double**
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Auburn/FastNoiseLite
+    wrapper: (见 scripts/game_gen_shadow.py --fail)
+    produces: 噪声精度与输入契约
+    evidence_level: C
+    degrade: optional
+    note: "⚠️ **许可证来源不确定**。🔑 官方明确支持 float 和/或 double —— **浮点类型本身就是生成输入**。🔴 不能为性能默认切 float64，也不能为『更精确』擅自改 float32"
+
+  doom3_ref:
+    name: DOOM 3 (id-Software)
+    kind: lib
+    repo: id-Software/DOOM-3
+    license: "GPL 及附加条款，**以 COPYING.txt 为准**"
+    purpose: 官方 GPL 源码发布；**硬阴影与可见性**历史证据
+    exe: (source)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/id-Software/DOOM-3
+    wrapper: (见 scripts/game_gen_shadow.py --shadow)
+    produces: 阴影历史证据
+    evidence_level: D
+    degrade: optional
+    note: "✅ 官方 GPL 源码发布。⚠️ 官方说明其**不包含 depth fail / Carmack's Reverse 的模板阴影实现**，具体条款以 COPYING.txt 为准。🔑 吸收硬阴影与可见性历史证据，**不复制其阴影算法**"
+
+  # ======= 游戏第二十四轮：信任边界/设置契约/帧预算/意图层 =======
+  ggpo_ref:
+    name: GGPO（回滚网络库）
+    kind: reference
+    repo: pond3r/ggpo
+    license: "**来源不确定，以具体分支为准**"
+    purpose: 输入同步 · save/load state · 预测与回滚边界记录
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/pond3r/ggpo
+    wrapper: (见 scripts/game_trust_settings.py --rollback)
+    produces: 回滚边界参照
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **维护状态与许可证未逐项核实，标来源不确定**。🔑 真实开源回滚网络库，适合记录输入同步与回滚边界；🔴 **不是通用权威服务器方案**，不能称为『复刻服务端规范』"
+
+  open_match_ref:
+    name: Open Match
+    kind: reference
+    dup_of: open_match
+    repo: googleforgames/open-match
+    license: "Apache-2.0（**以仓库为准**）"
+    purpose: 匹配编排 · 服务器分配 · **会话租约**记录
+    exe: (service)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/googleforgames/open-match
+    wrapper: (见 scripts/game_trust_settings.py --accept)
+    produces: 会话租约与匹配证据
+    evidence_level: D
+    degrade: optional
+    note: "🔑 真实开源**匹配编排**项目。🔴 **不应被当作战斗权威层**；只覆盖匹配标准与分配，不定义信任边界"
+
+  unity_input_system_ref:
+    name: Unity Input System
+    kind: sdk
+    repo: Unity-Technologies/InputSystem
+    license: "Unity Companion License（**以仓库为准**）"
+    purpose: "**Action / Action Map / Binding / Control Scheme** —— 意图层主模型"
+    exe: (package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Unity-Technologies/InputSystem
+    wrapper: (见 scripts/game_budget_intent.py --intent)
+    produces: 意图层与重绑定参照
+    evidence_level: C
+    degrade: optional
+    note: "🔑 官方文档明确 Action 把**输入目的与具体设备控件分开**。🔴 但同一帧**多个 Action 的报告顺序未定义** —— **不能把设备上报顺序当仲裁结果**，意图层必须自带稳定排序键"
+
+  sdl_gamecontrollerdb_ref:
+    name: SDL_GameControllerDB
+    kind: reference
+    repo: mdqinc/SDL_GameControllerDB
+    license: "**以仓库为准**"
+    purpose: 控制器映射数据库，记录"**同键码不同语义**"
+    exe: (data)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mdqinc/SDL_GameControllerDB
+    wrapper: (见 scripts/game_budget_intent.py --equiv)
+    produces: 输入等价性回归基线
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合**输入等价性回归**。🔴 **不能替代项目自己的意图映射**"
+
+  ue_anim_budget_allancer_ref:
+    name: Unreal Engine Animation Budget Allancer
+    kind: doc
+    repo: (UE 官方插件，仓库归属需核实)
+    license: "**来源不确定，需核实**"
+    purpose: 动画预算 · 重要性 · URO · tick 跳过的**动态预算**模板
+    exe: (plugin)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://dev.epicgames.com/documentation/en-us/unreal-engine/animation-budget-allocator-in-unreal-engine
+    wrapper: (见 scripts/game_budget_intent.py --budget)
+    produces: 动态预算模板
+    evidence_level: D
+    degrade: optional
+    note: "⚠️ **仓库归属与许可证来源不确定**。🔑 可作『动态预算』模板；🔴 **不能直接替代其他子系统的仲裁**"
+
+  # ======= 游戏第二十五轮：持久痕迹/通知聚合/加载连续性/非文本本地化 =======
+  harfbuzz_ref:
+    name: HarfBuzz
+    kind: cli
+    dup_of: harfbuzz
+    repo: harfbuzz/harfbuzz
+    license: "MIT（**以仓库为准**）"
+    purpose: 复杂文本整形引擎，校验**阿拉伯/印度系连字与 OpenType 特性**
+    exe: hb-shape
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/harfbuzz/harfbuzz
+    wrapper: (见 scripts/game_load_locale.py --bidi)
+    produces: 文本整形与连字校验
+    evidence_level: C
+    degrade: optional
+    note: "🔑 真实且维护中。🔑 用于**校验连字与 OpenType 特性**，不是本地化权威；🔴 不能替代原版字体的字形与度量取证"
+
+  xliff_ref:
+    name: OASIS XLIFF 2.0
+    kind: doc
+    repo: (OASIS 标准，**无单一官方 GitHub 仓库**)
+    license: "**标准文档，非软件仓库**"
+    purpose: 保存**原文 · 目标文 · 状态 · 注释 · 上下文**
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: http://docs.oasis-open.org/xliff/xliff-core/v2.0/os/xliff-core-v2.0-os.html
+    wrapper: (见 scripts/game_load_locale.py --locale)
+    produces: 本地化交换格式
+    evidence_level: B
+    degrade: optional
+    note: "🔑 适合保存原文/译文/状态/上下文。🔴 **只是交换格式**，不能保证口型、时长、字体与版式一致"
+
+  cldr_ref:
+    name: Unicode CLDR
+    kind: reference
+    repo: unicode-org/cldr
+    license: "Unicode License（**以仓库为准**）"
+    purpose: 日期 · 时间 · 数字 · 货币 · 单位 · 复数 · 区域数据
+    exe: (data)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/unicode-org/cldr
+    wrapper: (见 scripts/game_load_locale.py --culture)
+    produces: 区域数据参考
+    evidence_level: C
+    degrade: optional
+    note: "🔑 适合**区域数据参考**。🔴 **不能替代原版测量**；一般工程更适合直接接入平台/引擎 ICU，**不必复制整套 CLDR 发布流程**"
+
+  quake2_ref:
+    name: Quake II (id-Software)
+    kind: lib
+    repo: id-Software/Quake-II
+    license: "**GPLv2（2023 rerelease 源码，条款以仓库为准）**"
+    purpose: 经典第一人称**痕迹 · 环境改变 · 对象持久化 · 客户端预测 · 相机追踪**代码研究
+    exe: (source)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/id-Software/Quake-II
+    wrapper: (见 scripts/game_trace_notify.py --trace 与 scripts/game_load_locale.py --camera)
+    produces: 痕迹与空间连续性研究样本
+    evidence_level: A
+    degrade: optional
+    note: "🔑 2023 rerelease 源码明确供修改与 MOD 参考，GPLv2。🔑 只用于**研究实现与取证方法**，🔴 **不代表整个游戏资产可自由复用**。⚠️ 第三方镜像页不能替代具体提交页，活跃度应回项目页复核"
+
+  # ======= 游戏第二十六轮：地形/水体/布料/反射/响度/预热 =======
+  godot_ref:
+    name: Godot Engine
+    kind: cli
+    dup_of: godot_engine
+    repo: godotengine/godot
+    license: "MIT"
+    purpose: "跨平台**渲染 · 输入 · 粒子 · XR**参考实现（主分支 4.8-dev 活跃）"
+    exe: godot
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/godotengine/godot
+    wrapper: (见 scripts/game_cloth_reflect.py --xr)
+    produces: 可运行复现与子系统对照
+    evidence_level: C
+    degrade: optional
+    note: "🔑 MIT、活跃维护、OpenXR 持续扩展。🔴 **核心能力不等于与原版等价** —— 只作对照与复现，不作 must-match 基线"
+
+  o3de_ref:
+    name: O3DE
+    kind: reference
+    dup_of: o3de
+    repo: o3de/o3de
+    license: "Apache-2.0"
+    purpose: 大型模块化 3D 引擎，**地形 · 渲染 · 动画 · 物理**参考
+    exe: (engine)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/o3de/o3de
+    wrapper: (见 scripts/game_terrain_water.py --terrain)
+    produces: 大型世界子系统与 Gem 拆分对照
+    evidence_level: C
+    degrade: optional
+    note: "🔑 Apache-2.0。🔴 **项目成熟度不等于其每个子系统都适合直接搬运**；工程复杂度与系统边界高"
+
+  bullet3_ref_dup2:
+    name: Bullet SDK
+    kind: reference
+    repo: bulletphysics/bullet3
+    license: "zlib"
+    purpose: 碰撞与多物理；**地形碰撞 · 车辆/浮力代理 · 角色控制器 · 空间查询**
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/bulletphysics/bullet3
+    wrapper: (见 scripts/game_terrain_water.py --buoy)
+    produces: 物理与碰撞可验证性参考
+    evidence_level: C
+    degrade: optional
+    note: "🔑 zlib、官方 SDK，有实验性 OpenCL GPU 支持。🔴 **多物理通用库不等于原版布料/流体实现**"
+
+  openxr_sdk_ref:
+    name: OpenXR SDK Source
+    kind: reference
+    dup_of: openxr_sdk
+    repo: KhronosGroup/OpenXR-SDK-Source
+    license: "Apache-2.0（**以仓库为准**）"
+    purpose: "**跨 XR API**：session · 输入 · 输出帧 · 参考空间 · 交互配置"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/KhronosGroup/OpenXR-SDK-Source
+    wrapper: (见 scripts/game_cloth_reflect.py --xr)
+    produces: 跨设备动作路径与参考空间
+    evidence_level: C
+    degrade: optional
+    note: "🔑 统一**设备枚举 · 动作路径 · 空间定位 · 输入源语义**。🔴 **不规定 snap turn 度数 · 暗角强度 · IPD · 坐姿站姿人体工学 · 晕动阈值** —— 舒适度数值必须从原版测量"
+
+  rsgain_ref:
+    name: rsgain
+    kind: cli
+    repo: complexlogic/rsgain
+    license: "2-clause BSD"
+    purpose: ReplayGain 2.0 批量响度测量，**输出 CSV**
+    exe: rsgain
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/complexlogic/rsgain
+    wrapper: (见 scripts/game_cloth_reflect.py --loud)
+    produces: 资产批量响度巡检
+    evidence_level: D
+    degrade: optional
+    note: "🔑 2-clause BSD。🔴 **默认目标 −18 LUFS 与 EBU 的 −23 LUFS 不同**；只是测量工具，**不是原版行为证据**"
+
+  # ======= 游戏第二十七轮：环境耦合/系统健康/可观测性相位/统计竞速 =======
+  ocat_ref:
+    name: OCAT
+    kind: cli
+    repo: GPUOpen-Tools/OCAT
+    license: "MIT（**以仓库为准**）"
+    purpose: "**帧时间与帧节奏**覆盖层测量"
+    exe: OCAT.exe
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/GPUOpen-Tools/OCAT
+    wrapper: (见 scripts/game_coupling_health.py --obs)
+    produces: 帧时间分布与覆盖层证据
+    evidence_level: C
+    degrade: optional
+    note: "🔑 可用于相位化观测的四段延迟。🔴 **OCAT 已证明测量覆盖层自身可改变帧节奏** —— 测量值须标记采集方式，不能当原版无干扰基线"
+
+  rgp_ref:
+    name: Radeon GPU Profiler
+    kind: reference
+    repo: GPUOpen-Tools/radeon_gpu_profiler
+    license: "MIT（**以仓库为准**）"
+    purpose: GPU 执行时戳与提交时戳分析
+    exe: (tool)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/GPUOpen-Tools/radeon_gpu_profiler
+    wrapper: (见 scripts/game_coupling_health.py --obs)
+    produces: GPU 执行时戳证据
+    evidence_level: C
+    degrade: optional
+    note: "🔴 **RGP 已证明 CPU 提交时戳与 GPU 执行时戳不同** —— 两者不可混用；晚一帧的读数不是误差而是伪 bug 来源"
+
+  # ======= 游戏第二十八轮：可达性/材质/音效覆盖 =======
+  materialx_ref:
+    name: MaterialX
+    kind: reference
+    repo: AcademySoftwareFoundation/MaterialX
+    license: "**以仓库 LICENSE 为准**（含 GOVERNANCE.md / CHANGELOG.md，有治理迹象）"
+    purpose: 跨应用跨渲染器的**材质与 look-dev 交换开放标准**
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AcademySoftwareFoundation/MaterialX
+    wrapper: (见 scripts/game_reach_material.py --brdf)
+    produces: 材质事实中间表示
+    evidence_level: C
+    degrade: optional
+    note: "🔑 适合记录**节点图 · 参数 · 纹理坐标 · 命名语义**，降低「同名不同义」。🔴 **不是两个引擎的自动双向转换器，也不能证明底层 BRDF 相同**；具体版本与 SPDX 须在锁定时复核"
+
+  openpbr_ref:
+    name: OpenPBR Surface
+    kind: reference
+    repo: AcademySoftwareFoundation/OpenPBR
+    license: "**以发布 tag 的 LICENSE 为准**（本轮未可靠提取完整条款）"
+    purpose: 跨引擎**表面着色模型标准**，减少同一材质在不同渲染器的外观差异
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AcademySoftwareFoundation/OpenPBR
+    wrapper: (见 scripts/game_reach_material.py --brdf)
+    produces: 表面模型迁移基线
+    evidence_level: C
+    degrade: optional
+    note: "🔑 可作为**首选迁移目标**，把验证从全图像比较收敛到实现差异。🔴 **当前原版/新引擎未必都用它；直接换模型仍会改变外观** —— 原版专有参数须另存 legacy_parameter_pack"
+
+  recast_ref:
+    name: Recast & Detour
+    kind: cli
+    repo: recastnavigation/recastnavigation
+    license: "ZLib（**纳入构建前复核 LICENSE**）"
+    purpose: 生成**参照导航数据** · 标注行走表面 · **发现网格差异**
+    exe: RecastDemo
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/recastnavigation/recastnavigation
+    wrapper: (见 scripts/game_reach_material.py --reach)
+    produces: 参照 NavMesh 与寻路走廊
+    evidence_level: C
+    degrade: optional
+    note: "🔑 可算寻路走廊并用 Simple Stupid Funnel 拉直；配合 DetourCrowd 观察局部避让。🔴 **不是玩法权威** —— 原版实际走过的轨迹才是权威；维护状态须从仓库 commit/release 重新确认"
+
+  menge_ref:
+    name: Menge
+    kind: reference
+    repo: Menge/menge
+    license: "**以仓库为准**（本轮未可靠核验）"
+    purpose: 模块化**人群运动框架** —— 可换邻近搜索 · 速度策略 · 事件 · 行为模型
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Menge/menge
+    wrapper: (见 scripts/game_presence_interact.py --presence)
+    produces: 避障行为测量沙箱
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合在固定场景复现「半程相遇谁让路 · 通道拥塞谁先停 · 密度上限谁退出」，把 Reynolds 式分离/对齐/聚合变成可开关变量。🔴 **面向人群仿真，不等同于游戏角色控制器 · 根运动 · 物理材质 · 关卡门禁** —— 只作测量沙箱，不直接搬入生产"
+
+  opencv_ref:
+    name: OpenCV
+    kind: reference
+    repo: opencv/opencv
+    license: "Apache-2.0"
+    purpose: 批处理**色彩空间 · 掩膜 · SSIM · 直方图 · 特征比较**
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/opencv/opencv
+    wrapper: (见 scripts/game_reach_material.py --layer)
+    produces: 图像比较原语
+    evidence_level: C
+    degrade: optional
+    note: "🔑 Apache-2.0 适合脚本使用。🔴 **SSIM 不能单独证明「游戏正确」** —— 尤其会被模糊 · 锐化 · TAA · 动态分辨率欺骗"
+
+  # ======= 游戏第二十九轮：失败循环/刷新/容错/复位 =======
+  luanti_ref:
+    name: "Luanti (Minetest)"
+    kind: cli
+    repo: luanti-org/luanti
+    license: "**本轮未确认许可证全文**（页面有 2010—2026 版权区间）"
+    purpose: "**世界按文件夹保存于 user/worlds/** —— 地图块 · 节点 · 对象状态取证载体"
+    exe: luanti
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/luanti-org/luanti
+    wrapper: (见 scripts/game_fault_reset.py --trigger)
+    produces: 区块卸载后对象是否存在的取证
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合观察「区块卸载后对象存在与否」与节点元数据。🔴 **公开页面未直接写明许可证** —— 使用前必须打开主许可证文件并核对依赖与游戏内容是否采用不同许可；**其默认块持久化不等于上层游戏的所有实体行为**"
+
+  openmw_ref2:
+    name: "OpenMW（对象状态迁移锚点）"
+    kind: cli
+    repo: OpenMW/openmw
+    license: "GPLv3"
+    purpose: "老式开放世界**对象状态 · 存档 · 任务 · NPC** 迁移锚点"
+    exe: openmw
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/OpenMW/openmw
+    wrapper: (见 scripts/game_fault_reset.py --four)
+    produces: 存档与对象状态定位；支持 --load-savegame
+    evidence_level: D
+    degrade: optional
+    note: "🔑 明确 GPLv3。🔴 **具体复位表仍需原版测量** —— 它可帮助定位存档/任务/NPC/对象状态，但不能证明原版采用某一复位规则"
+
+  wesnoth_ref2:
+    name: "Battle for Wesnoth（回溯与保存点参考）"
+    kind: cli
+    repo: wesnoth/wesnoth
+    license: "**源码 GPLv2+；新贡献 CC BY-SA v4.0**"
+    purpose: "回合**保存点 · 回放 · 撤销结构**参考"
+    exe: wesnoth
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/wesnoth/wesnoth
+    wrapper: (见 scripts/game_retry_spawn.py --start)
+    produces: retry_restore_point 模板思路
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合吸收的是「把时间线切成可回到的事务点」。🔴 **不适合直接吸收其具体 UI 节奏或战斗规则**，也**不能证明其「无惩罚模式」按钮语义**"
+
+  cdda_ref2:
+    name: "Cataclysm: Dark Days Ahead（持久世界演化观察）"
+    kind: cli
+    repo: CleverRaven/Cataclysm-DDA
+    license: "**来源不确定**（本轮页面未解析许可）"
+    purpose: "**持久程序世界中时间 · 对象 · 死亡后果**的高密度观察对象"
+    exe: cataclysm-tiles
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/CleverRaven/Cataclysm-DDA
+    wrapper: (见 scripts/game_retry_spawn.py --res)
+    produces: 资源/怪物/车辆/世界状态随时间演化的候选机制
+    evidence_level: D
+    degrade: optional
+    note: "🔑 官方描述为 harsh, persistent, procedurally generated world。🔴 **公开资料不能证明某一具体刷新算法，只能作机制候选，不能作原版证据**"
+
+  # ======= 游戏第三十轮：连续性取证与验证 =======
+  miniaudio_ref:
+    name: miniaudio
+    kind: reference
+    dup_of: miniaudio
+    repo: mackron/miniaudio
+    license: "**以仓库 LICENSE 为准**（维护状态需复核）"
+    purpose: "建立**离线分析播放链**与统一 PCM 输出"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mackron/miniaudio
+    wrapper: (见 scripts/game_continuity.py --ambm)
+    produces: 氛围层离线频谱/onset 分析链
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合氛围层取证与离线分析。🔴 **不能替代 Wwise 或引擎内部 voice**；也**不能证明原版层数**"
+
+  otel_spec_ref:
+    name: OpenTelemetry Specification
+    kind: reference
+    repo: open-telemetry/opentelemetry-specification
+    license: "Apache-2.0"
+    purpose: "日志与追踪**字段命名参考**（跨语言实现要求与期望）"
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/open-telemetry/opentelemetry-specification
+    wrapper: (见 scripts/game_continuity.py --order)
+    produces: 事件字段命名与追踪语义参考
+    evidence_level: D
+    degrade: optional
+    note: "🔑 只作命名参考。🔴 **不能把 OTel 事件直接当成游戏事件模型** —— 具体语义约定仍须对照项目规范"
+
+  spdlog_ref:
+    name: spdlog
+    kind: reference
+    repo: gabime/spdlog
+    license: "**以仓库为准**（状态与许可需复核）"
+    purpose: "保存每个 **layer event 的时钟 · 触发条件 · 丢弃原因**"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/gabime/spdlog
+    wrapper: (见 scripts/game_continuity.py --amb)
+    produces: 氛围层事件日志
+    evidence_level: D
+    degrade: optional
+    note: "🔑 可用于氛围层与事件序取证日志。🔴 只记日志，**不判定原版语义**"
+
+  # ======= 游戏第三十一轮：共置/档案/天气/小地图 =======
+  tankgame_split_ref:
+    name: "TankGame（本地分屏最小原型样本）"
+    kind: reference
+    repo: ryklin2/TankGame
+    license: "**来源不确定**（许可证未直接核验）"
+    purpose: "本地分屏多人的**最小可运行原型参考**"
+    exe: (java)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/ryklin2/TankGame
+    wrapper: (见 scripts/game_colo_weather.py --view)
+    produces: 分屏拓扑原型
+    evidence_level: D
+    degrade: optional
+    note: "🔑 是基础 Java 坦克游戏并含本地分屏多人玩法，2025 年仍有更新。🔴 **只能证明最小原型可行** —— 不能证明多视口遮挡剔除 · 动态分辨率 · 输入设备重连已处理，**更不能替代原版测量**"
+
+  tm2_split_collision_ref:
+    name: "TM2SplitScreenCollisions（分屏碰撞参考）"
+    kind: reference
+    repo: AndreGelabert/TM2SplitScreenCollisions
+    license: "**来源不确定**（许可证未直接核验，不能认定可商用）"
+    purpose: "分屏**碰撞处理**参考实现"
+    exe: (project)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AndreGelabert/TM2SplitScreenCollisions
+    wrapper: (见 scripts/game_colo_weather.py --view)
+    produces: 分屏碰撞样本
+    evidence_level: D
+    degrade: optional
+    note: "🔑 只作参考实现/反例。🔴 **许可证未核验前不得纳入生产依赖**，也不构成原版证据"
+
+  fivem_seasonal_weather_ref:
+    name: "BySteel-RealTime-Seasonal-Weather（天气模组候选）"
+    kind: reference
+    repo: steel-fivem/BySteel-RealTime-Seasonal-Weather
+    license: "**来源不确定**（许可证未直接核验，不能认定可商用）"
+    purpose: "实时**季节天气模组**的字段与状态机候选"
+    exe: (mod)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/steel-fivem/BySteel-RealTime-Seasonal-Weather
+    wrapper: (见 scripts/game_colo_weather.py --weather)
+    produces: 天气两层状态机字段候选
+    evidence_level: D
+    degrade: optional
+    note: "🔑 可作为天气宏观/局部两层状态机的字段来源。🔴 **许可证未核验**；**不能证明原版天气语义**，只能作候选"
+
+  # ======= 游戏第三十二轮：交互事务契约 =======
+  openblocks_ref:
+    name: "Google Blocks / Open Blocks"
+    kind: reference
+    repo: googlevr/blocks
+    license: "Apache-2.0"
+    purpose: "VR 低多边形**建模与吸附手势**参照"
+    exe: (app)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/googlevr/blocks
+    wrapper: (见 scripts/game_txn_contract.py --place)
+    produces: snap_candidate / snap_commit 两阶段吸附参照
+    evidence_level: D
+    degrade: optional
+    note: "🔑 公开说明把「半按显示辅助线 · 完全按下前定位 · 完全按下确认吸附位置」作为手势，并描述从对象/边/顶点/网格等多语义吸附。🔴 **Google Blocks 已停止接受 PR**；**不能证明原版放置合法性规则**"
+
+  obs_studio_ref:
+    name: OBS Studio
+    kind: cli
+    repo: obsproject/obs-studio
+    license: "**GPLv2 或更高版本**"
+    purpose: "成品**捕获 · 混音 · 编码 · 录制 · 插件 API** 参照"
+    exe: obs
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/obsproject/obs-studio
+    wrapper: (见 scripts/game_txn_contract.py --export)
+    produces: 导出规格参照（container/codec/tracks/HDR）
+    evidence_level: D
+    degrade: optional
+    note: "🔑 一手文档确认含 sources · scenes · outputs · encoders · services · 音频处理器与重采样器，并提供插件和脚本 API。🔴 **它不保存游戏世界状态，也不能解决「回放为什么和重制行为不同」**"
+
+  gfxreconstruct_ref2:
+    name: GFXReconstruct（录制语义边界提示）
+    kind: cli
+    repo: LunarG/gfxreconstruct
+    license: "MIT"
+    purpose: "**只复现图形 API**，用于说明帧画面录制的边界"
+    exe: gfxrecon-replay
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/LunarG/gfxreconstruct
+    wrapper: (见 scripts/game_txn_contract.py --replay)
+    produces: 回放保真度模型对照（输入/快照/帧画面）
+    evidence_level: D
+    degrade: optional
+    note: "🔑 MIT 且活跃。🔴 **只复现图形 API 调用，不代表原版游戏逻辑** —— 不能作为逻辑验证证据"
+
+  # ======= 游戏第三十三轮：认知层与联机契约 =======
+  nakama_ref:
+    name: Nakama
+    kind: cli
+    repo: heroiclabs/nakama
+    license: "Apache-2.0"
+    purpose: "实时通信 · 匹配 · **组队 · 好友 · 存储 · 排行榜原语**"
+    exe: nakama
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/heroiclabs/nakama
+    wrapper: (见 scripts/game_cognitive_social.py --invite)
+    produces: 会话/社交原语底座
+    evidence_level: D
+    degrade: optional
+    note: "🔑 Apache-2.0 且活跃，可作联机实现底座。🔴 **只解决「怎么发消息」，不解决「契约是什么」** —— 组队/好友原语不能自动推导出掉落归属"
+
+  open_match_ref_dup2:
+    name: Open Match
+    kind: reference
+    dup_of: open_match
+    repo: googleforgames/open-match
+    license: "Apache-2.0"
+    purpose: "可插拔**匹配编排**（非游戏引擎绑定）"
+    exe: (k8s)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/googleforgames/open-match
+    wrapper: (见 scripts/game_cognitive_social.py --invite)
+    produces: 匹配编排原语
+    evidence_level: D
+    degrade: optional
+    note: "🔑 Google 维护，Apache-2.0。🔴 **匹配编排不能定义中途加入者的进度语义**"
+
+  reko_decompiler_ref:
+    name: Reko Decompiler
+    kind: reference
+    repo: uxmal/reko
+    license: "**GPL**（以仓库为准）"
+    purpose: "机器码**反编译**（与 Ghidra 交叉验证）"
+    exe: (app)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/uxmal/reko
+    wrapper: (见 scripts/game_cognitive_social.py --truth)
+    produces: 推测实现（证据降级使用）
+    evidence_level: D
+    degrade: optional
+    note: "🔑 GPL，可作 Ghidra 之外的第二反编译视角。🔴 **产出是「推测实现」而非「真实行为」，证据八级中须低一级**"
+
+  # ======= 游戏第三十四轮：纵深取证与配置反解 =======
+  bepinx_configmanager_ref:
+    name: BepInEx ConfigurationManager
+    kind: reference
+    repo: BepInEx/BepInEx.ConfigurationManager
+    license: "LGPL-2.1"
+    purpose: "运行时**枚举难度系数**并生成当前配置快照"
+    exe: (plugin)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/BepInEx/BepInEx.ConfigurationManager
+    wrapper: (见 scripts/game_depth_difficulty.py --hidden)
+    produces: 难度隐藏参数反解快照
+    evidence_level: D
+    degrade: optional
+    note: "🔑 持续维护，LGPL-2.1。用于把数值白盒化。🔴 **只能观察实际数值，不能据此认定设计意图**"
+
+  unity_runtime_inspector_ref:
+    name: Unity Runtime Inspector
+    kind: reference
+    repo: yasirkula/UnityRuntimeInspector
+    license: "MIT"
+    purpose: "运行时**观察实际数值**（世界状态 · 组件字段）"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/yasirkula/UnityRuntimeInspector
+    wrapper: (见 scripts/game_depth_difficulty.py --diff)
+    produces: 运行时数值观察
+    evidence_level: D
+    degrade: optional
+    note: "🔑 持续维护，MIT。🔴 **只观察实际数值，不能据此认定设计意图**"
+
+  # ======= 游戏第三十五轮：具身表现与输入时序 =======
+  vivox_positional_ref:
+    name: Vivox（Unity 位置频道）
+    kind: sdk
+    repo: (Unity Vivox SDK / 官方文档)
+    license: "**商业 SDK**（来源不确定，以官方条款为准）"
+    purpose: "**位置频道**：距离衰减 · 朝向渐变 · 人群噪声 · 进入/退出事件"
+    exe: (sdk)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://docs.unity.com/ugs/vivox
+    wrapper: (见 scripts/game_embodied_input.py --zone)
+    produces: 距离带与朝向权重取证字段
+    evidence_level: D
+    degrade: optional
+    note: "🔑 官方文档说明位置和面朝方向决定 3D 频道，音频混合含距离衰减、朝向渐变，可产生「鸡尾酒会」式人群噪声；进入或退出最大范围会产生参与者加入/移除事件。🔴 **它本身不是游戏内个人空间规范，也不覆盖 NPC 冒犯、碰撞和游戏内交易规则**"
+
+  unity_input_system_ref_dup2:
+    name: Unity Input System（时序审计接口）
+    kind: sdk
+    repo: Unity-Technologies/InputSystem
+    license: "**Unity Companion License**（以仓库为准）"
+    purpose: "**started/performed/canceled/duration** 与 composite/interaction 参数审计"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Unity-Technologies/InputSystem
+    wrapper: (见 scripts/game_embodied_input.py --phase)
+    produces: 输入时序日志（六张时序表）
+    evidence_level: D
+    degrade: optional
+    note: "🔑 提供可审计接口：动作阶段、时间戳、持续时间、可调 composite/interaction。🔴 **不能用一个自带默认表现的库直接替换原版手调细节**"
+
+  gameplay_cue_ref:
+    name: Unreal GameplayCueManager
+    kind: doc
+    repo: (Epic Games 官方能力系统文档)
+    license: "**Epic 官方条款**（以官方为准）"
+    purpose: "**表现事件与逻辑解耦**（HandleGameplayCue · 实例缓存 · 生命周期）"
+    exe: (engine)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://dev.epicgames.com/documentation/
+    wrapper: (见 scripts/game_embodied_input.py --phase)
+    produces: 逻辑标签与表现订阅分离范式
+    evidence_level: D
+    degrade: optional
+    note: "🔑 提供 HandleGameplayCue/HandleGameplayCues、实例缓存、缺失提示、对象库和生命周期接口，价值在于把「中毒累计」与「绿色覆盖/粒子/音效/屏幕效果」分开。🔴 **不能照搬某个游戏能力系统**"
+
+  # ======= 游戏第三十六轮：相位取证与边界生成 =======
+  presentmon_ref:
+    name: PresentMon
+    kind: cli
+    dup_of: presentmon
+    repo: GameTechDev/PresentMon
+    license: "MIT"
+    purpose: "采集 **CPU/GPU/Display 帧时与延迟**并输出 CSV"
+    exe: presentmon
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/GameTechDev/PresentMon
+    wrapper: (见 scripts/game_micro_rhythm.py --ladder)
+    produces: 帧时与延迟 CSV（帧阶梯输入之一）
+    evidence_level: D
+    degrade: optional
+    note: "🔑 MIT。可采集 CPU/GPU/Display 帧时与延迟。🔴 **只能证明时序，不能证明相位语义**；须与硬件触发视频、音频波形、震动记录合并成帧阶梯"
+
+  hypothesis_ref:
+    name: Hypothesis
+    kind: reference
+    repo: HypothesisWorks/hypothesis
+    license: "MPL-2.0"
+    purpose: "**生成边界用例**（0/1/最大±1/NaN/±∞/反序列化缺字段）"
+    exe: (python-module)
+    identity:
+      import_module: hypothesis
+    install:
+      pip: hypothesis
+    wrapper: (见 scripts/game_micro_rhythm.py --num)
+    produces: 边界状态触发序列
+    evidence_level: D
+    degrade: optional
+    note: "🔑 MPL-2.0。适合把「不可能状态」从随机测试的偶然产物变成必测状态。🔴 **不得因其通过就认为原版行为已被覆盖**"
+
+  cldr_ref_dup2:
+    name: Unicode CLDR
+    kind: reference
+    dup_of: cldr_ref
+    repo: unicode-org/cldr
+    license: "Unicode-Data"
+    purpose: "**复数 · 排序 · 单位**等地域数据（保证句子结构不被破坏）"
+    exe: (data)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/unicode-org/cldr
+    wrapper: (见 scripts/game_micro_rhythm.py --voice)
+    produces: 本地化格式校验
+    evidence_level: D
+    degrade: optional
+    note: "🔑 Unicode-Data 许可。🔴 **只保证格式不破坏句子结构，不能替你定人格**；错别字、口语、人称混用可能是设计"
+
+  # ======= 游戏第三十七轮：破坏 / 连锁 / 约束 / RNG =======
+  nvidia_blast_ref:
+    name: NVIDIA Blast SDK
+    kind: reference
+    repo: NVIDIAGameWorks/Blast
+    license: "**以仓库 LICENSE 为准**（NVIDIA 许可，来源不确定需复核）"
+    purpose: "**层级分块 + 支撑图 + 键合**结构化破坏参照"
+    exe: (sdk)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/NVIDIAGameWorks/Blast
+    wrapper: (见 scripts/game_destruct_chain.py --support)
+    produces: 支撑拓扑取证参照模型
+    evidence_level: D
+    degrade: optional
+    note: "🔑 当前公开说明仍称其为「预破碎的刚体破坏」，🔴 **运行时切分与形变属未来版本能力** —— 体素/运行时挖洞必须另找实现路径"
+
+  nvidia_flow_ref:
+    name: NVIDIA Flow
+    kind: reference
+    repo: NVIDIAGameWorks/Flow
+    license: "**以仓库 LICENSE 为准**（NVIDIA 许可，来源不确定需复核）"
+    purpose: "**四密度通道 + 四速度通道**流体/燃烧模拟参照"
+    exe: (sdk)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/NVIDIAGameWorks/Flow
+    wrapper: (见 scripts/game_destruct_chain.py --prop)
+    produces: 燃烧参数审计对照项
+    evidence_level: D
+    degrade: optional
+    note: "🔑 参数含 buoyancyPerBurn/burnPerTemp/fuelPerBurn/divergencePerBurn，阻尼与衰减分通道独立。🔴 **官方警告碰撞支持非常有限**，主要靠发射器适配 —— 须测「运动平台上的火」"
+
+  obi_rope_ref:
+    name: Obi（软体/绳索/布料）
+    kind: sdk
+    repo: (Virtual Method 商业资产)
+    license: "**商业资产**（来源不确定，以官方条款为准）"
+    purpose: "**约束参数审计**：迭代 × 子步 × 时间步"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://obi.virtualmethodstudio.com/
+    wrapper: (见 scripts/game_destruct_chain.py --rope)
+    produces: 约束语义对照表
+    evidence_level: D
+    degrade: optional
+    note: "🔑 官方收敛文档明确：0.1ms+1 迭代消拉伸；0.01ms+1 迭代获稳定与动态；0.1ms+10 迭代绷紧但抑制动态。🔴 **换求解器后「同一参数」是伪命题**"
+
+  sphere_rng_ref:
+    name: Sphere Engine RNG::state
+    kind: doc
+    repo: (Sphere Engine 官方文档)
+    license: "**以官方文档为准**（来源不确定需复核）"
+    purpose: "**32 字节十六进制 RNG 状态**，可跨会话恢复序列"
+    exe: (engine)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/sphere-engine
+    wrapper: (见 scripts/game_destruct_chain.py --rng)
+    produces: RNG 快照语义锚点
+    evidence_level: D
+    degrade: optional
+    note: "🔑 官方明确把此能力用于**对抗 save scumming**。🔴 **D 类无通用引擎级规范**，原版行为必须靠逐档取证"
+
+  # ======= 游戏第三十八轮：生活玩法 / 痕迹 / 叙事接口 =======
+  yarn_spinner_ref:
+    name: Yarn Spinner
+    kind: reference
+    dup_of: yarn_spinner
+    repo: YarnSpinnerTool/YarnSpinner
+    license: "MIT（以仓库 LICENSE 为准，需复核）"
+    purpose: "**对话分支 · 变量 · 命令接口**验证"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/YarnSpinnerTool/YarnSpinner
+    wrapper: (见 scripts/game_lifeplay_trace.py --choice)
+    produces: 分支与变量接口验证
+    evidence_level: D
+    degrade: optional
+    note: "🔑 官方定位是向游戏发送台词、选项和场景命令的对话编译器。🔴 **不是自动保证叙事表现一致的工具**，也不能当「分支因果验证器」"
+
+  inky_ref:
+    name: Inky（ink 编辑器）
+    kind: cli
+    repo: inkle/inky
+    license: "MIT"
+    purpose: "**边写边测**的叙事分支编辑与播放，可导出编译 JSON"
+    exe: inky
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/inkle/inky
+    wrapper: (见 scripts/game_lifeplay_trace.py --skip)
+    produces: 分支测试用例
+    evidence_level: D
+    degrade: optional
+    note: "🔑 页面明确 MIT。🔴 **官方坦承并非企业级完整编辑器**；只能设计分支测试，不能证明演出表现一致"
+
+  openra_ref:
+    name: OpenRA
+    kind: reference
+    repo: OpenRA/OpenRA
+    license: "GPL-3.0-or-later（当前状态需再核）"
+    purpose: "**规则化单位数据 · 阵营 · 地图修改**观察样本"
+    exe: (game)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/OpenRA/OpenRA
+    wrapper: (见 scripts/game_lifeplay_trace.py --mount)
+    produces: 单位与阵营数据取证参照
+    evidence_level: D
+    degrade: optional
+    note: "🔑 支持早期西木经典的自由/开源 RTS 引擎。🔴 **它是复刻且允许显著再设计，不能替代对原版单位的逐字段取证**，更不能照搬其「现代化」修改"
+
+  # ======= 游戏第三十九轮：载体 / UGC / 权利 / 数据布局 =======
+  luau_ref:
+    name: Luau
+    kind: reference
+    repo: roblox/luau
+    license: MIT
+    purpose: "**渐进类型 · 静态分析 · 能力控制 · 受控运行时**"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/roblox/luau
+    wrapper: (见 scripts/game_carrier_rights.py --sand)
+    produces: 沙箱能力控制参照
+    evidence_level: D
+    degrade: optional
+    note: "🔑 许可证允许嵌入自有项目并保留声明。🔑 吸收重点是**能力交集**模型：子容器能力由祖先能力交集决定"
+
+  tiled_editor_ref:
+    name: Tiled Map Editor
+    kind: cli
+    repo: mapeditor/tiled
+    license: "**编辑器核心 GPLv2**，libtiled 等另有 BSD/Apache（**须逐组件核**）"
+    purpose: "**官方编辑器 / 导出器**契约参照"
+    exe: tiled
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mapeditor/tiled
+    wrapper: (见 scripts/game_carrier_rights.py --ugc)
+    produces: 编辑器与导出器契约样本
+    evidence_level: D
+    degrade: optional
+    note: "🔑 2026-09 仍活跃。🔴 **只链接，不在自有代码复制其许可证约束部分**"
+
+  flecs_ref:
+    name: Flecs
+    kind: reference
+    repo: SanderMertens/flecs
+    license: MIT
+    purpose: "**组件存储 · 查询 · 关系 · 热重载 · 模块 API**"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/SanderMertens/flecs
+    wrapper: (见 scripts/game_carrier_rights.py --layout)
+    produces: ECS 布局与查询参照
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **仍须固定遍历与确定性策略** —— 使用相同 ECS 不能推出实体顺序、事件顺序、模拟结果必然一致"
+
+  entt_ref:
+    name: EnTT
+    kind: reference
+    repo: skypjack/entt
+    license: MIT
+    purpose: "**稀疏集存储 · 事件调度 · 依赖管理**"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/skypjack/entt
+    wrapper: (见 scripts/game_carrier_rights.py --layout)
+    produces: 存储与调度参照
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **默认不假定实体顺序稳定**"
+
+  llama_ref:
+    name: LLAMA
+    kind: reference
+    repo: LLNL/LLAMA
+    license: "BSD 类（以仓库 LICENSE 为准）"
+    purpose: "**AoS / SoA / AoSoA · 视图 · 迭代器 · 缓存行 · 分配器解耦**"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/LLNL/LLAMA
+    wrapper: (见 scripts/game_carrier_rights.py --layout)
+    produces: 数据布局抽象参照
+    evidence_level: D
+    degrade: optional
+    note: "🔑 把布局与算法解耦，便于保留「标量黄金路径」并逐布局比较哈希"
+
+  xsimd_ref:
+    name: xsimd
+    kind: reference
+    repo: xtensor-stack/xsimd
+    license: BSD-3-Clause
+    purpose: "**SIMD 内部函数抽象**"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/xtensor-stack/xsimd
+    wrapper: (见 scripts/game_carrier_rights.py --simd)
+    produces: SIMD 可移植层
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **启用前必须逐算法比较确定性**；不得与 -ffast-math 同用后宣称等价"
+
+  touchscript_ref:
+    name: TouchScript
+    kind: reference
+    repo: TouchScript/TouchScript
+    license: MIT
+    purpose: "**多点触控手势竞争 · 手指生命周期 · 历史轨迹**设计参照"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/TouchScript/TouchScript
+    wrapper: (见 scripts/game_carrier_rights.py --touch)
+    produces: 触控语义设计参照
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **最新 Release 为 2017-07-30** —— 只借鉴设计，**不再作为现代 Unity 依赖直接采用**"
+
+  pointerevents_ref:
+    name: W3C Pointer Events
+    kind: reference
+    repo: w3c/pointerevents
+    license: "W3C 规范（仓库内容 MIT）"
+    purpose: "**pointerId · 事件目标重映射 · 坐标 · 压力 · 宽高 · touch-action**"
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/w3c/pointerevents
+    wrapper: (见 scripts/game_carrier_rights.py --touch)
+    produces: 触控身份与坐标语义锚点
+    evidence_level: B
+    degrade: optional
+    note: "🔑 pointerId 是「按稳定标识维护手指生命周期」的规范锚点，🔴 反证「按数组索引处理」是高危做法"
+
+  # ======= 游戏第四十轮：意义层（声音语义/成长/元操作/时间美学） =======
+  godot_material_footsteps_ref:
+    name: godot-material-footsteps
+    kind: reference
+    repo: "（Godot 4 插件）"
+    license: MIT
+    purpose: "**表面检测四策略并列**：元数据 / GridMap 瓦片 / HTerrain 层 / 实际材质表面"
+    exe: (plugin)
+    identity:
+      version_args: [--version]
+    install:
+      manual: "Godot Asset Library 检索 godot-material-footsteps"
+    wrapper: (见 scripts/game_meaning_layer.py --mat)
+    produces: 表面→声音映射检测器参考
+    evidence_level: D
+    degrade: optional
+    note: "🔑 四种策略并列说明**真实项目不存在单一通用方案**。🔴 仍有 Terrain3D 与速度自动音量待办，**只能作检测器参考，不能作证据规范**"
+
+  surface_metadata_ref:
+    name: "SurfaceMetadata（Unity）"
+    kind: reference
+    repo: "AwesomeProjectionGames/SurfaceMetadata"
+    license: "**来源不确定**"
+    purpose: "Unity 表面元数据 · 射线检测 · 脚步组件（**仅作线索**）"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AwesomeProjectionGames/SurfaceMetadata
+    wrapper: (见 scripts/game_meaning_layer.py --mat)
+    produces: 表面元数据线索
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **公开元数据不足，仓库全名、许可证与维护状态均「来源不确定」，只作线索不作依赖**"
+
+  music_sync_ref:
+    name: Unity-Music-Sync-System
+    kind: reference
+    repo: "（FFT / 谱通量 onset 检测）"
+    license: "**来源不确定**"
+    purpose: "**音频 onset → 动画速度**工程路径参考"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: "GitHub 检索 Unity-Music-Sync-System"
+    wrapper: (见 scripts/game_meaning_layer.py --beat)
+    produces: 节拍候选机制
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **2025 年末仅两批提交，维护状态不确定，不能直接依赖**。🔑 能证明工程路径，🔴 **不能证明重制应采用自动节拍对齐**——应优先手动指定原版节拍表"
+
+  warpframe_ref:
+    name: WarpFrame
+    kind: reference
+    repo: "（PS1 风格复现）"
+    license: "**未披露**"
+    purpose: "**技术限制风格**实现样例：仿射映射 · 顶点抖动 · 16 位色深 · 低分辨率 · 抖动 · 固定管线"
+    exe: (renderer)
+    identity:
+      version_args: [--version]
+    install:
+      manual: "GitHub 检索 WarpFrame"
+    wrapper: (见 scripts/game_meaning_layer.py --imperf)
+    produces: 老硬件风格样例
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **许可证未披露、公开活动偏少、star/fork 极低** —— 只作「异常美学」实现样例，维护与可用性标「来源不确定」"
+
+  # ======= 游戏第四十一轮：认知 · 承诺 · 耐力 · 信任 =======
+  ink_commit_ref:
+    name: inkle/ink
+    kind: reference
+    repo: inkle/ink
+    license: MIT
+    purpose: "**交互叙事语言** —— 把 commitment_ledger 编成可测试剧本"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/inkle/ink
+    wrapper: (见 scripts/game_cognition.py --commit)
+    produces: 决策后果可查询状态
+    evidence_level: D
+    degrade: optional
+    note: "🔑 官方定位含文本与图形化分支故事，运行时加载 JSON 编译结果。🔴 **它负责表达层，不能自动证明玩家感知到了后果**"
+
+  yarnspinner_ref:
+    name: YarnSpinner
+    kind: reference
+    repo: YarnSpinnerTool/YarnSpinner
+    license: "**须读取仓库 LICENSE.md 并锁定版本**"
+    purpose: "运行时发对话行 · `options` · 场景 `commands` —— 驱动「选项—命令—后果」回放"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/YarnSpinnerTool/YarnSpinner
+    wrapper: (见 scripts/game_cognition.py --commit)
+    produces: 选项—后果回放链
+    evidence_level: D
+    degrade: optional
+    note: "🔑 仓库文件清单含 LICENSE.md，使用前仍需从仓库读取实际许可证文本并锁定版本"
+
+  recast_ref_dup2:
+    name: Recast Navigation
+    kind: reference
+    dup_of: recastnavigation
+    repo: recastnavigation/recastnavigation
+    license: ZLib
+    purpose: "**NavMesh 烘焙 · Detour 查询 · DetourTileCache · DetourCrowd** —— 客观可达性基线"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/recastnavigation/recastnavigation
+    wrapper: (见 scripts/game_cognition.py --map)
+    produces: 可达性差异基线
+    evidence_level: C
+    degrade: optional
+    note: "🔑 行业级工具集。🔴 **只作客观可达性基线，「AI 能过去」≠「玩家知道能过去」，不能代替玩家认知测试**"
+
+  landmarks_ref:
+    name: Landmarks
+    kind: reference
+    repo: mjstarrett/Landmarks
+    license: GPL-3.0
+    purpose: "**Unity 空间导航与记忆实验**样本"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mjstarrett/Landmarks
+    wrapper: (见 scripts/game_cognition.py --map)
+    produces: 空间认知实验参照
+    evidence_level: D
+    degrade: optional
+    note: "🔴 GPL-3.0 —— 只作实验设计参照，复制代码需许可兼容"
+
+  psychopy_ref:
+    name: PsychoPy
+    kind: reference
+    repo: psychopy/psychopy
+    license: GPL-3+
+    purpose: "**受控听觉 · 视觉 · 注意任务**离线基线实验"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/psychopy/psychopy
+    wrapper: (见 scripts/game_cognition.py --habit)
+    produces: 感知疲劳基线
+    evidence_level: D
+    degrade: optional
+    note: "🔑 心理/神经科学实验工具。🔴 **不建议把生理实验库直接耦合进发行版**，只作离线基线"
+
+  # ======= 游戏第四十二轮：推断层（常识/OOB/权威/迷信/设备） =======
+  calibrate_joystick_ref:
+    name: calibrate-joystick
+    kind: reference
+    repo: dkosmari/calibrate-joystick
+    license: GPL-3.0
+    purpose: "**摇杆范围与死区校准**（Linux）"
+    exe: (script)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/dkosmari/calibrate-joystick
+    wrapper: (见 scripts/game_inference.py --device)
+    produces: 摇杆死区与范围实测
+    evidence_level: D
+    degrade: optional
+    note: "113 次提交。🔑 可吸收为**设备老化与校准测试工具候选**。🔴 GPL-3.0 —— 复制代码需许可兼容，作测试工具使用时应隔离进程"
+
+  evdev_joystick_cal_ref:
+    name: evdev-joystick-calibration
+    kind: reference
+    repo: nick-l-o3de/evdev-joystick-calibration
+    license: "**声明 MIT（见 setup.py），维护状态未确认**"
+    purpose: "原始采样 + 自动建议死区（Linux evdev）"
+    exe: (script)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/nick-l-o3de/evdev-joystick-calibration
+    wrapper: (见 scripts/game_inference.py --device)
+    produces: 摇杆原始采样
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **维护状态未确认，需二次核验**；只作采样方法参照"
+
+  stick_drift_detect_ref:
+    name: stick-drift-detect-PC
+    kind: reference
+    repo: captainzero93/stick-drift-detect-PC
+    license: "**声明 MIT，近期活动存疑**"
+    purpose: "**摇杆漂移检测**：阈值与轨迹可视化"
+    exe: (tool)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/captainzero93/stick-drift-detect-PC
+    wrapper: (见 scripts/game_inference.py --device)
+    produces: 漂移轨迹与阈值
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **近期活动无法确认，不作为唯一基线** —— 需与游戏内实测死区交叉验证"
+
+  death_recap_ref:
+    name: DeathRecap
+    kind: reference
+    repo: Kouzukii/DeathRecap
+    license: MIT
+    purpose: "**死亡伤害复盘** —— failure_explanation 实现参考"
+    exe: (plugin)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Kouzukii/DeathRecap
+    wrapper: (见 scripts/game_inference.py --explain)
+    produces: 死亡原因时间线
+    evidence_level: D
+    degrade: optional
+    note: "22 次提交。🔑 可作 `failure_explanation` 的**实现参考**。🔴 **具体游戏绑定未确认**，不能直接当通用方案"
+
+  # ======= 游戏第四十三轮：关系状态（离开/第N次/幽灵/第一次） =======
+  yarnspinner_core_ref:
+    name: YarnSpinner (core)
+    kind: reference
+    repo: YarnSpinnerTool/YarnSpinner
+    license: MIT
+    purpose: "**把台词·标签·条件·选择重建为可重放规范** —— 重复叙事取证中间表示"
+    exe: (library)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/YarnSpinnerTool/YarnSpinner
+    wrapper: (见 scripts/game_relation.py --nth)
+    produces: 可重放对话规范
+    evidence_level: D
+    degrade: optional
+    note: "核心 2026-08-11 活跃。🔑 运行时逐行发送台词·选项·命令。🔴 **它不是原版资源提取器**，只作重建与回放"
+
+  yarnspinner_godot_ref:
+    name: YarnSpinner-Godot-GDScript
+    kind: reference
+    repo: YarnSpinnerTool/YarnSpinner-Godot-GDScript
+    license: "**页面标 Alpha**"
+    purpose: "Godot 侧对话回放原型"
+    exe: (godot-addon)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/YarnSpinnerTool/YarnSpinner-Godot-GDScript
+    wrapper: (见 scripts/game_relation.py --nth)
+    produces: Godot 对话原型
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **页面仍警告不宜商用，只作原型/迁移验证，不得承诺生产稳定性**"
+
+  assetripper_ref:
+    name: AssetRipper
+    kind: cli
+    dup_of: assetripper
+    repo: AssetRipper/AssetRipper
+    license: GPL-3.0
+    purpose: "**Unity 资源导出 · 引用图 · 类型树取证** —— 幽灵内容六级判定"
+    exe: AssetRipperCLI
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/AssetRipper/AssetRipper
+    wrapper: (见 scripts/game_relation.py --ghost)
+    produces: 资产引用图
+    evidence_level: C
+    degrade: optional
+    note: "2026-09-03 活跃。🔑 适合做 `GHOST_SIX` 的资源引用边取证。🔴 **GPL-3.0 —— 注意许可证边界，不复制代码**"
+
+  uabea_ref:
+    name: UABEA
+    kind: cli
+    repo: nesrak1/UABEA
+    license: "**逐库许可证不同（见仓库说明）**"
+    purpose: "Unity 资产读取/研究辅助"
+    exe: UABEAvalonia
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/nesrak1/UABEA
+    wrapper: (见 scripts/game_relation.py --ghost)
+    produces: 单资产检视
+    evidence_level: D
+    degrade: optional
+    note: "2026-05-11 活动。🔑 **作者明确建议纯提取优先用 AssetRipper** —— 本项仅作辅助"
+
+  assetstudio_legacy:
+    name: AssetStudio (legacy)
+    kind: cli
+    repo: Perfare/AssetStudio
+    license: "**原仓库已归档**；历史页面 MIT"
+    purpose: "旧版 Unity 资产只读兜底"
+    exe: AssetStudioGUI
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Perfare/AssetStudio
+    wrapper: (见 scripts/game_relation.py --ghost)
+    produces: 旧版资产检视
+    evidence_level: E
+    degrade: optional
+    note: "🔴 **原仓库已归档，仅作旧版只读兜底，不应成为新工具链主线**"
+
+  # ======= 游戏第四十四轮：身份与时序（同形异质/方言/组合/惯例） =======
+  factorio_migrations_ref:
+    name: Factorio Migrations (official Lua API docs)
+    kind: doc
+    repo: (official API docs, not an open repo)
+    license: "**游戏终端用户许可，不可复制代码**"
+    purpose: "**存档迁移与同形异质**：原型改名/替换 + 运行时状态迁移"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://lua-api.factorio.com/latest/auxiliary/migrations.html
+    wrapper: (见 scripts/game_identity.py --id)
+    produces: 迁移顺序与幂等记录模式
+    evidence_level: D
+    degrade: optional
+    note: "🔑 吸收：**迁移顺序 · 幂等记录 · 幽灵对象删除报告 · 定义层与实例层分离**。🔴 **许可证为游戏终端用户许可，不可直接复制代码**；🔴 **不吸收「删除幽灵实体」作为静默默认**"
+
+  stardew_migration_ref:
+    name: Stardew Valley 1.6 Migration (modding wiki)
+    kind: doc
+    repo: (community wiki)
+    license: "**Wiki 内容许可，不是代码**"
+    purpose: "**同名物品限定 ID**：`(O)128` / `(BC)128` 区分同名不同类"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://stardewvalleywiki.com/Modding:Migrate_to_Stardew_Valley_1.6
+    wrapper: (见 scripts/game_identity.py --id)
+    produces: 类型前缀与稳定全局键模式
+    evidence_level: D
+    degrade: optional
+    note: "🔑 吸收：**类型前缀 · 稳定全局键 · 旧版兼容别名**。🔴 **不应作为跨游戏唯一 ID 最终方案**"
+
+  unity_inputsystem_ref:
+    name: Unity InputSystem (official samples)
+    kind: sdk
+    repo: Unity-Technologies/InputSystem
+    license: "**Unity Companion License**"
+    purpose: "**输入事件录制与动作映射**：InputEventTrace / InputRecorder"
+    exe: (unity-package)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Unity-Technologies/InputSystem
+    wrapper: (见 scripts/game_identity.py --phrase)
+    produces: 原始输入事件流
+    evidence_level: C
+    degrade: optional
+    note: "🔑 只作**录制基础设施**。🔴 **Rebinding UI 另有第三方许可证**；🔴 **不能替代原版时序门禁，golden 必须以原版原始行为为依据**"
+
+  unity_seasonal_events_ref:
+    name: Unity Seasonal Events sample
+    kind: reference
+    repo: Unity-Technologies/com.unity.services.samples.use-cases
+    license: "**来源不确定（搜索材料未确认，以仓库 README 为准）**"
+    purpose: "**现实时间活动配置**：服务器时间 + Remote Config + 云端发奖"
+    exe: (unity-sample)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Unity-Technologies/com.unity.services.samples.use-cases
+    wrapper: (见 scripts/game_identity.py --cal)
+    produces: 活动时间边界与防篡改模式
+    evidence_level: E
+    degrade: optional
+    note: "🔑 吸收：**服务端时间源 · 配置化事件 · 边界结算**。🔴 **不吸收具体经济与奖励数值**"
+
+  # ======= 游戏第四十五轮：社会层与版本地层 =======
+  obs_studio_ref_dup2:
+    name: OBS Studio
+    kind: cli
+    dup_of: obs_studio_ref
+    repo: obsproject/obs-studio
+    license: GPL-2.0
+    purpose: "**外部录制基线** —— 记录玩家行为、直播、多音轨输出"
+    exe: obs
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/obsproject/obs-studio
+    wrapper: (见 scripts/game_social.py --teach)
+    produces: 外部行为录像
+    evidence_level: C
+    degrade: optional
+    note: "截至 2026-09-11 更新，活跃。🔑 适合记录**社会传播证据**。🔴 **不能据此声称原版内置观战/教学分享/回放系统**"
+
+  livesplit_ref:
+    name: LiveSplit
+    kind: cli
+    repo: LiveSplit/LiveSplit
+    license: MIT
+    purpose: "**速通切图与分段配置** —— 游戏内时间结构化、可共享 splits"
+    exe: LiveSplit
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/LiveSplit/LiveSplit
+    wrapper: (见 scripts/game_social.py --ascetic)
+    produces: 分段时间与验证证据
+    evidence_level: C
+    degrade: optional
+    note: "活跃。🔑 自动拆分器**读取内存中的游戏状态**。🔴 **重制改变地址或状态表示后旧拆分器会失效**"
+
+  ghidra_social_ref:
+    name: Ghidra (取证环境)
+    kind: cli
+    repo: NationalSecurityAgency/ghidra
+    license: "**GPL/Apache-2.0 混合声明（见许可证页面）**"
+    purpose: "**受控取证环境** —— 反汇编 · 反编译 · 调试 · 脚本扩展"
+    exe: ghidraRun
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/NationalSecurityAgency/ghidra
+    wrapper: (见 scripts/game_social.py --prof)
+    produces: 推测实现（证据八级须降级使用）
+    evidence_level: D
+    degrade: optional
+    note: "截至 2026-09-17 有近期提交。🔴 **许可证页面为混合声明；使用受软件许可 · 反规避法 · 平台条款约束**"
+
+  reclassex_ref:
+    name: ReClassEx
+    kind: cli
+    repo: dude719/ReClassEx
+    license: MIT
+    purpose: "**按类型浏览进程内存** —— RTTI 与 PDB 符号，说明矿工依赖运行时类型信息"
+    exe: ReClassEx
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/dude719/ReClassEx
+    wrapper: (见 scripts/game_social.py --prof)
+    produces: 内存结构视图
+    evidence_level: D
+    degrade: optional
+    note: "🔴 **最后更新约 2021 年，维护状态不确定**。🔑 要区分「读取公开调试符号」与「绕过安全措施」"
+
+  wikiblame_ref:
+    name: Wikiblame
+    kind: reference
+    repo: FlominatorTM/wikiblame
+    license: GPL
+    purpose: "**按字符串搜索 Wiki 修订历史** —— 追踪错误知识何时进入/被纠正"
+    exe: (tool)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/FlominatorTM/wikiblame
+    wrapper: (见 scripts/game_social.py --teach)
+    produces: 知识传播时间线
+    evidence_level: D
+    degrade: optional
+    note: "🔑 用于**错误知识撤销**取证。🔴 多人一致只升级为「社区共识」，不等于为真"
+
+  # ======= 游戏第四十六轮：外围层 / 自救 / 外设 / 环境 =======
+  gog_galaxy_sdk_ref:
+    name: GOG GALAXY SDK (official docs)
+    kind: sdk
+    repo: (official SDK, not an open repo)
+    license: "**专有 SDK，不得复制实现**"
+    purpose: "**外围层失败态与降级序列**：Init 失败不停止加载、认证可选、离线无缝、成就本地缓存"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://partner.gog.com/doc/
+    wrapper: (见 scripts/game_periphery.py --meta / --gog)
+    produces: 外围状态机字段
+    evidence_level: B
+    degrade: optional
+    note: "🔑 只吸收**失败态 · 降级序列 · 身份分层**等契约语义。🔴 **专有 SDK，不是开源仓库**"
+
+  eos_overview_ref:
+    name: Epic Online Services Overview
+    kind: sdk
+    repo: (official service docs)
+    license: "**专有服务，不得复制实现**"
+    purpose: "**身份与数据是两条链**：Epic 账号（社交层）vs 第三方身份（多人/数据/成就/统计/排行榜）"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://dev.epicgames.com/docs/epic-online-services
+    wrapper: (见 scripts/game_periphery.py --eos)
+    produces: 五类账号标识与跨平台范围
+    evidence_level: B
+    degrade: optional
+    note: "🔑 **能跨平台联机不自动等于账号 · 好友 · 邀请 · 进度全面打通**"
+
+  legendary_ref:
+    name: Legendary (open-source Epic launcher)
+    kind: cli
+    repo: Dummerle/legendary
+    license: "**需仓库内核对**"
+    purpose: "**安装器/修复器实现参照**：认证、增量更新、云存档同步、清单校验"
+    exe: legendary
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/Dummerle/legendary
+    wrapper: (见 scripts/game_periphery.py --repair)
+    produces: manifest / repair_report / repair_plan
+    evidence_level: D
+    degrade: optional
+    note: "0.20.34 发布于 2023-12-08；曾修复并发写数据库 · 认证文件锁 · 下载器校验。🔴 **非官方规范**，只作实现参照；🔴 **绝不能自动删除玩家本地内容**"
+
+  mame_input_ref:
+    name: MAME (official input system docs)
+    kind: cli
+    repo: mamedev/mame
+    license: "**需按发布页复核**"
+    purpose: "**物理外设四类抽象**：开关 0/1、绝对轴 -65536~65536、相对轴、单端轴负半区"
+    exe: mame
+    identity:
+      version_args: [-version]
+    install:
+      manual: https://github.com/mamedev/mame
+    wrapper: (见 scripts/game_periphery.py --device)
+    produces: 设备输入域语义
+    evidence_level: C
+    degrade: optional
+    note: "🔑 比「键码/轴号映射」更适合像素级记录。🔑 0.285（2026-01-30）把**离屏装填**改为插件 —— 证明「离屏开火＝装填」是应记录的语义而非硬件偶然"
+
+  sdl_gamecontroller_ref:
+    name: SDL GameController / Haptic
+    kind: lib
+    repo: libsdl-org/SDL
+    license: "**需仓库内核对**"
+    purpose: "**跨设备映射层参考**：GUID,name,mapping 字符串、按钮与轴互映、xinput 保留 GUID、振动线程排队"
+    exe: (lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/libsdl-org/SDL
+    wrapper: (见 scripts/game_periphery.py --device)
+    produces: 设备映射与力反馈排队语义
+    evidence_level: C
+    degrade: optional
+    note: "🔑 **振动请求在线程中排队** —— 「发出振动」到「设备真正产生力」存在异步链。🔴 **不能假定所有硬件符合同一默认轮廓**"
+
+  r2modman_ref:
+    name: r2modman
+    kind: cli
+    repo: ebkr/r2modmanPlus
+    license: MIT
+    purpose: "**配置与版本可迁移反向参照**：配置档案含 Mod、精确版本、禁用状态、配置文件"
+    exe: r2modman
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/ebkr/r2modmanPlus
+    wrapper: (见 scripts/game_periphery.py --work)
+    produces: 可审计的 Mod 清单与依赖锁
+    evidence_level: C
+    degrade: optional
+    note: "3.2.12 发布于 2026-01-20。🔑 **文件导出优于短码**（短码是临时服务器上传）。🔑 **不得将「完全无 Mod」视为唯一干净状态**"
+
+  # ======= 游戏第四十七轮：生活层 / 拟人化 / 文化层 / 元收藏 =======
+  cldr_ldml_ref:
+    name: Unicode CLDR / LDML
+    kind: doc
+    repo: (Unicode standard, unicode-org/cldr)
+    license: "**Unicode Terms of Use（需复核具体条款）**"
+    purpose: "**locale 数据标准**：数字/货币 · 日期 · 排序 · 显示名 · 单位 · 日历 · 复数 · 书写方向"
+    exe: (data)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://unicode-org.github.io/cldr/ldml/tr35.html
+    wrapper: (见 scripts/game_life.py --culture)
+    produces: locale 数据版本与区域变体字段
+    evidence_level: B
+    degrade: optional
+    note: "🔑 Unicode 持续维护，**locale 数据必须版本化**。🔴 **不是笑话 · 手势 · 颜色情绪 · 宗教隐喻的语义数据库**；区域数据会随国家边界/政府/货币/标准变化"
+
+  icu_ref_dup2:
+    name: ICU
+    kind: lib
+    dup_of: icu
+    repo: unicode-org/icu
+    license: "**Unicode Terms of Use（许可证文件须结合具体源码复核）**"
+    purpose: "**稳定区域化比较与格式化**：排序 · 数字/日期/单位 · 双向文本 · 规范化"
+    exe: (lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/unicode-org/icu
+    wrapper: (见 scripts/game_life.py --culture / --name)
+    produces: 稳定排序与文本边界处理
+    evidence_level: C
+    degrade: optional
+    note: "截至 2026-09-03 仍有提交。🔴 **不能替代文化顾问**；业务排序仍需按原版自定义规则覆盖"
+
+  libretranslate_ref:
+    name: LibreTranslate
+    kind: cli
+    repo: LibreTranslate/LibreTranslate
+    license: AGPL-3.0
+    purpose: "**本地预翻译 · 回译 · 异常检测**（社区文本与占位文本）"
+    exe: libretranslate
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/LibreTranslate/LibreTranslate
+    wrapper: (见 scripts/game_life.py --culture)
+    produces: 回译对照与异常候选
+    evidence_level: D
+    degrade: optional
+    note: "2026-09-03 仍有提交。🔴 **不得作为文化正确性裁判**；网络部署注意 AGPL 义务"
+
+  exiftool_ref:
+    name: ExifTool
+    kind: cli
+    repo: exiftool/exiftool
+    license: "**按与 Perl 相同条款（具体版本需复核 LICENSE）**"
+    purpose: "**截图与录像元数据出处链**：哈希 · 时间线 · 关卡/区域 · 会话 ID · 玩家坐标"
+    exe: exiftool
+    identity:
+      version_args: [-ver]
+    install:
+      manual: https://github.com/exiftool/exiftool
+    wrapper: (见 scripts/game_life.py --h / --show)
+    produces: 玩家作品出处链
+    evidence_level: C
+    degrade: optional
+    note: "🔴 **不能证明游戏内图鉴或库存顺序**；🔴 **不得自动把截图上传云端**"
+
+  retroarch_ref:
+    name: RetroArch
+    kind: cli
+    repo: libretro/RetroArch
+    license: "**官方页未明示，核心许可证各异**"
+    purpose: "**黄金回放基线**：savestate · rewind · runahead · netplay · shader stack"
+    exe: retroarch
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/libretro/RetroArch
+    wrapper: (见 scripts/game_life.py --h)
+    produces: 确定性回放与状态快照
+    evidence_level: C
+    degrade: optional
+    note: "1.21.0 附近。🔴 **核心许可证各异，不得把核心许可证泛化到整个项目**；🔴 **不应把回放器变成 DRM 或强制联网启动器**"
+
+  # ======= 游戏第四十八轮：沟通 / 风险 / 记忆 / 工具契约 =======
+  openapi_ref:
+    name: OpenAPI Specification
+    kind: reference
+    repo: OAI/OpenAPI-Specification
+    license: "**Apache-2.0（规范仓库需复核具体 tag）**"
+    purpose: "**接口契约**：端点 · 参数 · 请求 · 响应 · 认证 · 错误码 · 示例"
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/OAI/OpenAPI-Specification
+    wrapper: (见 scripts/game_meta.py --tool)
+    produces: 外部工具接口描述
+    evidence_level: B
+    degrade: optional
+    note: "🔑 3.x 支持多版本文档；🔑 **schema 与规范文本冲突时以规范文本为准**"
+
+  jsonschema_ref:
+    name: JSON Schema
+    kind: reference
+    repo: json-schema-org/json-schema-spec
+    license: "**需复核具体仓库条款**"
+    purpose: "**数据契约**：字段 · 单位 · 枚举 · 必填项 · 时区 · 精度"
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/json-schema-org/json-schema-spec
+    wrapper: (见 scripts/game_meta.py --schema)
+    produces: 数据字典与导出契约
+    evidence_level: B
+    degrade: optional
+    note: "🔑 **工具能否迁移取决于字段语义是否稳定，不是 JSON 是否美观**。🔴 SchemaStore 只是目录基础设施，**不得把『加入 SchemaStore』误写为 must-match**"
+
+  opentelemetry_ref:
+    name: OpenTelemetry
+    kind: reference
+    repo: open-telemetry/opentelemetry-specification
+    license: "**Apache-2.0（需复核）**"
+    purpose: "**遥测契约**：事件 · 指标 · 日志 · 资源 · 采样 · 导出目标"
+    exe: (spec)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/open-telemetry/opentelemetry-specification
+    wrapper: (见 scripts/game_meta.py --tool)
+    produces: 跨进程遥测语义
+    evidence_level: B
+    degrade: optional
+    note: "🔑 使用语义化版本，规定 MUST/MUST NOT/SHOULD 合规性含义。🔴 不能被同一个『统一数据格式』替代"
+
+  game_accessibility_guidelines_ref:
+    name: Game Accessibility Guidelines
+    kind: doc
+    repo: (community guideline site)
+    license: "**内容许可需按站点条款复核**"
+    purpose: "**跨语言协作契约**：文字与语音并存 · 可只与愿开语音者玩 · 符号化聊天 · 重要语音字幕与说话人视觉指示"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://gameaccessibilityguidelines.com/
+    wrapper: (见 scripts/game_meta.py --cross)
+    produces: 无语音玩家公平参与检查项
+    evidence_level: C
+    degrade: optional
+    note: "🔑 **这些不是无障碍附加项，而是跨语言协作契约**。🔴 关闭语音会失去关键战术信息＝违反公平协作原则"
+
+  # ======= 游戏第四十九轮：非完整版 / 秘籍 / 旁观者 / 实体载体 =======
+  ludusavi_ref:
+    name: Ludusavi
+    kind: cli
+    dup_of: ludusavi
+    repo: mtkennerly/ludusavi
+    license: MIT
+    purpose: "**存档备份测试基础设施**：跨平台存档路径发现 · 备份完整性验证 · 原版与复刻存档位置比对"
+    exe: ludusavi
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mtkennerly/ludusavi
+    wrapper: (见 scripts/game_variant.py --saveown)
+    produces: 存档路径与备份证据
+    evidence_level: C
+    degrade: optional
+    note: "🔑 2026 年 4 月仍发布 v0.31.0；支持 Win/macOS/Linux · CLI/GUI · Steam 与其他库 · 文件与 Windows 注册表存档 · Proton · Steam 截图 · 自定义条目。🔴 **清单主要来自 PCGamingWiki，不应成为唯一的『原版路径真相』，仍需逐标题核对**"
+
+  obs_websocket_js_ref:
+    name: obs-websocket-js
+    kind: lib
+    repo: obs-websocket-js-community/obs-websocket-js
+    license: MIT
+    purpose: "**观众层与直播状态桥接**：读取场景 · 录制 · 直播状态"
+    exe: (lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/obs-websocket-js-community/obs-websocket-js
+    wrapper: (见 scripts/game_variant.py --watch)
+    produces: 观众信息层状态
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合状态桥接。🔴 **投票 · 概率控制 · 权限与作弊必须由游戏服务端或本地仲裁，不能信任浏览器来源**"
+
+  # ======= 游戏第五十轮：Kiosk / 反盗版屏 / Credits =======
+  attract_mode_ref:
+    name: Attract-Mode
+    kind: cli
+    repo: mickelson/attract
+    license: "**GPLv3 或更高版本（官方 README 显示）**"
+    purpose: "**Attract 循环 / 输入映射 / 状态返回的验证台**"
+    exe: attract
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mickelson/attract
+    wrapper: (见 scripts/game_edge.py --kiosk)
+    produces: Attract 序列与输入映射证据
+    evidence_level: C
+    degrade: optional
+    note: "🔑 2.6.0 可下载且长期维护。🔴 **不能把它的 Squirrel 布局字体、滚动速度、默认键位当作原版 must-match**"
+
+  koala_kiosk_ref:
+    name: Koala Kiosk
+    kind: doc
+    repo: (未确认)
+    license: "**来源不确定——仓库页面仍写『[Your License Here]』**"
+    purpose: "**仅用于确认现代 Kiosk 字段**：开机自启 · 空闲超时 · PIN · 锁定应用"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: (来源不确定，不写入依赖)
+    wrapper: (见 scripts/game_edge.py --kiosk)
+    produces: 现代 Kiosk 字段参考
+    evidence_level: E
+    degrade: optional
+    note: "🔴 **许可证未确认，不能直接吸收到生产流程**"
+
+  hawkthorne_credits_ref:
+    name: Hawkthorne Journey Credits
+    kind: lib
+    repo: hawkthorne/hawkthorne-journey
+    license: "**自定义许可证说明，来源不确定**"
+    purpose: "**Credits 架构参考**：`CONTRIBUTORS 数据 + Jinja2 模板 + 运行时状态` 三层拆解"
+    exe: (source)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/hawkthorne/hawkthorne-journey
+    wrapper: (见 scripts/game_edge.py --credit)
+    produces: Credits 三层架构参考
+    evidence_level: E
+    degrade: optional
+    note: "🔴 **不可直接复制代码或署名模板**。🔑 更稳妥的做法是把「数据—模板—运行时」三层拆成自有 MIT/Apache-2.0 工具，另加 IGDA 字段与多版本 diff"
+
+  igda_crediting_ref:
+    name: IGDA Game Crediting Guidelines 10.1
+    kind: doc
+    repo: (IGDA 官方 PDF，非代码仓库)
+    license: "**规范文档，使用条款需按 IGDA 站点确认**"
+    purpose: "**派生作品署名规范**：原始团队与新团队分列 · 原始在前 · 两类同时可见 · 离职者仍署名"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://igda.org/
+    wrapper: (见 scripts/game_edge.py --credit / --evolve)
+    produces: Credits 合规检查项
+    evidence_level: B
+    degrade: optional
+    note: "🔑 **是规范而非游戏事实**。🔴 **各游戏实际执行极不统一**——排序语义必须按原版事实记录"
+
+  android_retail_demo_ref:
+    name: Android Retail Demo Mode
+    kind: doc
+    repo: (AOSP 官方技术文档)
+    license: "**官方文档，代码按 AOSP 许可**"
+    purpose: "**会话清场样本**：90 秒空闲提示 · 5 秒重置 · 复位亮度/自动旋转/手电筒/语言/无障碍"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://source.android.com/docs/devices/tech/display/retail_demo
+    wrapper: (见 scripts/game_edge.py --kiosk)
+    produces: 会话重置状态样本
+    evidence_level: C
+    degrade: optional
+    note: "🔑 说明『会话重置』本身就是必须记录的产品行为。🔴 **它是移动设备零售演示规范，不等于街机 Kiosk 规范**"
+
+  # ======= 游戏第五十一轮：四路验收接入（统一时钟/截图/音频/物理） =======
+  playwright_ref:
+    name: Playwright
+    kind: lib
+    repo: microsoft/playwright
+    license: Apache-2.0
+    purpose: "**主驱动**：整屏快照断言 + 可编程逐帧抓取；trace 含 DOM/网络/控制台/截图"
+    exe: (lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/microsoft/playwright
+    wrapper: (见 scripts/edge_accept.py --visual)
+    produces: 整屏/逐帧截图基线
+    evidence_level: C
+    degrade: optional
+    note: "🔑 官方提醒 OS·版本·设置·硬件·电源模式·headless 都会影响渲染，baseline 与测试须同环境生成；快照名带浏览器/平台后缀。🔴 **trace 是调试事件，不得冒充图形 baseline**"
+
+  odiff_ref:
+    name: ODiff
+    kind: cli
+    repo: dmtrKovalenko/odiff
+    license: MIT
+    purpose: "**批量 CI 层图像 diff**：Zig+SIMD，支持不同布局/尺寸与忽略区"
+    exe: odiff
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/dmtrKovalenko/odiff
+    wrapper: (见 scripts/edge_accept.py --visual)
+    produces: 整屏差异与 mask 报告
+    evidence_level: C
+    degrade: optional
+    note: "🔑 建议主链 Playwright→PNG→ODiff"
+
+  pixelmatch_ref:
+    name: pixelmatch
+    kind: lib
+    repo: mapbox/pixelmatch
+    license: ISC
+    purpose: "**滑窗级差异检测**：windowSize=N 输出任意 N×N 滑窗最大差异数"
+    exe: (lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/mapbox/pixelmatch
+    wrapper: (见 scripts/edge_accept.py --visual)
+    produces: 差异像素数与 diffMask
+    evidence_level: C
+    degrade: optional
+    note: "🔑 非常适合检测小区域滚动残影而避免全屏 diff 被合理运动淹没。Playwright 内置引擎即 pixelmatch，不需重复封装"
+
+  chromaprint_ref:
+    name: Chromaprint
+    kind: cli
+    repo: acoustid/chromaprint
+    license: "**LGPL-2.1（内嵌 FFmpeg 代码）**"
+    purpose: "**窗口级音频指纹**：识别近相同音频，按时间窗切段比对"
+    exe: fpcalc
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/acoustid/chromaprint
+    wrapper: (见 scripts/edge_accept.py --audio)
+    produces: 音频指纹与相似度
+    evidence_level: C
+    degrade: optional
+    note: "🔴 **官方明确不是 general-purpose fingerprint**；须按时间窗切段，并配合样本级 cross-correlation 与频谱/节拍特征。⚠️ **静态链接 FFmpeg/FFTW 必须做完整 LGPL 合规审查**"
+
+  audfprint_ref:
+    name: audfprint
+    kind: lib
+    repo: dpwe/audfprint
+    license: MIT
+    purpose: "**地标指纹**：片段检索与离线索引"
+    exe: (py)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/dpwe/audfprint
+    wrapper: (见 scripts/edge_accept.py --audio)
+    produces: 音频片段匹配
+    evidence_level: D
+    degrade: optional
+    note: "🔑 MIT 地标指纹，适合片段检索与离线索引"
+
+  librosa_ref:
+    name: librosa
+    kind: lib
+    repo: librosa/librosa
+    license: ISC
+    purpose: "**音频特征**：频谱·节拍·响度相似度分析"
+    exe: (py)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/librosa/librosa
+    wrapper: (见 scripts/edge_accept.py --audio)
+    produces: 频谱/节拍/响度特征
+    evidence_level: D
+    degrade: optional
+    note: "🔑 适合相似度分析，🔴 **不是音频哈希的替代品**"
+
+  colmap_ref:
+    name: COLMAP
+    kind: cli
+    repo: colmap/colmap
+    license: BSD
+    purpose: "**SfM/MVS**：可复核尺度的物理表面重建（有序或无序照片）"
+    exe: colmap
+    identity:
+      version_args: [--help]
+    install:
+      manual: https://github.com/colmap/colmap
+    wrapper: (见 scripts/edge_accept.py --photo)
+    produces: 相机位姿与稀疏/稠密重建
+    evidence_level: C
+    degrade: optional
+    note: "🔑 BSD 许可，SfM/MVS 通用流程"
+
+  alicevision_ref:
+    name: AliceVision
+    kind: lib
+    repo: alicevision/AliceVision
+    license: MPL-2.0
+    purpose: "**摄影测量框架**：SfM·MVS·HDR·RAW·相机跟踪"
+    exe: (lib)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://github.com/alicevision/AliceVision
+    wrapper: (见 scripts/edge_accept.py --photo)
+    produces: 物理表面标定与重建
+    evidence_level: C
+    degrade: optional
+    note: "🔑 MPL-2.0。🔴 **Meshroom 许可证未确认，只能作其实验前端，正式分发前须从仓库再核**"
+
+  spdx_build_ref:
+    name: "SPDX 3.0 Build 类"
+    kind: doc
+    repo: (SPDX 官方规范，非代码仓库)
+    license: "**规范文档；使用条款按 SPDX 站点**"
+    purpose: "**build manifest 主 schema**：buildId/buildStartTime/buildEndTime/buildType/configSourceDigest/configSourceUri/environment/parameter + externalRef/verifiedUsing/creationInfo"
+    exe: (doc)
+    identity:
+      version_args: [--version]
+    install:
+      manual: https://spdx.org/
+    wrapper: (见 scripts/game_edge.py --variant)
+    produces: build variant manifest 字段
+    evidence_level: B
+    degrade: optional
+    note: "🔑 **本轮唯一可直接落地的规范级骨架**——天然对应『哪个评测版/零售版/补丁版、何时由何配置构建、输入如何哈希、测试如何验证』"
+
+  # ======= 游戏第五十三轮：端到端流水线实测依赖 =======
+  ffmpeg_local:
+    name: FFmpeg
+    kind: cli
+    dup_of: ffmpeg
+    repo: FFmpeg/FFmpeg
+    license: "**GPL-2.0+ / LGPL 按构建配置而定**"
+    purpose: "**抽帧与抽音**（visual 路入口）；合成样本编码与解码"
+    exe: ffmpeg
+    identity:
+      version_args: [-version]
+      version_contains: [ffmpeg]
+      subcommand: -h
+    install:
+      apt: apt-get install -y ffmpeg
+      brew: brew install ffmpeg
+    wrapper: tools/ffmpeg_probe.py
+    produces: 逐帧 PNG + WAV
+    evidence_level: C
+    degrade: optional
+    note: "🔑 **本环境实测可用**，四路验收 visual 路因此真正跑通。⚠️ 许可随构建配置变化，分发前须复核"
+  numpy_local:
+    name: NumPy
+    kind: lib
+    repo: numpy/numpy
+    license: BSD-3-Clause
+    purpose: "**逐帧差与 N×N 滑窗最大差**（pixelmatch windowSize 语义）；FFT 降级特征"
+    exe: (lib)
+    identity:
+      version_args: [-c]
+      version_contains: [numpy]
+    install:
+      pip: pip install numpy
+    wrapper: (见 scripts/edge_pipeline.py --capture)
+    produces: 帧差指标与频谱特征
+    evidence_level: D
+    degrade: optional
+    note: "🔑 **本环境实测可用（2.2.6）**。🔴 用它算的音频特征只是**降级特征**，不是真指纹，必须标 backend"

@@ -1,0 +1,59 @@
+# 证据卡模板
+
+> **为什么需要**：复刻的真相在"原版实际做了什么"，不在"代码看起来做了什么"。
+> 证据卡让每条结论可追溯到具体文件行号与运行录制。
+> **assumption 级证据不得成为迁移决定。**
+
+```yaml
+id: EVD-LOGIN-021
+subject: 登录失败时用户名保留
+capability: CAP-AUTH-001          # 关联的能力包
+layer: 界面资产 / 逻辑 / 行为      # 可多选
+feature_ref: "#142"               # 关联功能清单编号
+
+evidence:
+  - type: runtime-observation     # runtime-verified 级
+    source: legacy-app@build123
+    env: goldens/env.md
+    trace: goldens/raw/login-failure.json
+    excerpt: "输入 user=u、pwd=wrong 后，密码清空，用户名保留"
+  - type: static                  # static-code 级
+    location: src/LoginViewModel.cs:88-102
+    excerpt: "PasswordBox.Clear(); UsernameBox.Focus();"
+
+status: verified                  # verified / partial / unknown
+confidence: high                  # high / medium / low
+
+nature:
+  code: original-intent           # original-intent / tech-workaround / platform-limit
+                                  # / historical-debt / unintended-smell / best-practice
+  reason: 减少重复输入，提升可访问性
+  action: preserve                # preserve / replace / merge / remove / defer
+
+migration:
+  target: NewLoginForm.username
+  preserve: true
+  deviation_allowed: false
+  notes: |
+    不要"优化"成清空用户名；这是被真实场景教育过的行为。
+
+faults_to_cover:                  # S4 故障注入要覆盖的
+  - 网络超时
+  - 空用户名
+  - 连续点击登录
+```
+
+---
+
+## 证据等级速查
+
+```
+runtime-verified   > dynamic-trace > static-code > resource/declaration
+                   > documentation > commit-history > assumption
+```
+
+- 非平凡条目至少要有 `static-code` 级
+- 只有 `documentation` 级的，必须先补证据
+- `assumption` 级一律进 unknown 清单（S7 门禁 G3 会阻塞）
+
+详见 `../references/证据等级.md`。

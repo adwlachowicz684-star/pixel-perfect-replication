@@ -1,0 +1,26 @@
+# 第九十四轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**G388 扫描范围扩展到全部脚本** + **语义豁免**
+
+# ① 扩展扫描（只引代码标识符）
+grep:scripts/claim_verify.py::_scan_rc_domain
+grep:scripts/claim_verify.py::RC_DOMAIN_ALLOW
+grep:scripts/claim_verify.py::理由为空或过短
+grep:scripts/claim_verify.py::扫描范围
+cmd:claim_verify.py --check-rc-domain
+# ② 真实抓到的第二处（语义不同，已登记豁免）
+grep:scripts/ast_query.py::returncode not in
+# ③ 门禁仍登记
+gate:G388
+cmd:run_all_gates.py --self-check-noop
+# ④ 既有能力仍工作
+cmd:claim_verify.py --probe-capability audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ⑤ 历史清单不得被误删
+file:ledger/claims_91.txt
+file:ledger/claims_92.txt
+file:ledger/claims_93.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
+file:scripts/gate_chaos.py

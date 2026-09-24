@@ -1,0 +1,22 @@
+# 第八十九轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**跨进程真值**（打破自证循环）
+
+# ① 跨进程真值实现（只引代码标识符）
+grep:scripts/claim_verify.py::跨进程取真值
+grep:scripts/claim_verify.py::sub_cmds
+grep:scripts/claim_verify.py::不在合法域
+cmd:claim_verify.py --probe-capability audit-all
+# ② 关键报错串
+grep:scripts/claim_verify.py::无法取得独立真值
+grep:scripts/claim_verify.py::无任何输出
+grep:scripts/claim_verify.py::不得当作真值
+# ③ 既有能力仍工作
+cmd:claim_verify.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_86.txt
+file:ledger/claims_87.txt
+file:ledger/claims_88.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

@@ -1,0 +1,27 @@
+# 第九十轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**把能力框架推广到第二个能力**（chaos-full）
+
+# ① gate_chaos 侧能力框架（只引代码标识符）
+grep:scripts/gate_chaos.py::DECLARED_CAPABILITIES
+grep:scripts/gate_chaos.py::CAPABILITY_PROBE
+grep:scripts/gate_chaos.py::CAPABILITY_ARTIFACT
+grep:scripts/gate_chaos.py::CAPABILITY_ARTIFACT_KEYS
+grep:scripts/gate_chaos.py::_declare_capability
+grep:scripts/gate_chaos.py::_probe_capability
+grep:scripts/gate_chaos.py::低于下界
+cmd:gate_chaos.py --declare-capability
+# ② 关键报错串
+grep:scripts/gate_chaos.py::未登记产物或产物内容键
+grep:scripts/gate_chaos.py::产物**未被重写**
+# ③ 既有能力仍工作
+cmd:claim_verify.py --declare-capability
+cmd:claim_verify.py --probe-capability audit-all
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_87.txt
+file:ledger/claims_88.txt
+file:ledger/claims_89.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
+file:scripts/gate_chaos.py

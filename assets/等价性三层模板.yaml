@@ -1,0 +1,128 @@
+# 等价性三层模板（差分 oracle / 属性不变量 / mutation）
+
+> **三层回答不同问题，不能互相替代**：
+> - 差分 oracle：**新旧在同一输入下是否一致**
+> - 属性测试：**任意合法输入下不变量是否成立**
+> - mutation：**测试是不是真的能发现破坏**
+
+---
+
+## 一、差分 oracle（新旧同输入对照）
+
+**核心思想**：不要"让新实现自己证明自己"。
+同一固定输入、同一时钟、同一随机种子、同一 locale，
+分别喂给原端录制服务与目标端实现，按字段投影比较。
+
+```yaml
+id: DIFF-LOGIN-001
+feature_ref: "#142"
+inputs:
+  - { user: "u", pwd: "wrong" }
+  - { user: "", pwd: "" }
+  - { user: "u" * 200, pwd: "p" }
+shared_env:
+  clock: 2026-09-17T09:00:00+08:00
+  seed: 42
+  locale: zh-CN
+legacy_oracle:
+  type: recorded          # recorded | live-service | historical
+  source: goldens/raw/login.json
+  version: build123
+modern_target:
+  impl: src/commands/login.ts
+projection:               # 按字段投影比较，忽略非语义差异
+  - field: success
+  - field: error_code
+  - field: username_preserved
+  - field: password_cleared
+ignore:
+  - field: timestamp      # 由固定时钟控制后仍可能有实现级差异
+    reason: 非语义
+result_class: null        # 语义相同 | 允许择优不同 | 未覆盖 | 冲突
+```
+
+**结果四类**：
+
+| 类 | 处置 |
+|---|---|
+| 语义相同 | 可关闭 |
+| 允许择优不同 | 可关闭（须有 S5 择优证据） |
+| 未覆盖 | 补输入，**不许关闭** |
+| **冲突** | **必须进 S5 重新判定，不许关闭** |
+
+**原端已不能运行时**：用旧录制、日志、DB 快照、视频帧、专家访谈形成证据链，
+但必须**标为历史证据**，不能伪装成实时 oracle。
+
+---
+
+## 二、属性不变量（property test）
+
+工具：fast-check（TS/JS）、proptest（Rust）、Hypothesis（Python）、schemathesis（OpenAPI）。
+
+```yaml
+id: PROP-ICON-001
+target: sys::merge_icon_line
+invariants:
+  - id: roundtrip
+    desc: 读 → 改 → 写 → 再读，非目标段完全保留
+  - id: sort_stable
+    desc: 排序键稳定，相等元素顺序不变
+  - id: precision_monotonic
+    desc: 裁剪与精度规则单调
+  - id: error_set_unchanged
+    desc: 错误码覆盖集合与原端一致
+  - id: idempotent
+    desc: 幂等操作重复执行结果一致
+  - id: reversible
+    desc: 可逆操作前后状态一致
+  - id: encode_decode_roundtrip
+    desc: 编码/解码往返一致（⚠️ UTF-16LE 当 UTF-8 解析几乎不报错）
+generators:
+  paths: [中文路径, 含空格路径, 8.3 短名, 超长路径, 空串]
+  encodings: [utf8-bom, utf16le, utf8-nobom]
+```
+
+**⚠️ 禁止用一个全局"新旧必须完全相同"掩盖 S5 的设计选择** ——
+property 要表达的是"目标端有意等价"还是"目标端按择优新契约"。
+
+---
+
+## 三、mutation 审计（测试有效性，不是代码质量分）
+
+```yaml
+id: MUT-001
+scope: capability CAP-DOC-002          # 关键功能包
+targets:
+  - delete_field          # 删掉一个 DTO 字段
+  - invert_comparison     # 反转比较
+  - swap_branch           # 交换分支
+  - change_constant       # 改数字常量（如防抖 400ms → 0）
+  - change_error_return   # 改错误返回
+  - change_delimiter      # 改序列化分隔符
+  - change_timeout
+  - change_encoding
+gate:
+  critical_package_survivors: 0        # 关键功能包：存活数必须为 0
+  other_threshold: 项目协商
+```
+
+**存活 = 说明当前功能卡只有截图或固定 fixture，没有真正锁定行为。**
+
+**⚠️ 纪律**：
+- 不把工具默认分数直接设成 G 门禁
+- mutation 覆盖 100% **不代表视觉与体验等价**，必须与视觉状态契约并用
+- 优先变异等价性测试与契约测试，不是全量代码
+
+---
+
+## 四、四道锁（AI 生成代码的等价性校验）
+
+| 道 | 内容 |
+|---|---|
+| 1 结构化搜索锁 | 同一查询在旧端和目标端都能执行（避免只 grep 到一边） |
+| 2 契约锁 | 命令、参数、DTO、异常、时序有机器可读契约 |
+| 3 oracle 锁 | 差分测试 + property test + golden review |
+| 4 突变锁 | 故意破坏目标端，检查测试会失败 |
+
+**任一锁都不能替代前三者。**
+特别警惕"模型看一眼 diff 说可接受" —— 这是最容易破坏像素级要求的捷径。

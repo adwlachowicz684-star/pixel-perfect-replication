@@ -1,0 +1,19 @@
+# 第七十七轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 类型 = gate / cmd / file / grep / cachekey / absent
+# 🔑 本轮主题：守「**有没有写清单**」而不只是「写了的是否兑现」
+
+# ① 新增 --check-current（G384）
+cmd:claim_verify.py --check-current
+grep:scripts/claim_verify.py::def cmd_check_current
+# ② 中文轮次解析（🔴 解析不了返回 None，**不猜**）
+grep:scripts/claim_verify.py::def _cn2num
+# ③ 只扫**标题行**（正文里的"下一轮计划"不算已完成）
+grep:scripts/claim_verify.py::def _rounds_in_docs
+# ④ 可选 --require-since：自某轮起**逐轮**要求清单
+cmd:claim_verify.py --require-since
+# ⑤ G384 已注册为自动门禁
+gate:G384
+# ⑥ 历史清单不得被误删（第七十五轮重复造轮子的教训）
+file:ledger/claims_75.txt
+file:ledger/claims_76.txt
+file:scripts/claim_verify.py

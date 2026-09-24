@@ -1,0 +1,22 @@
+# 第八十三轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：DUP_CMDS_GUARDIAN 加 **guards 语义字段**（防"存在但无关"）
+
+# ① 语义字段 guards（说得出守的是什么）
+grep:scripts/run_all_gates.py::guardian, guards = rec
+grep:scripts/run_all_gates.py::没说守的是什么
+# ② 语义校验：守卫命令必须体现 guards 声明的能力
+grep:scripts/run_all_gates.py::不含
+grep:scripts/run_all_gates.py::它可能是"存在但无关"的门禁
+# ③ 自证循环仍守（守卫不得跑被守护的命令）
+grep:scripts/run_all_gates.py::自己查自己，等于没查
+# ④ 既有能力仍工作
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+cmd:claim_verify.py --audit-all
+cmd:claim_verify.py --check-content
+# ⑤ 历史清单不得被误删
+file:ledger/claims_80.txt
+file:ledger/claims_81.txt
+file:ledger/claims_82.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

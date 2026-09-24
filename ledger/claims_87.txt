@@ -1,0 +1,21 @@
+# 第八十七轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**文件系统产物**（真外部副作用）
+
+# ① 产物登记表 + 写入处（只引代码标识符）
+grep:scripts/claim_verify.py::CAPABILITY_ARTIFACT
+grep:scripts/claim_verify.py::generated_at_ns
+grep:scripts/claim_verify.py::运行前产物快照
+cmd:claim_verify.py --probe-capability audit-all
+# ② 关键报错串
+grep:scripts/claim_verify.py::未登记文件系统产物
+grep:scripts/claim_verify.py::产物**未被重写**
+# ③ 既有能力仍工作
+cmd:claim_verify.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_84.txt
+file:ledger/claims_85.txt
+file:ledger/claims_86.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

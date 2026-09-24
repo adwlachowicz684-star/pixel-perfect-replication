@@ -1,0 +1,21 @@
+# 第八十八轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**产物内容**必须反映真实结果（防"只写个时间戳"）
+
+# ① 产物内容键登记 + 下钻（只引代码标识符）
+grep:scripts/claim_verify.py::CAPABILITY_ARTIFACT_KEYS
+grep:scripts/claim_verify.py::产物内容键
+cmd:claim_verify.py --probe-capability audit-all
+# ② 关键报错串
+grep:scripts/claim_verify.py::未登记产物内容键
+grep:scripts/claim_verify.py::产物**缺少键**
+grep:scripts/claim_verify.py::产物在说谎
+# ③ 既有能力仍工作
+cmd:claim_verify.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_85.txt
+file:ledger/claims_86.txt
+file:ledger/claims_87.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

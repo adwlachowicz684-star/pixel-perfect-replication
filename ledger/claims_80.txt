@@ -1,0 +1,28 @@
+# 第八十轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：给 ALL_CONTENT 加**自校验**（防措辞漂移 / 非独有）
+
+# ① 自校验入口 --check-content（G386）
+cmd:claim_verify.py --check-content
+grep:scripts/claim_verify.py::def cmd_check_content
+# ② 特征串 ↔ 段体函数映射（使"独有"成为可校验事实，而非注释声称）
+grep:scripts/claim_verify.py::ALL_CONTENT_FN
+grep:scripts/claim_verify.py::def _fn_code_lines
+# ③ 两条断言：存在性 + 唯一性
+grep:scripts/claim_verify.py::存在性失败
+grep:scripts/claim_verify.py::唯一性失败
+# ④ 🔑 audit-all 先自检判据，坏尺子拒绝给结论
+grep:scripts/claim_verify.py::判据不可信
+# ⑤ G386 已注册为自动门禁
+gate:G386
+# ⑥ 单独入口仍在（不得因新增而删除）
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --check-current
+# ⑦ 历史清单不得被误删
+file:ledger/claims_75.txt
+file:ledger/claims_76.txt
+file:ledger/claims_77.txt
+file:ledger/claims_78.txt
+file:ledger/claims_79.txt
+file:scripts/claim_verify.py

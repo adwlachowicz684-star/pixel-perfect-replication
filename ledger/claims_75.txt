@@ -1,0 +1,14 @@
+# 第七十五轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 格式：类型: 值     类型 = gate / cmd / file / grep / cachekey
+
+gate:G379          # 全量混沌必须写入 full 口径缓存
+gate:G380          # 抽样不得污染全量口径
+gate:G381          # 完成声明须回读代码核实
+file:scripts/claim_verify.py
+cmd:claim_verify.py --self-test
+cmd:claim_verify.py --scan-doc
+cmd:claim_verify.py --verify
+grep:scripts/run_all_gates.py::G381
+grep:scripts/gate_chaos.py::_j[_mode] = _res
+cachekey:audit/.chaos_last.json::full
+cachekey:audit/.chaos_last.json::sampled

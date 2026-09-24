@@ -1,0 +1,27 @@
+# 第八十二轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：登记集合必须**等于**实际重复组（警告→阻断）+ G385 联动
+
+# ① 联动登记表（共用命令 → 必须有完整性门禁）
+grep:scripts/run_all_gates.py::DUP_CMDS_GUARDIAN
+# ② 相等性：从警告升级为阻断
+grep:scripts/run_all_gates.py::本轮升级为**阻断**
+grep:scripts/run_all_gates.py::必须**完全相等**
+# ③ 联动三条断言
+grep:scripts/run_all_gates.py::联动检查：共用命令须有完整性门禁
+# 🔑 以下三条在第八十三轮**被改写**（文案变动），故改为现存的稳定串：
+#    "但登记的完整性门禁" → 现已并入语义校验输出，不再单独出现。
+grep:scripts/run_all_gates.py::完整性门禁
+grep:scripts/run_all_gates.py::自己查自己，等于没查
+# ④ 既有 G387 仍工作
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ⑤ 单独入口仍在
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:claim_verify.py --check-content
+# ⑥ 历史清单不得被误删
+file:ledger/claims_79.txt
+file:ledger/claims_80.txt
+file:ledger/claims_81.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

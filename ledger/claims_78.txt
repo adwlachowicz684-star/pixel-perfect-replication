@@ -1,0 +1,22 @@
+# 第七十八轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：合并入口 --all（G385）+ 默认起始轮可配置常量
+
+# ① 合并入口（一次进程跑完 G382/G383/G384）
+cmd:claim_verify.py --all
+grep:scripts/claim_verify.py::def cmd_all
+# ② 默认起始轮常量（不再每次手传 --require-since 75）
+grep:scripts/claim_verify.py::DEFAULT_REQUIRE_SINCE = 75
+# ③ 裸传 --require-since 即取该常量（nargs='?' + const）
+grep:scripts/claim_verify.py::const=DEFAULT_REQUIRE_SINCE
+# ④ 合并入口须把三者都跑（G385 自身健康度）
+gate:G385
+# ⑤ 子命令仍可单独调用（合并不等于废弃）
+cmd:claim_verify.py --verify
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --check-current
+cmd:claim_verify.py --scan-doc
+# ⑥ 历史清单不得被误删（第七十五轮重复造轮子的教训）
+file:ledger/claims_75.txt
+file:ledger/claims_76.txt
+file:ledger/claims_77.txt
+file:scripts/claim_verify.py

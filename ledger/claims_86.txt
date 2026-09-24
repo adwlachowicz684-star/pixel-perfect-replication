@@ -1,0 +1,21 @@
+# 第八十六轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**外部可观测副作用**（防"打印标记就走人"）
+
+# ① 副作用登记表（只引代码标识符）
+grep:scripts/claim_verify.py::CAPABILITY_EFFECT
+grep:scripts/claim_verify.py::CAPABILITY_EFFECT.get
+grep:scripts/claim_verify.py::redirect_stdout
+cmd:claim_verify.py --probe-capability audit-all
+# ② 关键报错串
+grep:scripts/claim_verify.py::未登记外部可观测副作用
+grep:scripts/claim_verify.py::打印了个标记就走人
+# ③ 既有能力仍工作
+cmd:claim_verify.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_83.txt
+file:ledger/claims_84.txt
+file:ledger/claims_85.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py

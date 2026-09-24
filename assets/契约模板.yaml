@@ -1,0 +1,69 @@
+# 契约模板（脚本可读）
+
+> **为什么文件化**：让脚本机械检查，而不是让模型"检查是否一致"。
+> 存到 `contracts/*.yaml`，由 `scripts/cross-end-check.mjs` 之类脚本消费。
+
+```yaml
+command: document.save
+source: legacy/DocCommands.cs:73
+target: src/commands/save.ts:31
+capability: CAP-DOC-002
+
+rename_all: snake_case          # 影响参数名比对方式
+
+arguments:
+  - name: path
+    type: string
+    nullable: false
+    legacyEncoding: utf16-le    # ⚠️ 编码是跨语言迁移的高发坑
+  - name: overwrite
+    type: boolean
+    default: false
+
+result:
+  type: union
+  variants: [ok, validation-error, io-error, permission-error]
+
+sideEffects:
+  - write-file
+  - add-history
+  - emit-saved-event
+
+idempotency: same-path-replay-must-not-create-duplicate-history
+
+faults:                          # 故障注入清单，S4 必做
+  - disk-full
+  - locked-file
+  - invalid-utf16
+  - missing-parent-dir
+  - concurrent-save
+
+dto:
+  rust: DocInfo
+  ts: DocInfo
+  alias: {}                      # 改名映射（不是错误）
+  internal_only: false           # 仅 Rust 内部使用，不暴露前端
+```
+
+---
+
+## 四类检查对照
+
+| # | 检查 | 抓什么 |
+|---|---|---|
+| C1 | 命令存在性 | 定义了没注册 / 注册了没定义 / 前端调用了不存在的命令 |
+| C2 | 参数名一致性 | 前端传的参数名 ≠ Rust 参数名（含命名风格映射） |
+| C3 | 必填/可选匹配 | Rust 非 `Option` 的参数，前端没传（**只查这一个方向**） |
+| C4 | DTO 字段一致性 | Rust struct 字段 ≠ TS interface 字段 |
+
+---
+
+## 五个必踩的坑
+
+| 坑 | 后果 |
+|---|---|
+| `[^}]*` 提前截断 | 实证：`FpxConfig` 39 字段只抓到 33，漏的正是出过 bug 的 `chain_actions` |
+| 对象字面量简写属性 `{ kind, path }` | 只匹配 `(\w+)\s*:` 会漏 |
+| `pub async fn` 漏匹配 | 4 个 async 命令全漏，表现为"前端调了不存在的命令" |
+| 命令/DTO 分散在多文件 | 必须用文件列表逐个读 |
+| 脚本永远绿灯 | **必须故障注入验证** |

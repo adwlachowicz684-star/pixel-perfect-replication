@@ -1,0 +1,26 @@
+# 第九十五轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**豁免清单外部化**
+
+# ① 外部豁免文件（只引代码标识符）
+grep:scripts/claim_verify.py::_load_rc_domain_allowlist
+grep:scripts/claim_verify.py::rc_domain_allowlist
+grep:scripts/claim_verify.py::豁免文件不存在
+grep:scripts/claim_verify.py::缺冒号
+grep:scripts/claim_verify.py::豁免清单不可读
+file:ledger/rc_domain_allowlist.txt
+cmd:claim_verify.py --check-rc-domain
+# ② 门禁仍登记
+gate:G388
+cmd:run_all_gates.py --self-check-noop
+# ③ 既有能力仍工作
+cmd:claim_verify.py --probe-capability audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_92.txt
+file:ledger/claims_93.txt
+file:ledger/claims_94.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
+file:scripts/gate_chaos.py

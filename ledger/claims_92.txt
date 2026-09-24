@@ -1,0 +1,25 @@
+# 第九十二轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**锚点分母改台账型** + **锚点推广到 audit-all**
+
+# ① 台账型分母（只引代码标识符）
+grep:scripts/gate_chaos.py::_anchor_denom
+grep:scripts/gate_chaos.py::_ANCHOR_DENOM_MODE
+grep:scripts/gate_chaos.py::CAPABILITY_ANCHOR_FLOOR
+# ② audit-all 值域锚点
+grep:scripts/claim_verify.py::CAPABILITY_ANCHOR_SPEC
+grep:scripts/claim_verify.py::不在合法域
+grep:scripts/claim_verify.py::未登记锚点
+grep:scripts/claim_verify.py::未登记合法域
+cmd:claim_verify.py --probe-capability audit-all
+# ③ 既有能力仍工作
+cmd:gate_chaos.py --declare-capability
+cmd:claim_verify.py --declare-capability
+cmd:run_all_gates.py --check-dup-cmds
+gate:G387
+# ④ 历史清单不得被误删
+file:ledger/claims_89.txt
+file:ledger/claims_90.txt
+file:ledger/claims_91.txt
+file:scripts/run_all_gates.py
+file:scripts/claim_verify.py
+file:scripts/gate_chaos.py

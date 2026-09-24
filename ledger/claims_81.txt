@@ -1,0 +1,30 @@
+# 第八十一轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：区分**刻意重复**与**误重复**（G387）
+
+# ① 新门禁 --check-dup-cmds（G387）
+cmd:run_all_gates.py --check-dup-cmds
+grep:scripts/run_all_gates.py::def cmd_check_dup_cmds
+# ② 刻意重复登记表（值含**批准 ID 集合** + 理由）
+grep:scripts/run_all_gates.py::INTENTIONAL_DUP_CMDS
+# ③ 🔑 逐个 ID 校验（第一版按组放过，实测漏网）
+grep:scripts/run_all_gates.py::组内存在未被批准的门禁
+# ④ 理由为空须阻断
+grep:scripts/run_all_gates.py::已登记但理由为空
+# ⑤ 登记过时要警告（不阻断）
+grep:scripts/run_all_gates.py::登记过时
+# ⑥ 字符串 tpl 不得参与判定（第七十一轮缺陷）
+grep:scripts/run_all_gates.py::def _cmd_key
+# ⑦ G387 已注册
+gate:G387
+# ⑧ 单独入口仍在
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:run_all_gates.py --self-check-noop
+# ⑨ 历史清单不得被误删
+file:ledger/claims_75.txt
+file:ledger/claims_76.txt
+file:ledger/claims_77.txt
+file:ledger/claims_78.txt
+file:ledger/claims_79.txt
+file:ledger/claims_80.txt
+file:scripts/run_all_gates.py

@@ -1,0 +1,24 @@
+# 第七十九轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：G385 与 G382~G384 真正解耦（独立完整性校验）
+
+# ① 独立校验入口 --audit-all
+cmd:claim_verify.py --audit-all
+grep:scripts/claim_verify.py::def cmd_audit_all
+# ② 关键：用**段体内容特征**而非自打印标记（前两版实测无效）
+grep:scripts/claim_verify.py::ALL_CONTENT
+# ③ G385 已注册，且**不复用** --all 的 rc
+gate:G385
+grep:scripts/run_all_gates.py::--audit-all
+# ④ 段体特征三串必须齐全（少一段即被抓）
+grep:scripts/claim_verify.py::('G382', '提到的 G 编号')
+grep:scripts/claim_verify.py::('G384', 'ledger 清单')
+# ⑤ 合并入口与单独入口都仍在（不得因解耦而删除其一）
+cmd:claim_verify.py --all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --check-current
+# ⑥ 历史清单不得被误删
+file:ledger/claims_75.txt
+file:ledger/claims_76.txt
+file:ledger/claims_77.txt
+file:ledger/claims_78.txt
+file:scripts/claim_verify.py

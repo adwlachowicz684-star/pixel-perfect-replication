@@ -1,0 +1,91 @@
+# 视觉状态契约模板
+
+> **一个视觉状态一张**，不是"一个页面一张截图"。
+> 校验：`python3 scripts/visual_check.py --states visual/states`
+> 模板文件：`visual/states/<功能>.<状态>.yaml`
+
+```yaml
+state_id: settings-dialog.default          # 唯一，命名：<功能>.<状态>
+feature_ref: "#142"                        # 关联功能卡
+capability: CAP-SETTINGS-001
+
+# ── 前置：全部锁死，否则 diff 不可复现 ──────────────────────
+preconditions:
+  fixture: user.admin
+  db_seed: settings/full.yaml
+  clock: 2026-09-17T09:00:00+08:00         # 固定时钟（时间戳类必填）
+  seed: 42                                 # 随机种子
+  font: Inter@2.001                        # 字体名@版本
+  locale: zh-CN
+  timezone: Asia/Shanghai
+  viewport: { width: 1440, height: 900 }
+  device_scale_factor: 1                   # ⚠️ 高 DPI 必须显式设，否则截图错位
+  zoom: 1
+  theme: light
+  reduced_motion: reduce                   # 禁用动画；或改为等终态
+  animations: disabled                     # disabled | wait-stable | deterministic-stub
+
+# ── 步骤：等待用语义断言，不用固定时间 ──────────────────────
+steps:
+  - action: click role=button name="设置"
+  - wait: aria-expanded=true               # ✅ 语义等待
+  # ❌ 禁止：waitForTimeout(1000)
+
+# ── 选择器 ────────────────────────────────────────────────
+selectors:
+  stable: [data-testid=settings-dialog]    # 比对范围
+  mask:
+    - selector: data-testid=avatar
+      reason: 头像来自用户数据，不属于本状态的视觉契约（已换 fixture 固定）
+    - selector: data-testid=last-login
+      reason: 相对时间，由固定时钟控制后仍可能受 locale 影响
+  # ⚠️ 若核心体验就是头像或倒计时 → 不许遮，必须换 fixture
+
+# ── 比较策略 ──────────────────────────────────────────────
+comparison:
+  engine: [pixel, layout]                  # 双引擎：像素 + 结构，交叉验证
+  threshold: 0.000                         # 状态级阈值，不是全局值
+  threshold_reason: 精确对齐项，必须零差异
+  include_aa: false                        # 是否忽略抗锯齿像素
+
+# ── 审批（人签，AI 不得代签）──────────────────────────────
+review:
+  approvers: [design, domain_owner]
+  baseline_ref: baselines/settings-dialog.default.png
+  decision_ref: decisions/settings-dialog.default.md
+  approved_by: null                        # 未批准前为 null
+  approved_at: null
+  decision_type: null                      # 原端有意变更 | 目标端等价 | 目标端择优且有证据
+```
+
+---
+
+## 阈值分层（写 `comparison.threshold` 时照此定）
+
+| 类别 | 阈值 | 理由 |
+|---|---|---|
+| 核心图标、像素标尺、图表轴、精确对齐项 | `0.000` | "像素级"的字面含义 |
+| 普通组件 | 按证据定，**必须写 `threshold_reason`** | 说不出理由就不给阈值 |
+| 动画、时间戳、头像 | **不给阈值** → 遮罩或 fixture | 给阈值 = 默许漂移 |
+
+---
+
+## 状态清单（一个功能通常要覆盖这些）
+
+```
+空态 / 首屏 / 加载完成 / 加载中 / 错误态 / 禁用态 / hover / 按下 / 焦点 /
+键盘焦点环 / 长内容 / 溢出 / 拖拽中 / 弹窗蒙层 / 右键菜单 / 暗色 /
+强制颜色 / 缩减动画 / 高 DPI / 打印
+```
+
+**至少覆盖该功能实际拥有的状态**，并为每个状态建一张 yaml。
+
+---
+
+## 审批纪律（三条硬规则）
+
+1. **`.approved` 必须有对应决策卡 + reviewer 签字**
+2. **只有三类可接受**：原端有意变更 / 目标端等价 / 目标端择优且有证据
+3. **禁止 bulk approve、禁止 AI 自签、禁止自动夜间 rebase**
+
+详见 `../flow/S7V-视觉状态契约门禁.md`、`../references/视觉稳定化.md`。

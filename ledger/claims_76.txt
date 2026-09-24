@@ -1,0 +1,19 @@
+# 第七十六轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 类型 = gate / cmd / file / grep / cachekey / absent（第七十六轮新增）
+# 🔑 absent = **必须不出现**（防回退），只在**代码行**判，排除注释与 docstring
+
+# ① 本轮新增：`absent` 声明类型（必须不出现）
+grep:scripts/claim_verify.py::if kind == 'absent'
+# ② 说明行过滤（排除 # 注释 + AST docstring）—— 上轮踩坑的根治
+grep:scripts/claim_verify.py::def _code_lines
+# ③ 该过滤器被 grep 与 absent 共用
+grep:scripts/claim_verify.py::仅在说明行命中
+# ④ 新子命令 --verify-all（核实全部历史清单，防回退）
+cmd:claim_verify.py --verify-all
+grep:scripts/claim_verify.py::def cmd_verify_all
+# ⑤ G383 已注册为自动门禁
+gate:G383
+# ⑥ G341 不得再带 --limit（🔑 第七十四轮事故的防回退断言）
+absent:scripts/run_all_gates.py::--limit
+# ⑦ 脚本仍存在（防误删既有产物 —— 第七十五轮重复造轮子的教训）
+file:scripts/claim_verify.py
