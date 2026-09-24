@@ -212,6 +212,34 @@ def local_index_entries():
     return res or None
 
 
+def _dirty_tracked():
+    """🔑 返回**已跟踪但未提交修改**的文件列表；`None` 表示无法确定。
+
+    🔑 第一百零六轮：只看 `M`/` M`/`MM`/`AM` 等"已跟踪且内容变了"的状态，
+       🔴 **不看** `??`（未跟踪）—— 那是 G390 的职责，两者语义不同。
+    """
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ['git', '-c', 'core.quotepath=false', 'status', '--porcelain',
+             '-z'],
+            capture_output=True, text=True, timeout=120, cwd=ROOT)
+        if proc.returncode != 0:
+            return None
+    except Exception:
+        return None
+    out = []
+    for item in proc.stdout.split('\0'):
+        if not item.strip():
+            continue
+        st = item[:2]
+        path = item[3:]
+        if st.strip() == '?':      # 🔑 ?? = 未跟踪 → G390 管，此处不管
+            continue
+        if st.strip():             # 已跟踪且有变化（含 M/A/D/R 等）
+            out.append(path)
+    return out
+
 def cmd_verify_push(report=False):
     """🔑 G391：**回读远端 tree** 并与本地逐条比对。
 
@@ -283,13 +311,34 @@ def cmd_verify_push(report=False):
         for p_ in mode_diff[:10]:
             print(f'   - {p_}  本地 {loc[p_][0]} ≠ 远端 {rem[p_][0]}')
 
-    bad = len(missing) + len(diff) + len(mode_diff)
+    # ⑤ 🔑 第一百零六轮：**本地有未提交的修改**
+    #    🔴 实测事故：commit 之后又跑了会写产物的自检入口
+    #       （--audit-history 重写了 history_mode_known.json）→
+    #       工作区变脏 → 推送的内容是**旧 commit**的，
+    #       而"本地文件"是新的 → 内容不一致。
+    #    🔑 这一层把"commit 与 push 之间不该再跑写文件的命令"
+    #       变成**可断言的事实**。
+    dirty = _dirty_tracked()
+    if dirty is None:
+        print('🔴 **无法确定**本地是否有未提交修改（git 不可用）'
+              ' —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    if dirty:
+        print(f'🔴 **本地有 {len(dirty)} 个未提交的修改** —— '
+              f'推送的是 commit 的内容，不是当前工作区：')
+        for p_ in dirty[:10]:
+            print(f'   - {p_}')
+        print('   🔑 成因通常是：commit 之后又跑了会写产物的入口'
+              '（如 --audit-history / --dump-legacy-files）')
+
+    bad = len(missing) + len(diff) + len(mode_diff) + len(dirty)
     print()
     print('=' * 70)
     if bad:
         print(f'🔴 **{"远端与本地不一致" if report else "推送不完整"}**：'
               f'缺失 {len(missing)} · 内容不一致 {len(diff)} · '
-              f'权限不一致 {len(mode_diff)}')
+              f'权限不一致 {len(mode_diff)} · 未提交修改 {len(dirty)}')
         if report:
             print('   🔑 报告模式：**只报告不阻断**，请人工判断')
             print('=' * 70)
