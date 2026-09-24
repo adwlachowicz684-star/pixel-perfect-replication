@@ -704,6 +704,12 @@ GATES = [
      # 🔑 G396 让遗留成为**可断言的事实**：台账 vs 实测，双向比对。
      #    🔴 依赖远端 API：不可达时**拒绝给结论**（rc=1），不静默通过。
      ["{py}", "{s}/push_api.py", "--assert-history-known"], "hard", []),
+    ("G397", "**文件级遗留断言**（odd_count / odd_paths_sha 与实测一致）",
+     # 🔴 第一百零二轮诚实结论②：台账只记 mode 与数量
+     #    → 无法回答"哪些文件被推成 100755"，
+     #    🔴 且"数量相同但文件不同"会被 G396 蒙混。
+     # 🔑 G397 逐条比对 **odd_count + 异常路径指纹**。
+     ["{py}", "{s}/push_api.py", "--assert-legacy-files"], "hard", []),
 ]
 
 MANUAL_GATES = [

@@ -25,6 +25,7 @@ python3 scripts/push_api.py --dry-run        # 只统计，不推送
 - 🔑 **空仓库**第一次要先建一个初始 commit（blob API 对空仓库返回 409）。
 """
 import base64
+import hashlib
 import json
 import os
 import sys
@@ -37,6 +38,21 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 # 🔑 第一百零二轮：历史遗留台账 —— 让"已知遗留"成为**可断言的事实**。
 HISTORY_KNOWN = os.path.join(ROOT, 'audit', 'history_mode_known.json')
+# 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
+LEGACY_SAMPLE_N = 10
+# 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
+LEGACY_SHOW_N = 20
+_LAST_DETAILS = {}
+
+
+def _rec_body(rec):
+    """台账**去掉 generated_at 后**的内容 —— 用于幂等比对。
+
+    🔑 判据：`generated_at` 每次跑都变，**不能**作为"台账变了"的依据。
+    """
+    return json.dumps({k: v for k, v in rec.items()
+                       if k != 'generated_at'},
+                      ensure_ascii=False, sort_keys=True)
 OWNER = 'adwlachowicz684-star'
 REPO = 'pixel-perfect-replication'
 
@@ -410,6 +426,7 @@ def cmd_audit_history():
     print(f'🔑 远端 commit {len(d)} 个\n')
 
     bad = []
+    details = {}          # 🔑 第一百零三轮：文件级明细（供 --show-legacy-files）
     for c in d:
         sha = c['sha']
         t = req('GET', f'{API}/git/trees/{sha}?recursive=1')
@@ -417,17 +434,34 @@ def cmd_audit_history():
             print(f"⚠️ {sha[:12]} 树读取失败 HTTP {t['__err']} —— 跳过")
             continue
         dist = {}
+        odd_paths = {}    # mode -> [path, ...]（**排序**，保证确定性）
         for it in t.get('tree', []):
-            if it['type'] == 'blob':
-                dist[it['mode']] = dist.get(it['mode'], 0) + 1
+            if it['type'] != 'blob':
+                continue
+            dist[it['mode']] = dist.get(it['mode'], 0) + 1
+            if it['mode'] not in want:
+                odd_paths.setdefault(it['mode'], []).append(it['path'])
         msg = c['commit']['message'].splitlines()[0][:34]
         # 🔑 判据：与该 commit **当时**应有的 mode 无法自动得知，
         #    故用**当前索引基准**比对：出现索引里**没有**的 mode 即为异常。
         odd = {m: n for m, n in dist.items() if m not in want}
         if odd:
-            bad.append((sha[:12], msg, odd, dist))
+            for _m in odd_paths:
+                odd_paths[_m].sort()
+            flat = sorted(p for ps in odd_paths.values() for p in ps)
+            # 🔑 清单指纹：全部异常路径排序后拼串的 sha1。
+            #    🔴 只记数量会被"数量相同但文件不同"蒙混。
+            fp = hashlib.sha1('\n'.join(flat).encode('utf-8')).hexdigest()
+            ent = {'sha': sha[:12], 'msg': msg, 'odd_modes': odd,
+                   'odd_count': len(flat),
+                   'odd_sample': flat[:LEGACY_SAMPLE_N],
+                   'odd_sample_truncated': len(flat) > LEGACY_SAMPLE_N,
+                   'odd_paths_sha': fp}
+            bad.append((sha[:12], msg, odd, dist, ent))
+            details[sha[:12]] = flat
             print(f'🔴 {sha[:12]}  {msg}')
-            print(f'     异常 mode {odd}   全分布 {dist}')
+            print(f'     异常 mode {odd}   全分布 {dist}'
+                  f'   异常文件 {len(flat)} 个')
         else:
             print(f'✅ {sha[:12]}  {msg}   {dist}')
 
@@ -448,21 +482,42 @@ def cmd_audit_history():
         'generated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
         'baseline_modes': want,
         'checked_commits': len(d),
-        'known_legacy': [{'sha': h, 'msg': m, 'odd_modes': o}
-                         for h, m, o, _ in bad],
+        # 🔑 第一百零三轮：每条含**文件级**信息：
+        #    odd_count（异常文件总数）· odd_sample（排序后前 N 个路径）
+        #    · odd_paths_sha（全部异常路径的指纹）
+        #    🔴 上一轮只有 odd_modes（数量）→ 无法回答"哪些文件不对"，
+        #       且"数量相同但文件不同"会被蒙混。
+        'known_legacy': [e[4] for e in bad],
         'note': '历史 commit 的 mode 与当前 git 索引基准不一致。'
                 ' 修正需 force push（破坏性），本脚本只读不改写。'
-                ' 本台账由 G396 双向断言，不得手工静默删改。',
+                ' 本台账由 G396/G397 双向断言，不得手工静默删改。',
     }
     try:
         os.makedirs(os.path.dirname(HISTORY_KNOWN), exist_ok=True)
-        with open(HISTORY_KNOWN, 'w', encoding='utf-8') as f:
-            json.dump(rec, f, ensure_ascii=False, indent=2)
-        print(f'\n🔑 台账已写：{os.path.relpath(HISTORY_KNOWN, ROOT)}'
-              f' · known_legacy {len(rec["known_legacy"])} 条')
+        # 🔑 幂等写入：除 generated_at 外内容一致 → **不重写**。
+        #    🔴 上一轮问题③：generated_at 每次都变 → 台账**必然变脏**，
+        #       但 G396 不比对它 → "跑一次就更新一次"永远发现不了。
+        #    🔑 现在只在**内容真变**时才改时间戳。
+        prev = None
+        try:
+            with open(HISTORY_KNOWN, encoding='utf-8') as f:
+                prev = json.load(f)
+        except (FileNotFoundError, ValueError):
+            pass
+        if prev is not None and _rec_body(prev) == _rec_body(rec):
+            print(f'\n🔑 台账内容未变 —— **不重写**（避免时间戳抖动）：'
+                  f'{os.path.relpath(HISTORY_KNOWN, ROOT)}')
+        else:
+            with open(HISTORY_KNOWN, 'w', encoding='utf-8') as f:
+                json.dump(rec, f, ensure_ascii=False, indent=2)
+            print(f'\n🔑 台账已写：{os.path.relpath(HISTORY_KNOWN, ROOT)}'
+                  f' · known_legacy {len(rec["known_legacy"])} 条')
     except Exception as e:
-        print(f'\n🔴 台账写入失败：{e} —— 遗留无法被 G396 断言')
+        print(f'\n🔴 台账写入失败：{e} —— 遗留无法被 G396/G397 断言')
         return 1
+    # 🔑 供 --show-legacy-files 在同一进程内复用
+    global _LAST_DETAILS
+    _LAST_DETAILS = details
     print('=' * 70)
     # 🔑 审计本身不算失败 —— 它**不被掩盖**即算达标（由 G396 守）
     return 0
@@ -634,6 +689,161 @@ def cmd_assert_history_known():
     return 1
 
 
+
+def cmd_show_legacy_files(a):
+    """🔑 列出某历史 commit 中 **mode 异常的具体文件**（人工可查）。
+
+    🔴 第一百零二轮诚实结论②：台账只记 mode 与数量，
+       **无法回答"哪些文件被推成 100755"**。
+    🔑 本入口回答这个问题：给定 commit（默认台账里第一条），
+       列出全部异常文件路径。
+
+    🔑 用法：`--show-legacy-files [SHA前缀]`；省略则列**全部**遗留 commit。
+    """
+    print('=' * 70)
+    print('🔑 **历史遗留文件清单**（哪些文件的 mode 不对）')
+    print('=' * 70)
+    want_arg = (getattr(a, 'show_legacy_files') or '').strip()
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{HISTORY_KNOWN} —— 先跑 --audit-history')
+        return 1
+    except Exception as e:
+        print(f'🔴 台账不可读：{e} —— 拒绝给结论')
+        return 1
+
+    want = set()
+    for _m, _ in (local_index_entries() or {}).values():
+        want.add(_m)
+    if not want:
+        print('🔴 无法确定当前索引 mode 基准 —— 拒绝给结论')
+        return 1
+
+    targets = rec.get('known_legacy', [])
+    if want_arg:
+        targets = [t for t in targets if t['sha'].startswith(want_arg)]
+        if not targets:
+            print(f'🔴 台账里没有 sha 以 {want_arg!r} 开头的遗留')
+            return 1
+
+    total = 0
+    for t in targets:
+        # 🔑 用 **完整 sha 查远端**（台账里存的是 12 位前缀，tree API 也接受）
+        d = req('GET', f'{API}/git/trees/{t["sha"]}?recursive=1')
+        if '__err' in d:
+            print(f'\n⚠️ {t["sha"]} 树读取失败 HTTP {d["__err"]} —— 跳过')
+            continue
+        paths = sorted(it['path'] for it in d.get('tree', [])
+                       if it['type'] == 'blob' and it['mode'] not in want)
+        total += len(paths)
+        print(f'\n### {t["sha"]}  {t.get("msg", "")}')
+        print(f'    mode 异常文件 **{len(paths)} 个**'
+              f'（台账记 odd_count={t.get("odd_count", "?")}）')
+        if t.get('odd_count') != len(paths):
+            print(f'    🔴 与台账 odd_count **不一致** —— 台账已过期')
+        for p_ in paths[:LEGACY_SHOW_N]:
+            print(f'      - {p_}')
+        if len(paths) > LEGACY_SHOW_N:
+            print(f'      … 另 {len(paths) - LEGACY_SHOW_N} 个'
+                  f'（全部 {len(paths)} 个已计入 odd_paths_sha）')
+
+    print()
+    print('=' * 70)
+    print(f'🔑 共 {total} 个文件路径分布在 {len(targets)} 个 commit')
+    print('=' * 70)
+    return 0
+
+
+def cmd_assert_legacy_files():
+    """🔑 G397：**文件级**遗留断言（odd_count / odd_paths_sha 与实测一致）。
+
+    🔴 第一百零二轮诚实结论②：台账只记数量，
+       🔴 "数量相同但文件不同"会被 G396 蒙混过去。
+    🔑 G397 补上文件级：逐条比对 `odd_count` 与 `odd_paths_sha`。
+
+    | 层 | 比什么 | 防什么 |
+    |---|---|---|
+    | G396 | **有哪些 commit** 有遗留 | 新遗留 / 台账过期 |
+    | **G397** | 每个 commit **有哪些文件** | 数量对但文件变了 |
+    """
+    print('=' * 70)
+    print('🔑 **文件级遗留断言**（G397 · odd_count / odd_paths_sha）')
+    print('=' * 70)
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{HISTORY_KNOWN}')
+        return 1
+    except Exception as e:
+        print(f'🔴 台账不可读：{e} —— 拒绝给结论')
+        return 1
+
+    known = {r['sha']: r for r in rec.get('known_legacy', [])}
+    # ① 结构完整性：每条都**必须**有文件级字段
+    need = ('odd_count', 'odd_sample', 'odd_paths_sha',
+            'odd_sample_truncated')
+    miss = [h for h, r in known.items() if any(k not in r for k in need)]
+    print(f'\n① 台账 {len(known)} 条 · 文件级字段齐全？'
+          f'{"✅" if not miss else "🔴"}')
+    if miss:
+        for h in miss[:10]:
+            lack = [k for k in need if k not in known[h]]
+            print(f'   🔴 {h} 缺少 {lack}')
+        print('   🔑 处置：重跑 `--audit-history` 生成新格式台账')
+        print('=' * 70)
+        return 1
+
+    idx = local_index_entries()
+    if not idx:
+        print('🔴 无法确定 git 索引 mode —— 拒绝给结论')
+        return 1
+    want = {}
+    for _m, _ in idx.values():
+        want[_m] = want.get(_m, 0) + 1
+    d = req('GET', f'{API}/commits?per_page=100')
+    if '__err' in d or not isinstance(d, list):
+        print('🔴 无法读取远端 commit 列表 —— **拒绝给结论**')
+        return 1
+
+    print('\n② 逐条比对（台账 vs 实测）')
+    bad_c, bad_s = [], []
+    for h, r in sorted(known.items()):
+        t = req('GET', f'{API}/git/trees/{h}?recursive=1')
+        if '__err' in t:
+            print(f'   ⚠️ {h} 树读取失败 —— 跳过')
+            continue
+        paths = sorted(it['path'] for it in t.get('tree', [])
+                       if it['type'] == 'blob' and it['mode'] not in want)
+        fp = hashlib.sha1('\n'.join(paths).encode('utf-8')).hexdigest()
+        c_ok = (r['odd_count'] == len(paths))
+        s_ok = (r['odd_paths_sha'] == fp)
+        tag = '✅' if (c_ok and s_ok) else '🔴'
+        print(f'   {tag} {h}  count 台账{r["odd_count"]}'
+              f'/实测{len(paths)}  sha '
+              f'{r["odd_paths_sha"][:8]}/{fp[:8]}')
+        if not c_ok:
+            bad_c.append(h)
+        if not s_ok:
+            bad_s.append(h)
+
+    print()
+    print('=' * 70)
+    if bad_c or bad_s:
+        print(f'🔴 文件级不一致：odd_count {len(bad_c)} 条'
+              f' · odd_paths_sha {len(bad_s)} 条')
+        print('   🔑 含义：遗留的**具体文件**变了，'
+              '数量恰好相同也会被测出')
+        print('=' * 70)
+        return 1
+    print(f'✅ {len(known)} 条遗留的文件级信息与实测一致'
+          f'（count + 路径指纹双向）')
+    print('=' * 70)
+    return 0
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -655,6 +865,11 @@ def main():
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
                     help='G394：历史 commit 权限审计（**只读**，不改写历史）')
+    ap.add_argument('--show-legacy-files', nargs='?', const='',
+                    metavar='SHA前缀',
+                    help='列出历史 commit 中 **mode 异常的具体文件**')
+    ap.add_argument('--assert-legacy-files', action='store_true',
+                    help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--check-gitlink', action='store_true',
@@ -672,6 +887,14 @@ def main():
     if a.audit_history:
         os.chdir(ROOT)
         return cmd_audit_history()
+
+    if a.show_legacy_files is not None:
+        os.chdir(ROOT)
+        return cmd_show_legacy_files(a)
+
+    if a.assert_legacy_files:
+        os.chdir(ROOT)
+        return cmd_assert_legacy_files()
 
     if a.assert_history_known:
         os.chdir(ROOT)
