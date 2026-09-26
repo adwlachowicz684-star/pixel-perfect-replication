@@ -25,6 +25,7 @@ python3 scripts/push_api.py --dry-run        # 只统计，不推送
 - 🔑 **空仓库**第一次要先建一个初始 commit（blob API 对空仓库返回 409）。
 """
 import base64
+import glob
 import hashlib
 import json
 import os
@@ -483,6 +484,99 @@ def cmd_assert_fp_mirror():
         return 1
     print()
     print(f'✅ 镜像与台账一致 —— 整段替换须同时改两处')
+    print('=' * 70)
+    return 0
+
+def _scan_write_pairing():
+    """🔑 扫描 scripts/*.py：找出写**台账变更史**与写**镜像**的函数。
+
+    🔑 为什么用 AST 而不是 grep：
+       🔴 grep 分不清 `rec['baseline_fp_history'] = x`（写）
+          与 `h = rec['baseline_fp_history']`（只读）。
+    """
+    import ast
+    base_w, mir_w = {}, {}
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            tree = ast.parse(open(f, encoding='utf-8').read())
+        except (SyntaxError, ValueError):
+            continue
+        for fn_ in ast.walk(tree):
+            if not isinstance(fn_, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            name = fn_.name
+            wb, wm = False, False
+            for n in ast.walk(fn_):
+                # ① 写 baseline_fp_history：下标赋值 / .append 调用
+                if isinstance(n, ast.Subscript):
+                    sl = getattr(n.slice, 'value', None)
+                    if sl == 'baseline_fp_history' and isinstance(
+                            n.ctx, (ast.Store, ast.Del)):
+                        wb = True
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)                         and n.func.attr in ('append', 'extend', 'insert', 'pop'):
+                    v = n.func.value
+                    if isinstance(v, ast.Subscript) and getattr(
+                            v.slice, 'value', None) == 'baseline_fp_history':
+                        wb = True
+                # ② 写镜像
+                if isinstance(n, ast.Call):
+                    fn_id = getattr(n.func, 'id', None)
+                    if fn_id == '_write_mirror':
+                        wm = True
+            if wb:
+                base_w.setdefault(os.path.basename(f), []).append(name)
+            if wm:
+                mir_w.setdefault(os.path.basename(f), []).append(name)
+    return base_w, mir_w
+
+
+def cmd_assert_write_pairing():
+    """🔑 G403：**写台账变更史必须与写镜像在同一个函数内**。
+
+    🔴 第一百零九轮诚实结论②（本轮要解决的那一条）：
+       "镜像只由 `--audit-history` 写，其它入口改变更史
+        不会同步镜像（未设门禁禁止）"。
+
+    🔑 双向断言（与 G396 同构）：
+       - 改了台账**没同步镜像** → G402 抓得到（指纹不符）
+       - 🔴 改了镜像**没同步台账** → **没有任何门禁能抓**
+         本门禁补的就是这个反向漏洞。
+       - 🔑 更根本的：新入口若只写台账不写镜像 → 从一开始就是单点。
+
+    🔑 判据：写 `baseline_fp_history` 的函数集合
+       **必须等于** 调用 `_write_mirror` 的函数集合。
+    """
+    print('🔑 **写入配对断言**（G403）')
+    print('=' * 70)
+    base_w, mir_w = _scan_write_pairing()
+    if not base_w:
+        print('🔴 未发现任何写 baseline_fp_history 的函数 —— '
+              '台账无法被维护，拒绝给结论')
+        return 1
+    print(f'   写台账变更史的函数：{dict(base_w)}')
+    print(f'   写镜像的函数：{dict(mir_w)}')
+
+    def flat(d):
+        return {f'{k}::{n}' for k, v in d.items() for n in v}
+
+    only_base = sorted(flat(base_w) - flat(mir_w))
+    only_mir = sorted(flat(mir_w) - flat(base_w))
+    bad = []
+    if only_base:
+        bad.append('改了台账**未同步镜像**：'
+                   f'{only_base} —— 变更史仍只有一处，整段替换无从发现')
+    if only_mir:
+        bad.append('改了镜像**未同步台账**：'
+                   f'{only_mir} —— 镜像会与台账脱钩，G402 将误报')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('   🔑 正确做法：在**同一个函数内**先写台账、再写镜像')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ 写入配对一致 —— {len(flat(base_w))} 个函数同时写台账与镜像')
     print('=' * 70)
     return 0
 
@@ -1633,6 +1727,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-write-pairing', action='store_true',
+                    help='G403：写台账与写镜像必须在同一函数内')
     ap.add_argument('--assert-fp-mirror', action='store_true',
                     help='G402：变更史镜像须与台账一致（防整段替换）')
     ap.add_argument('--assert-fp-history', action='store_true',
@@ -1673,6 +1769,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_write_pairing:
+        return cmd_assert_write_pairing()
     if a.assert_fp_mirror:
         return cmd_assert_fp_mirror()
     if a.assert_fp_history:

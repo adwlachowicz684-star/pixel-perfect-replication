@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-27T05:03:38+0800",
+  "generated_at": "2026-09-27T05:32:59+0800",
   "baseline_modes": {
-    "100644": 283
+    "100644": 284
   },
   "baseline_fp_history": [
     {
@@ -52,10 +52,26 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-27T05:03:38+0800"
+    },
+    {
+      "seq": 4,
+      "seq_in_round": 1,
+      "round": 109,
+      "from_fp": "cff3cedcab26f175730c17d1d1e9106e1414124d",
+      "to_fp": "c88985e84eb8806d1446db6e49f667d80316ce2b",
+      "from_modes": {
+        "100644": 283
+      },
+      "to_modes": {
+        "100644": 284
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-27T05:32:59+0800"
     }
   ],
-  "baseline_fp": "cff3cedcab26f175730c17d1d1e9106e1414124d",
-  "checked_commits": 19,
+  "baseline_fp": "c88985e84eb8806d1446db6e49f667d80316ce2b",
+  "checked_commits": 20,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -79,7 +95,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 283
+        "100644": 284
       }
     },
     {
@@ -104,7 +120,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 283
+        "100644": 284
       }
     },
     {
@@ -129,7 +145,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 283
+        "100644": 284
       }
     },
     {
@@ -154,7 +170,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 283
+        "100644": 284
       }
     },
     {
@@ -179,7 +195,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 283
+        "100644": 284
       }
     }
   ],
