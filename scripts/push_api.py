@@ -86,6 +86,15 @@ PATH_CONST_ALLOW = {
 }
 # 🔑 豁免**必须非空** —— 空表 + 新常量 = 应报未登记，不得静默
 PATH_CONST_ALLOW_MIN_REASON = 6
+
+# 🔑 第一百一十四轮：**元登记项** —— 被依赖的"登记表本身"。
+#    🔴 113 轮③：PATH_CONST_ALLOW 自己未纳入登记项，
+#       **它自己改名也会静默失效** —— 与 112 轮同一个洞又出现一次。
+#    🔑 根治思路：**登记表自己也要被登记**，形成闭环。
+#    🔑 这些名字同样是"被依赖的"：G405/G406 都靠它们工作。
+SELF_REGISTERED_META = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
+                        'DEPENDENT_NAMES_REQUIRED', 'PATH_CONST_ALLOW',
+                        'PATH_CONST_ALLOW_MIN_REASON')
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -717,7 +726,7 @@ def cmd_assert_dependent_names():
                    f'< 下限 {DEPENDENT_NAMES_MIN} —— 疑似被删减')
     missing_req = [n for n in DEPENDENT_NAMES_REQUIRED if n not in tbl]
     if missing_req:
-        bad.append(f'**核心**名字缺失：{missing_req} —— 不得从登记表中删除')
+        bad.append(f'**核心**名字缺失：{missing_req} —— 不得从登记表的删除'.replace('的删除', '删除'))
     print(f'   登记 {len(tbl)} 条 · 核心名 {len(DEPENDENT_NAMES_REQUIRED)} 个齐全'
           if not missing_req else f'   登记 {len(tbl)} 条')
 
@@ -736,8 +745,27 @@ def cmd_assert_dependent_names():
                     nm = n.id
             elif isinstance(n, ast.Attribute):
                 nm = n.attr
-            if nm in tbl:
+            # 🔑 收集范围 = 登记表 + 元登记项（后者不在表里，需显式并入）
+            watch = tbl.keys() | set(globals().get('SELF_REGISTERED_META') or ())
+            if nm in watch:
                 refs[nm] = refs.get(nm, 0) + 1
+            # 🔑 **字符串形式**的动态引用：globals().get('X')
+            #    🔴 这类引用 AST 扫不到（是 Constant 不是 Name）——
+            #       若不计入，元登记项会**永远**报"无引用"（114 轮实测踩到）。
+            #    🔑 与 110 轮"grep 分不清写与只读"同源：
+            #       **按名字访问**与**按字符串访问**是两种不同的引用形态。
+            elif isinstance(n, ast.Constant) and isinstance(n.value, str) \
+                    and n.value in watch:
+                refs[n.value] = refs.get(n.value, 0) + 1
+    # 🔑 元登记项：**登记表自己**也必须闭合（113 轮③）
+    #    🔑 与 **G407 共用** `_meta_names_bad()`，不另抄一份。
+    m_bad = _meta_names_bad(refs)
+    if m_bad:
+        bad.extend(m_bad)
+    else:
+        print(f'   ✅ meta    {len(globals().get("SELF_REGISTERED_META") or ())} '
+              f'个元登记项闭合')
+
     for name, (kind, desc) in sorted(tbl.items()):
         g = globals().get(name)
         if kind == 'const':
@@ -853,6 +881,72 @@ def cmd_assert_path_consts():
         return 1
     print()
     print(f'✅ {len(consts)} 个路径常量**均已登记或已豁免**（无未登记项）')
+    print('=' * 70)
+    return 0
+
+def _meta_names_bad(refs):
+    """🔑 元登记项校验（被 G405 与 **G407** 共用，避免两处各写一份）。
+
+    🔴 必须与 G405 共用同一实现 —— 若 G407 自己抄一份，
+       则第一百轮那种"自测测的是自己抄的那份"会重演。
+    """
+    meta = globals().get('SELF_REGISTERED_META')
+    if not isinstance(meta, tuple) or not meta:
+        return ['SELF_REGISTERED_META 未登记或为空 —— 拒绝给结论']
+    out = []
+    for nm in meta:
+        g = globals().get(nm)
+        if g is None or (isinstance(g, (dict, tuple, str)) and len(g) == 0):
+            out.append(f'{nm}（元登记项）**不存在或为空**')
+        elif refs.get(nm, 0) == 0:
+            out.append(f'{nm}（元登记项）**无任何引用** —— 改名后静默失效')
+    return out
+
+
+def cmd_assert_meta_names():
+    """🔑 G407：**元登记项闭合**（登记表自己也要被登记）。
+
+    🔴 第一百一十三轮诚实结论③（本轮要解决的那一条）：
+       "豁免表 PATH_CONST_ALLOW **本身未纳入**登记项 ——
+        **它自己改名也会静默失效**（与 112 轮同一个洞，又出现一次）。"
+
+    🔑 为什么**独立成门禁**而不只是并入 G405：
+       🔴 破坏实测时只有 G405 会连带失败，看不出**是表内项还是元项**坏了。
+       独立后可单独证明"元登记项这一层"确实有效（与 78 轮"保留三条编号"同理）。
+
+    🔑 与 G405 共用 `_meta_names_bad()` —— 不另抄一份。
+    """
+    print('🔑 **元登记项闭合断言**（G407）')
+    print('=' * 70)
+    import ast
+    meta = globals().get('SELF_REGISTERED_META') or ()
+    refs = {}
+    watch = set(meta)
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            tree = ast.parse(open(f, encoding='utf-8').read())
+        except (SyntaxError, ValueError):
+            continue
+        for n in ast.walk(tree):
+            nm = None
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+                nm = n.id
+            elif isinstance(n, ast.Attribute):
+                nm = n.attr
+            elif isinstance(n, ast.Constant) and isinstance(n.value, str):
+                nm = n.value
+            if nm in watch:
+                refs[nm] = refs.get(nm, 0) + 1
+    bad = _meta_names_bad(refs)
+    if bad:
+        for b in bad:
+            print(f'🔴 {b}')
+        print('=' * 70)
+        return 1
+    for nm in sorted(meta):
+        print(f'   ✅ {nm:28s} 引用 {refs.get(nm, 0)} 处')
+    print()
+    print(f'✅ {len(meta)} 个元登记项**全部闭合** —— 登记表自己也被登记了')
     print('=' * 70)
     return 0
 
@@ -2003,6 +2097,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-meta-names', action='store_true',
+                    help='G407：元登记项（登记表本身）必须闭合')
     ap.add_argument('--assert-path-consts', action='store_true',
                     help='G406：新产物路径常量必须已登记')
     ap.add_argument('--assert-dependent-names', action='store_true',
@@ -2051,6 +2147,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_meta_names:
+        return cmd_assert_meta_names()
     if a.assert_path_consts:
         return cmd_assert_path_consts()
     if a.assert_dependent_names:
