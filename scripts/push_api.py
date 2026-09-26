@@ -45,6 +45,11 @@ HISTORY_KNOWN = os.path.join(ROOT, 'audit', 'history_mode_known.json')
 FP_HISTORY_MIRROR = os.path.join(ROOT, 'ledger', 'baseline_fp_mirror.json')
 # 🔑 第一百零八轮：基准变更史上限（保留最早 1 条 + 最近 N-1 条）
 BASELINE_FP_HISTORY_MAX = 20
+# 🔑 第一百一十一轮：**镜像写入函数名**登记项。
+#    🔴 110 轮诚实结论③：_write_mirror 硬编码在扫描器里 ——
+#       改函数名会让 G403 **静默失效**（与 93 轮常量改名同源）。
+#    🔑 登记后由 G404 断言该函数**真实存在**，改名即暴露。
+MIRROR_WRITE_FN = '_write_mirror'
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -521,7 +526,7 @@ def _scan_write_pairing():
                 # ② 写镜像
                 if isinstance(n, ast.Call):
                     fn_id = getattr(n.func, 'id', None)
-                    if fn_id == '_write_mirror':
+                    if fn_id == MIRROR_WRITE_FN:
                         wm = True
             if wb:
                 base_w.setdefault(os.path.basename(f), []).append(name)
@@ -577,6 +582,68 @@ def cmd_assert_write_pairing():
         return 1
     print()
     print(f'✅ 写入配对一致 —— {len(flat(base_w))} 个函数同时写台账与镜像')
+    print('=' * 70)
+    return 0
+
+def cmd_assert_mirror_fn():
+    """🔑 G404：**登记项必须真实存在且真被使用** —— 防改名静默失效。
+
+    🔴 第一百一十轮诚实结论③（本轮要解决的那一条）：
+       "_write_mirror 名字**硬编码**在扫描器里 —— 改函数名会让 G403
+        静默失效（与 93 轮常量改名同源，未设反制）。"
+
+    🔑 三层判据（与 94 轮"常量必须真的被引用"同构）：
+       ① 登记常量 **MIRROR_WRITE_FN** 必须存在且非空
+       ② 该函数必须**真实定义**在 scripts/*.py 里（AST 顶层函数）
+       ③ 该函数必须**真被扫描器使用** —— 即在 _scan_write_pairing 内被引用
+          🔴 只验①+②不够：改了常量值而不改调用点 → 函数存在但没人用，
+             G403 会静默变成"永远找不到镜像写入者"。
+
+    🔑 为什么③必须查"在扫描函数内被引用"：
+       这是把"登记"与"使用"绑成一条**可校验的链**，
+       而不是只证明"这个名字碰巧存在"（83 轮"存在但无关"）。
+    """
+    print('🔑 **登记项完整性断言**（G404）')
+    print('=' * 70)
+    import ast
+    bad = []
+    fn_name = MIRROR_WRITE_FN
+    if not fn_name or not isinstance(fn_name, str):
+        print('🔴 MIRROR_WRITE_FN 未登记或类型异常 —— 拒绝给结论')
+        return 1
+    print(f'   登记值：{fn_name!r}')
+    if fn_name not in globals() or not callable(globals().get(fn_name)):
+        bad.append(f'登记的函数 {fn_name!r} **未定义** —— '
+                   'G403 会静默失效')
+    else:
+        print(f'   ✅ 函数已定义（可调用）')
+
+    # ③ 真被扫描器使用
+    used = False
+    try:
+        src = open(os.path.join(HERE, 'push_api.py'), encoding='utf-8').read()
+        tree = ast.parse(src)
+        for n in ast.walk(tree):
+            if isinstance(n, ast.FunctionDef) and n.name == '_scan_write_pairing':
+                for m in ast.walk(n):
+                    if isinstance(m, ast.Name) and m.id == 'MIRROR_WRITE_FN':
+                        used = True
+                    if isinstance(m, ast.Attribute) and m.attr == fn_name:
+                        used = True
+    except (SyntaxError, ValueError, FileNotFoundError) as e:
+        bad.append(f'无法解析 push_api.py：{e} —— 拒绝给结论')
+    if not bad and not used:
+        bad.append(f'常量 MIRROR_WRITE_FN **未在 _scan_write_pairing 内被引用** '
+                   f'—— 改名后 G403 静默失效')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('=' * 70)
+        return 1
+    print('   ✅ 扫描器 _scan_write_pairing 内**确被引用**')
+    print()
+    print(f'✅ 登记项闭合 —— {fn_name!r} 已定义且被使用')
     print('=' * 70)
     return 0
 
@@ -1727,6 +1794,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-mirror-fn', action='store_true',
+                    help='G404：镜像写入函数登记项必须真实存在且被使用')
     ap.add_argument('--assert-write-pairing', action='store_true',
                     help='G403：写台账与写镜像必须在同一函数内')
     ap.add_argument('--assert-fp-mirror', action='store_true',
@@ -1769,6 +1838,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_mirror_fn:
+        return cmd_assert_mirror_fn()
     if a.assert_write_pairing:
         return cmd_assert_write_pairing()
     if a.assert_fp_mirror:
