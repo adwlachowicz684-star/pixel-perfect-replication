@@ -1,0 +1,11 @@
+{
+  "_why": "🔑 第一百一十五轮：SELF_REGISTERED_META 自己是'元元登记项'——它不在任何表里，改名同样无人发现。这条链可无限递推（113③→114①）。本文件是**明示的信任根**：停止递推，把它写死在这里，并断言代码值必须与本文件一致。",
+  "_rule": "🔴 修改本文件必须在本轮文档中写明理由。同时改代码与本文件会绕过 G408 —— 这是**已知边界**（与 109 轮'同时改两处'同源），靠 git 审计兜底。",
+  "SELF_REGISTERED_META": [
+    "DEPENDENT_NAMES",
+    "DEPENDENT_NAMES_MIN",
+    "DEPENDENT_NAMES_REQUIRED",
+    "PATH_CONST_ALLOW",
+    "PATH_CONST_ALLOW_MIN_REASON"
+  ]
+}

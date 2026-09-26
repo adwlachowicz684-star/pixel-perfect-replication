@@ -64,6 +64,7 @@ DEPENDENT_NAMES = {
     'LEGACY_FILES_DIR': ('const', '异常文件完整清单落盘目录'),
     # ── 登记项本身：改名会让 G403/G404 静默失效 ──
     'MIRROR_WRITE_FN': ('const', '镜像写入函数名登记项'),
+    'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
     # ── 被依赖的函数 ──
     '_write_mirror': ('fn', '写镜像'),
     '_scan_write_pairing': ('fn', 'G403 用的函数级扫描器'),
@@ -947,6 +948,79 @@ def cmd_assert_meta_names():
         print(f'   ✅ {nm:28s} 引用 {refs.get(nm, 0)} 处')
     print()
     print(f'✅ {len(meta)} 个元登记项**全部闭合** —— 登记表自己也被登记了')
+    print('=' * 70)
+    return 0
+
+TRUST_ROOT_FILE = os.path.join(ROOT, 'ledger', 'trust_root.json')
+
+
+def _trust_root():
+    """🔑 读信任根。**读不到返回 None**（区分"没有"与"读不到"）。"""
+    try:
+        return json.load(open(TRUST_ROOT_FILE, encoding='utf-8'))
+    except Exception:
+        return None
+
+
+def cmd_assert_trust_root():
+    """🔑 G408：**信任根闭合** —— 代码里的元登记项必须与信任根一致。
+
+    🔴 第一百一十四轮诚实结论①（本轮要解决的那一条）：
+       "`SELF_REGISTERED_META` 自己是**元元登记项** —— 它本身不在任何表里，
+        它改名同样无人发现。**这是同一条链的又一层，可无限递推。**"
+
+    🔑 处置：**停止递推 + 明示信任根**。
+       把期望值写进 `ledger/trust_root.json`（**独立于代码**的文件），
+       并断言代码值 == 信任根值。
+       🔑 为什么不再叠一层"元元元登记项"：递推没有终点，
+          每叠一层只会让"守住了"的错觉更厚（114 轮已论证）。
+
+    🔑 三条判据：
+       ① 信任根**必须可读** —— 读不到拒绝给结论
+          （🔴 若"读不到"当"没有信任根"，就会静默放行）
+       ② 代码 `SELF_REGISTERED_META` **必须等于**信任根记录值（逐项比对）
+       ③ 信任根**不得**把自己登记进 DEPENDENT_NAMES
+          —— 🔴 若登记了，它就退化成普通登记项，递推重新开始
+    """
+    print('🔑 **信任根闭合断言**（G408）')
+    print('=' * 70)
+    tr = _trust_root()
+    if tr is None:
+        print('🔴 信任根不可读 —— 拒绝给结论（不静默当"没有信任根"）')
+        print('=' * 70)
+        return 1
+    want = tr.get('SELF_REGISTERED_META')
+    if not isinstance(want, list) or not want:
+        print('🔴 信任根未登记 SELF_REGISTERED_META —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    cur = list(globals().get('SELF_REGISTERED_META') or ())
+    bad = []
+    if cur != want:
+        bad.append(f'代码值 {cur} ≠ 信任根 {want}')
+    tbl = globals().get('DEPENDENT_NAMES') or {}
+    # 🔑 判据③：**根名本身** + **元项名**都不得被登记进 DEPENDENT_NAMES
+    #    🔴 若登记了，它们就从"根/元项"降级为"表内项"，递推层级混乱。
+    #    🔑 115 轮实测：只查 want 中的项时，把**根名本身**加进表会**漏网**
+    #       （rc=0）—— 因为根名不在 want 里。两种情形必须都覆盖。
+    guard = {'SELF_REGISTERED_META'} | set(want)
+    in_tbl = sorted(n for n in guard if n in tbl)
+    if in_tbl:
+        bad.append(f'信任根/元项**被登记进 DEPENDENT_NAMES**：{in_tbl} —— '
+                   f'🔴 这会让递推重新开始，信任根必须停在根上')
+    print(f'   信任根 {TRUST_ROOT_FILE}')
+    print(f'   代码值 {len(cur)} 项 · 信任根 {len(want)} 项')
+    print(f'   理由：{(tr.get("_why") or "")[:60]}…')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('=' * 70)
+        return 1
+    for n in want:
+        print(f'   ✅ {n}')
+    print()
+    print(f'✅ 信任根闭合：{len(want)} 项一致，且未退回登记项')
     print('=' * 70)
     return 0
 
@@ -2097,6 +2171,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-trust-root', action='store_true',
+                    help='G408：信任根闭合（代码元登记项 == 信任根文件）')
     ap.add_argument('--assert-meta-names', action='store_true',
                     help='G407：元登记项（登记表本身）必须闭合')
     ap.add_argument('--assert-path-consts', action='store_true',
@@ -2147,6 +2223,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_trust_root:
+        return cmd_assert_trust_root()
     if a.assert_meta_names:
         return cmd_assert_meta_names()
     if a.assert_path_consts:

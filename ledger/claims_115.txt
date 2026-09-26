@@ -1,0 +1,70 @@
+# 第一百一十五轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**信任根闭合** —— 停止递推，明示信任根
+
+# ① 新能力
+grep:scripts/push_api.py::TRUST_ROOT_FILE
+grep:scripts/push_api.py::def _trust_root
+grep:scripts/push_api.py::def cmd_assert_trust_root
+grep:scripts/push_api.py::assert_trust_root
+cmd:push_api.py --assert-trust-root
+cmd:push_api.py --assert-meta-names
+cmd:push_api.py --assert-dependent-names
+cmd:push_api.py --assert-path-consts
+cmd:push_api.py --assert-mirror-fn
+cmd:push_api.py --assert-write-pairing
+cmd:push_api.py --assert-fp-mirror
+cmd:push_api.py --assert-fp-history
+cmd:push_api.py --assert-baseline-fp
+cmd:push_api.py --audit-history
+gate:G400
+gate:G401
+gate:G402
+gate:G403
+gate:G404
+gate:G405
+gate:G406
+gate:G407
+gate:G408
+# ② 第九组互补关系
+grep:scripts/run_all_gates.py::G408
+# ③ 既有能力仍工作
+cmd:push_api.py --assert-history-known
+cmd:push_api.py --assert-legacy-files
+cmd:push_api.py --assert-legacy-dump
+cmd:push_api.py --dump-legacy-files
+cmd:push_api.py --show-legacy-files
+cmd:push_api.py --verify-push
+cmd:push_api.py --check-leak
+cmd:push_api.py --check-symlink
+cmd:push_api.py --check-gitlink
+cmd:run_all_gates.py --check-both-layers
+cmd:run_all_gates.py --check-dup-cmds
+cmd:run_all_gates.py --self-check-noop
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --probe-capability audit-all
+cmd:claim_verify.py --verify-all
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:gate_chaos.py --declare-capability
+cmd:gate_chaos.py --self-check
+gate:G387
+gate:G389
+gate:G390
+gate:G391
+gate:G392
+gate:G393
+gate:G394
+gate:G395
+gate:G396
+gate:G397
+gate:G398
+gate:G399
+# ④ 产物不得被误删
+file:audit/history_mode_known.json
+file:ledger/baseline_fp_mirror.json
+file:ledger/trust_root.json
+file:audit/history_mode_files/444515de4b42.txt
+file:ledger/claims_114.txt
+file:scripts/push_api.py
+file:scripts/run_all_gates.py

@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-27T06:42:35+0800",
+  "generated_at": "2026-09-27T06:59:41+0800",
   "baseline_modes": {
-    "100644": 288
+    "100644": 290
   },
   "baseline_fp_history": [
     {
@@ -132,10 +132,42 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-27T06:42:35+0800"
+    },
+    {
+      "seq": 9,
+      "seq_in_round": 1,
+      "round": 114,
+      "from_fp": "ed2b3988e30412b3075881985293b153d2812d6d",
+      "to_fp": "0d95715a6d78a6effccd26b33f9befe128cfe495",
+      "from_modes": {
+        "100644": 288
+      },
+      "to_modes": {
+        "100644": 289
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-27T06:56:23+0800"
+    },
+    {
+      "seq": 10,
+      "seq_in_round": 2,
+      "round": 114,
+      "from_fp": "0d95715a6d78a6effccd26b33f9befe128cfe495",
+      "to_fp": "a36f89a620e86cfecc967854b24800971c4349bc",
+      "from_modes": {
+        "100644": 289
+      },
+      "to_modes": {
+        "100644": 290
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-27T06:59:41+0800"
     }
   ],
-  "baseline_fp": "ed2b3988e30412b3075881985293b153d2812d6d",
-  "checked_commits": 24,
+  "baseline_fp": "a36f89a620e86cfecc967854b24800971c4349bc",
+  "checked_commits": 25,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -159,7 +191,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 288
+        "100644": 290
       }
     },
     {
@@ -184,7 +216,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 288
+        "100644": 290
       }
     },
     {
@@ -209,7 +241,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 288
+        "100644": 290
       }
     },
     {
@@ -234,7 +266,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 288
+        "100644": 290
       }
     },
     {
@@ -259,7 +291,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 288
+        "100644": 290
       }
     }
   ],
