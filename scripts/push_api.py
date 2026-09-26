@@ -50,6 +50,31 @@ BASELINE_FP_HISTORY_MAX = 20
 #       改函数名会让 G403 **静默失效**（与 93 轮常量改名同源）。
 #    🔑 登记后由 G404 断言该函数**真实存在**，改名即暴露。
 MIRROR_WRITE_FN = '_write_mirror'
+
+# 🔑 第一百一十二轮：**被依赖的名字**统一登记。
+#    🔴 111 轮诚实结论②：只登记了 MIRROR_WRITE_FN 一个 ——
+#       HISTORY_KNOWN / LEGACY_FILES_DIR 等同样是"被依赖的名字"，
+#       改名同样会**静默失效**，却一个都没被覆盖。
+#    🔑 本表让"改名静默失效"这一类问题**一次性**被覆盖，而不是逐个补。
+#    🔑 值 = (类型, 说明)；类型: 'const'（模块级常量）· 'fn'（函数）
+DEPENDENT_NAMES = {
+    # ── 路径类常量：改了会让产物写到别处，而旧门禁全部静默失效 ──
+    'HISTORY_KNOWN': ('const', '历史 mode 台账路径'),
+    'FP_HISTORY_MIRROR': ('const', '变更史镜像路径'),
+    'LEGACY_FILES_DIR': ('const', '异常文件完整清单落盘目录'),
+    # ── 登记项本身：改名会让 G403/G404 静默失效 ──
+    'MIRROR_WRITE_FN': ('const', '镜像写入函数名登记项'),
+    # ── 被依赖的函数 ──
+    '_write_mirror': ('fn', '写镜像'),
+    '_scan_write_pairing': ('fn', 'G403 用的函数级扫描器'),
+    '_baseline_fp': ('fn', '基准指纹算法'),
+    'blob_content': ('fn', 'blob 内容唯一实现（symlink 走 readlink）'),
+    'local_index_entries': ('fn', 'git 索引 mode+sha 唯一来源'),
+}
+# 🔑 登记项**不得为空**：空表会让 G405 退化成"永远通过"
+DEPENDENT_NAMES_MIN = 5
+# 🔑 必须始终在表内的**核心**名字（防有人把关键项悄悄删掉）
+DEPENDENT_NAMES_REQUIRED = ('HISTORY_KNOWN', 'MIRROR_WRITE_FN', '_write_mirror')
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -644,6 +669,86 @@ def cmd_assert_mirror_fn():
     print('   ✅ 扫描器 _scan_write_pairing 内**确被引用**')
     print()
     print(f'✅ 登记项闭合 —— {fn_name!r} 已定义且被使用')
+    print('=' * 70)
+    return 0
+
+def cmd_assert_dependent_names():
+    """🔑 G405：**所有被依赖的名字都必须闭合**（通用版）。
+
+    🔴 第一百一十一轮诚实结论②（本轮要解决的那一条）：
+       "只登记了 MIRROR_WRITE_FN 一个名字 —— HISTORY_KNOWN、
+        LEGACY_FILES_DIR 等同样是'被依赖的名字'，未纳入登记项闭合机制。"
+
+    🔑 与 G404 的关系：
+       G404 对 **MIRROR_WRITE_FN** 做**深度**校验（还查"在 _scan_write_pairing
+       内被引用"）；G405 对**所有**登记名做**广度**校验（存在 + 真被引用）。
+       🔴 只有 G404 → 其它名字仍可改名静默失效；
+          只有 G405 → 那一条最关键的链缺少"在特定函数内被引用"这层。
+
+    🔑 三层判据：
+       ① 表**非空**且达到 DEPENDENT_NAMES_MIN（空表 → 拒绝给结论）
+       ② 核心名 DEPENDENT_NAMES_REQUIRED **必须都在表内**
+       ③ 每个登记名 **真存在**（const 非空 / fn 可调用）
+          **且真被引用**（AST 统计，排除定义/赋值处）
+          🔴 只验"存在"不够 —— 改名后旧名字消失，
+             若无人引用则门禁静默失效（与 83 轮"存在但无关"同源）。
+    """
+    print('🔑 **被依赖名字闭合断言**（G405）')
+    print('=' * 70)
+    import ast
+    bad = []
+    tbl = globals().get('DEPENDENT_NAMES')
+    if not isinstance(tbl, dict) or not tbl:
+        print('🔴 DEPENDENT_NAMES 未登记或为空 —— 拒绝给结论')
+        return 1
+    if len(tbl) < DEPENDENT_NAMES_MIN:
+        bad.append(f'登记项仅 {len(tbl)} 条 '
+                   f'< 下限 {DEPENDENT_NAMES_MIN} —— 疑似被删减')
+    missing_req = [n for n in DEPENDENT_NAMES_REQUIRED if n not in tbl]
+    if missing_req:
+        bad.append(f'**核心**名字缺失：{missing_req} —— 不得从登记表中删除')
+    print(f'   登记 {len(tbl)} 条 · 核心名 {len(DEPENDENT_NAMES_REQUIRED)} 个齐全'
+          if not missing_req else f'   登记 {len(tbl)} 条')
+
+    # ③ 统计全 scripts/*.py 的**真引用**
+    refs = {}
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            tree = ast.parse(open(f, encoding='utf-8').read())
+        except (SyntaxError, ValueError):
+            continue
+        for n in ast.walk(tree):
+            nm = None
+            if isinstance(n, ast.Name):
+                # 🔑 排除**赋值目标**：那是定义，不是引用
+                if isinstance(n.ctx, ast.Load):
+                    nm = n.id
+            elif isinstance(n, ast.Attribute):
+                nm = n.attr
+            if nm in tbl:
+                refs[nm] = refs.get(nm, 0) + 1
+    for name, (kind, desc) in sorted(tbl.items()):
+        g = globals().get(name)
+        if kind == 'const':
+            ok = g is not None and g != ''
+        else:
+            ok = callable(g)
+        n_ref = refs.get(name, 0)
+        if not ok:
+            bad.append(f'{kind} {name}（{desc}）**不存在或为空**')
+        elif n_ref == 0:
+            bad.append(f'{name}（{desc}）**无任何引用** —— '
+                       f'改名后门禁会静默失效')
+        else:
+            print(f'   ✅ {kind:5s} {name:22s} 引用 {n_ref} 处 · {desc}')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ {len(tbl)} 个被依赖的名字**全部闭合**（存在且真被引用）')
     print('=' * 70)
     return 0
 
@@ -1794,6 +1899,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-dependent-names', action='store_true',
+                    help='G405：所有被依赖的名字必须闭合')
     ap.add_argument('--assert-mirror-fn', action='store_true',
                     help='G404：镜像写入函数登记项必须真实存在且被使用')
     ap.add_argument('--assert-write-pairing', action='store_true',
@@ -1838,6 +1945,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_dependent_names:
+        return cmd_assert_dependent_names()
     if a.assert_mirror_fn:
         return cmd_assert_mirror_fn()
     if a.assert_write_pairing:
