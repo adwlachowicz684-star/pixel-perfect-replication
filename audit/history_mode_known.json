@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-27T05:50:10+0800",
+  "generated_at": "2026-09-27T05:57:12+0800",
   "baseline_modes": {
-    "100644": 286
+    "100644": 287
   },
   "baseline_fp_history": [
     {
@@ -100,10 +100,26 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-27T05:50:10+0800"
+    },
+    {
+      "seq": 7,
+      "seq_in_round": 1,
+      "round": 112,
+      "from_fp": "3f5b2e62161379d28f6b22d8a91acb724fe00e29",
+      "to_fp": "54927ef73b9006bf5c09e7037f4a8c3e8221b6a2",
+      "from_modes": {
+        "100644": 286
+      },
+      "to_modes": {
+        "100644": 287
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-27T05:57:12+0800"
     }
   ],
-  "baseline_fp": "3f5b2e62161379d28f6b22d8a91acb724fe00e29",
-  "checked_commits": 22,
+  "baseline_fp": "54927ef73b9006bf5c09e7037f4a8c3e8221b6a2",
+  "checked_commits": 23,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -127,7 +143,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 286
+        "100644": 287
       }
     },
     {
@@ -152,7 +168,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 286
+        "100644": 287
       }
     },
     {
@@ -177,7 +193,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 286
+        "100644": 287
       }
     },
     {
@@ -202,7 +218,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 286
+        "100644": 287
       }
     },
     {
@@ -227,7 +243,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 286
+        "100644": 287
       }
     }
   ],

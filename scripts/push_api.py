@@ -75,6 +75,17 @@ DEPENDENT_NAMES = {
 DEPENDENT_NAMES_MIN = 5
 # 🔑 必须始终在表内的**核心**名字（防有人把关键项悄悄删掉）
 DEPENDENT_NAMES_REQUIRED = ('HISTORY_KNOWN', 'MIRROR_WRITE_FN', '_write_mirror')
+
+# 🔑 第一百一十三轮：**未登记常量豁免** —— 但必须写明理由。
+#    🔴 112 轮①：G405 只能守住"已登记的"，守不住"该登记没登记的"。
+#    🔑 豁免**不得静默**：每条都要理由，且理由非空（与 94/95 轮同构）。
+PATH_CONST_ALLOW = {
+    # registry.yaml 是工具注册表，不是产物路径；改它不会让门禁静默失效
+    'registry_normalize.py::REG': '工具注册表路径，非产物/台账路径',
+    'tool_run.py::REGISTRY': '工具注册表路径，非产物/台账路径',
+}
+# 🔑 豁免**必须非空** —— 空表 + 新常量 = 应报未登记，不得静默
+PATH_CONST_ALLOW_MIN_REASON = 6
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -749,6 +760,99 @@ def cmd_assert_dependent_names():
         return 1
     print()
     print(f'✅ {len(tbl)} 个被依赖的名字**全部闭合**（存在且真被引用）')
+    print('=' * 70)
+    return 0
+
+def _scan_path_consts():
+    """🔑 扫 scripts/*.py 的**模块级路径常量**（os.path.join(ROOT/HERE, ...)）。
+
+    🔑 为什么只看模块级 + ROOT/HERE 开头：
+       - 函数内的临时路径不是"被依赖的名字"，登记它们只会稀释登记表；
+       - 以 ROOT/HERE 开头 = 仓库内**产物/台账**路径，改名会让门禁静默失效。
+    """
+    import ast
+    out = []
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        base = os.path.basename(f)
+        try:
+            tree = ast.parse(open(f, encoding='utf-8').read())
+        except (SyntaxError, ValueError):
+            continue
+        for n in tree.body:
+            if not isinstance(n, ast.Assign) or len(n.targets) != 1:
+                continue
+            t = n.targets[0]
+            if not isinstance(t, ast.Name):
+                continue
+            v = n.value
+            if not (isinstance(v, ast.Call)
+                    and getattr(v.func, 'attr', '') == 'join'):
+                continue
+            src = ast.unparse(v)
+            if 'ROOT' in src or 'HERE' in src:
+                out.append((f'{base}::{t.id}', src))
+    return out
+
+
+def cmd_assert_path_consts():
+    """🔑 G406：**新产物路径常量必须已登记**（防"该登记没登记"）。
+
+    🔴 第一百一十二轮诚实结论①（本轮要解决的那一条，也是本机制最大的洞）：
+       "登记表是人工维护的 —— 新增一个被依赖的名字没人提醒要登记，
+        G405 照样绿。**只能守住已登记的，守不住该登记没登记的。**"
+
+    🔑 做法：**反向**——不查"登记了什么"，而查"**代码里有什么**"。
+       扫出全部模块级路径常量，凡不在 DEPENDENT_NAMES 也不在豁免表中的，
+       一律报"未登记"。新增常量即刻暴露，不需要人记得去登记。
+
+    🔑 三条判据：
+       ① 每个路径常量必须 **已登记** 或 **已豁免**
+       ② 豁免必须有理由且长度 ≥ PATH_CONST_ALLOW_MIN_REASON
+          🔴 否则豁免退化成"随便放行"（与 81 轮粗粒度白名单同一个病）
+       ③ 豁免中的名字必须**真实存在**（防登记了已删除的常量 = 僵尸豁免）
+    """
+    print('🔑 **路径常量登记断言**（G406）')
+    print('=' * 70)
+    tbl = globals().get('DEPENDENT_NAMES') or {}
+    allow = globals().get('PATH_CONST_ALLOW') or {}
+    consts = _scan_path_consts()
+    if not consts:
+        print('🔴 未发现任何路径常量 —— 扫描器可能失效，拒绝给结论')
+        return 1
+    bad = []
+    reg_names = {n for n, (k, _) in tbl.items() if k == 'const'}
+    print(f'   路径常量 {len(consts)} 个 · 登记表含 const {len(reg_names)} 个')
+    seen = set()
+    for key, src in consts:
+        name = key.split('::', 1)[1]
+        seen.add(name)
+        if name in reg_names:
+            print(f'   ✅ 已登记  {key}')
+        elif key in allow:
+            r = (allow[key] or '').strip()
+            if len(r) < PATH_CONST_ALLOW_MIN_REASON:
+                bad.append(f'豁免 {key} **理由过短**（{len(r)} < '
+                           f'{PATH_CONST_ALLOW_MIN_REASON}）—— 不得静默放行')
+            else:
+                print(f'   ✅ 已豁免  {key} · {r}')
+        else:
+            bad.append(f'**未登记**的路径常量 {key} = {src}\n'
+                       f'        → 加入 DEPENDENT_NAMES 或 PATH_CONST_ALLOW（须写理由）')
+    # ③ 僵尸豁免
+    zombie = sorted(k for k in allow if k not in {c[0] for c in consts})
+    if zombie:
+        bad.append(f'豁免指向**已不存在**的常量（僵尸豁免）：{zombie}')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print()
+        print('   🔑 G405 只能守住"已登记的"；本门禁从**代码侧**反向补上'
+              '"该登记没登记的"。')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ {len(consts)} 个路径常量**均已登记或已豁免**（无未登记项）')
     print('=' * 70)
     return 0
 
@@ -1899,6 +2003,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-path-consts', action='store_true',
+                    help='G406：新产物路径常量必须已登记')
     ap.add_argument('--assert-dependent-names', action='store_true',
                     help='G405：所有被依赖的名字必须闭合')
     ap.add_argument('--assert-mirror-fn', action='store_true',
@@ -1945,6 +2051,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_path_consts:
+        return cmd_assert_path_consts()
     if a.assert_dependent_names:
         return cmd_assert_dependent_names()
     if a.assert_mirror_fn:
