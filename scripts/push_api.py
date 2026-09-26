@@ -38,6 +38,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 # 🔑 第一百零二轮：历史遗留台账 —— 让"已知遗留"成为**可断言的事实**。
 HISTORY_KNOWN = os.path.join(ROOT, 'audit', 'history_mode_known.json')
+# 🔑 第一百零九轮：变更史**镜像** —— 放在 ledger/（与 audit/ 不同目录）。
+#    🔴 只有一处时，整段替换变更史改一个文件就能蒙混（108 轮②）。
+#    🔑 两处独立 → 误操作必须**同时改两处**才不被发现。
+FP_HISTORY_MIRROR = os.path.join(ROOT, 'ledger', 'baseline_fp_mirror.json')
 # 🔑 第一百零八轮：基准变更史上限（保留最早 1 条 + 最近 N-1 条）
 BASELINE_FP_HISTORY_MAX = 20
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
@@ -360,7 +364,9 @@ def cmd_assert_fp_history():
               f'（应为 list）—— 拒绝给结论')
         return 1
     print(f'   变更史 {len(h)} 条')
-    need = ('round', 'from_fp', 'to_fp', 'legacy_from', 'legacy_to')
+    # 🔑 第一百零九轮：新增 seq / seq_in_round，解决 108 轮①
+    need = ('seq', 'seq_in_round', 'round', 'from_fp', 'to_fp',
+            'legacy_from', 'legacy_to')
     bad = []
     prev_to = None
     for i, e in enumerate(h):
@@ -375,8 +381,13 @@ def cmd_assert_fp_history():
             bad.append(f'第 {i} 条 **链条断裂**：from_fp '
                        f'{str(e["from_fp"])[:8]} ≠ 上一条 to_fp '
                        f'{str(prev_to)[:8]} —— 中间变更被跳过或被删')
+        # 🔑 seq 必须严格等于下标+1（防删中间一条后重编号掩盖）
+        if e.get('seq') != i + 1:
+            bad.append(f'第 {i} 条 seq = {e.get("seq")!r}，应为 '
+                       f'{i + 1} —— 变更史被删条或重编号')
         prev_to = e['to_fp']
-        print(f'   #{i}  第 {e["round"]} 轮  '
+        print(f'   #{i}  seq={e.get("seq")}  第 {e["round"]} 轮'
+              f'（本轮第 {e.get("seq_in_round")} 次）  '
               f'{str(e["from_fp"])[:8]} → {str(e["to_fp"])[:8]}  '
               f'遗留 {e["legacy_from"]} → {e["legacy_to"]}')
 
@@ -394,6 +405,84 @@ def cmd_assert_fp_history():
         return 1
     print()
     print(f'✅ 变更史闭合：{len(h)} 条 · 每条均含轮次与前后指纹')
+    print('=' * 70)
+    return 0
+
+def cmd_assert_fp_mirror():
+    """🔑 G402：**变更史镜像**必须与台账一致 —— 防"整段替换变更史"。
+
+    🔴 第一百零八轮诚实结论②（本轮要解决的那一条）：
+       "变更史没有独立门禁防整段手工替换 —— G401 只验链条闭合，
+        若整段重造且自洽，它验不出来（与 89 轮同源自证循环同源）。"
+
+    🔑 解法：**在另一处独立文件里放变更史的指纹**。
+       整段替换变更史 → 必须**同时**改台账与镜像 → 少改一处即暴露。
+
+    🔑 三条判据（任一不满足即阻断）：
+       ① 镜像文件必须存在且可解析（缺失/损坏 → 拒绝给结论）
+       ② `history_sha` 必须等于**当前台账**变更史的指纹
+       ③ `history_len` 与 `baseline_fp` 也必须一致
+          —— 🔴 只比 sha 时，长度不同但 sha 相同不可能；
+             但若有人只改 len 不改 sha，也属于篡改，须拦。
+    """
+    print('🔑 **变更史镜像断言**（G402）')
+    print('=' * 70)
+    try:
+        with open(HISTORY_KNOWN, encoding='utf-8') as f:
+            rec = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 台账不存在：{os.path.relpath(HISTORY_KNOWN, ROOT)}')
+        return 1
+    except ValueError as e:
+        print(f'🔴 台账解析失败：{e} —— 拒绝给结论')
+        return 1
+
+    h = rec.get('baseline_fp_history')
+    if h is None:
+        print('🔴 台账缺少 baseline_fp_history —— 无法与镜像比对，'
+              '拒绝给结论')
+        return 1
+
+    try:
+        with open(FP_HISTORY_MIRROR, encoding='utf-8') as f:
+            mir = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 镜像不存在：{os.path.relpath(FP_HISTORY_MIRROR, ROOT)}')
+        print('   🔴 变更史只有一处 —— 整段替换将无从发现')
+        print('   🔑 修复：重跑 --audit-history')
+        print('=' * 70)
+        return 1
+    except ValueError as e:
+        print(f'🔴 镜像解析失败：{e} —— 拒绝给结论')
+        return 1
+
+    want = _mirror_payload(rec)
+    bad = []
+    for k in ('history_sha', 'history_len', 'baseline_fp'):
+        got = mir.get(k)
+        exp = want.get(k)
+        if got != exp:
+            bad.append(f'{k} 不符：镜像 {str(got)[:16]!r} ≠ '
+                       f'台账 {str(exp)[:16]!r}')
+        else:
+            print(f'   ✅ {k} = {str(exp)[:16]}')
+    # 🔑 幂等性：镜像里不得有多余键（防塞入伪造说明）
+    extra = sorted(set(mir) - set(want))
+    if extra:
+        bad.append(f'镜像含多余键 {extra} —— 可能是手工改写')
+
+    print(f'   变更史 {len(h)} 条 · 镜像路径 '
+          f'{os.path.relpath(FP_HISTORY_MIRROR, ROOT)}')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('   🔴 变更史被改过而镜像未同步（或反之）—— '
+              '**整段替换企图**')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ 镜像与台账一致 —— 整段替换须同时改两处')
     print('=' * 70)
     return 0
 
@@ -661,6 +750,47 @@ def _doc_max_round():
     return mx
 
 
+def _mirror_payload(rec):
+    """🔑 镜像里放什么：**只放变更史的指纹 + 条数**，不放变更史本身。
+
+    🔑 为什么不直接复制一份变更史：
+       🔴 复制 → 两处内容相同 → 改两处即可蒙混，
+          而"两处内容相同"这件事本身**无法被发现**（G398 同源自证循环）。
+       🔑 放**指纹**：改任一处 → 指纹不符 → 立刻暴露；
+          且镜像体积小，不随变更史增长。
+    """
+    h = rec.get('baseline_fp_history') or []
+    return {
+        'history_sha': hashlib.sha1(
+            json.dumps(h, ensure_ascii=False, sort_keys=True).encode()
+        ).hexdigest(),
+        'history_len': len(h),
+        'baseline_fp': rec.get('baseline_fp'),
+        'source': 'audit/history_mode_known.json',
+        'note': '🔑 变更史镜像：整段替换变更史须同时改本文件与台账，'
+                '否则 G402 会报指纹不符。',
+    }
+
+
+def _write_mirror(rec):
+    """写镜像（幂等：内容一致则不重写）。"""
+    payload = _mirror_payload(rec)
+    try:
+        os.makedirs(os.path.dirname(FP_HISTORY_MIRROR), exist_ok=True)
+        prev = None
+        try:
+            with open(FP_HISTORY_MIRROR, encoding='utf-8') as f:
+                prev = json.load(f)
+        except (FileNotFoundError, ValueError):
+            pass
+        if prev == payload:
+            return 'unchanged', payload
+        with open(FP_HISTORY_MIRROR, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        return ('written' if prev is not None else 'created'), payload
+    except Exception as e:
+        return f'fail:{e}', payload
+
 def cmd_audit_history():
     """🔑 G394：**历史 commit 权限审计**（只读，不改写历史）。
 
@@ -804,7 +934,17 @@ def cmd_audit_history():
         _rnd = _doc_max_round()
         rec['baseline_fp_history'] = list(
             (prev or {}).get('baseline_fp_history', []) or [])
+        # 🔑 第一百零九轮：**单调序号** —— 108 轮①的修补。
+        #    🔴 round 取自文档最大轮次 → 一轮内多次变更会**都记成同一轮**。
+        #       （本轮实测已复现：两条变更都标第 108 轮）
+        #    🔑 seq：全局单调递增（1..n）· seq_in_round：本轮内第几次
+        _n = len(rec['baseline_fp_history'])
+        _seq = _n + 1
+        _seq_in_round = sum(1 for e in rec['baseline_fp_history']
+                            if e.get('round') == _rnd) + 1
         rec['baseline_fp_history'].append({
+            'seq': _seq,
+            'seq_in_round': _seq_in_round,
             'round': _rnd,
             'from_fp': prev_fp,
             'to_fp': cur_fp,
@@ -840,6 +980,17 @@ def cmd_audit_history():
     except Exception as e:
         print(f'\n🔴 台账写入失败：{e} —— 遗留无法被 G396/G397 断言')
         return 1
+
+    # 🔑 第一百零九轮：**写变更史镜像**（另一处独立文件）
+    #    🔴 108 轮②：变更史只在一处时，整段手工替换验不出来
+    #       （G401 只验链条闭合 —— 重造一段自洽的照样通过）。
+    st, pay = _write_mirror(rec)
+    if st.startswith('fail'):
+        print(f'\n🔴 镜像写入失败：{st} —— 整段替换变更史将无从发现')
+        return 1
+    print(f'🔑 变更史镜像（{os.path.relpath(FP_HISTORY_MIRROR, ROOT)}）：'
+          f'{st} · history_sha {str(pay["history_sha"])[:12]}'
+          f' · {pay["history_len"]} 条')
     # 🔑 供 --show-legacy-files 在同一进程内复用
     global _LAST_DETAILS
     _LAST_DETAILS = details
@@ -1482,6 +1633,8 @@ def main():
                     help='列出历史 commit 中 **mode 异常的具体文件**')
     ap.add_argument('--assert-legacy-files', action='store_true',
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
+    ap.add_argument('--assert-fp-mirror', action='store_true',
+                    help='G402：变更史镜像须与台账一致（防整段替换）')
     ap.add_argument('--assert-fp-history', action='store_true',
                     help='G401：基准变更史须闭合且可答“哪一轮变的、为什么变”')
     ap.add_argument('--assert-baseline-fp', action='store_true',
@@ -1520,6 +1673,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_legacy_files()
 
+    if a.assert_fp_mirror:
+        return cmd_assert_fp_mirror()
     if a.assert_fp_history:
         return cmd_assert_fp_history()
     if a.assert_baseline_fp:

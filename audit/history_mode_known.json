@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-25T05:20:04+0800",
+  "generated_at": "2026-09-27T05:03:38+0800",
   "baseline_modes": {
-    "100644": 281
+    "100644": 283
   },
   "baseline_fp_history": [
     {
@@ -17,11 +17,45 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-25T05:20:05+0800",
-      "note": "🔴 本条轮次曾被误记为 100 —— 中文数字解析 bug（\"一百零七\"的\"零七\"未处理 → 100）。 ✅ 第一百零八轮修复解析后回填真实轮次 108。"
+      "note": "🔴 本条轮次曾被误记为 100 —— 中文数字解析 bug（\"一百零七\"的\"零七\"未处理 → 100）。 ✅ 第一百零八轮修复解析后回填真实轮次 108。",
+      "seq": 1,
+      "seq_in_round": 1
+    },
+    {
+      "round": 108,
+      "from_fp": "53b9749a79344f81fd1f7dd3fb0256049f310754",
+      "to_fp": "f5ec0e778c473e8f5ffe4eae934c545387b81871",
+      "from_modes": {
+        "100644": 281
+      },
+      "to_modes": {
+        "100644": 282
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-27T04:58:49+0800",
+      "seq": 2,
+      "seq_in_round": 2
+    },
+    {
+      "seq": 3,
+      "seq_in_round": 3,
+      "round": 108,
+      "from_fp": "f5ec0e778c473e8f5ffe4eae934c545387b81871",
+      "to_fp": "cff3cedcab26f175730c17d1d1e9106e1414124d",
+      "from_modes": {
+        "100644": 282
+      },
+      "to_modes": {
+        "100644": 283
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-27T05:03:38+0800"
     }
   ],
-  "baseline_fp": "53b9749a79344f81fd1f7dd3fb0256049f310754",
-  "checked_commits": 18,
+  "baseline_fp": "cff3cedcab26f175730c17d1d1e9106e1414124d",
+  "checked_commits": 19,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -45,7 +79,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 281
+        "100644": 283
       }
     },
     {
@@ -70,7 +104,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 281
+        "100644": 283
       }
     },
     {
@@ -95,7 +129,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 281
+        "100644": 283
       }
     },
     {
@@ -120,7 +154,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 281
+        "100644": 283
       }
     },
     {
@@ -145,7 +179,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 281
+        "100644": 283
       }
     }
   ],
