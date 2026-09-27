@@ -29,6 +29,7 @@ import glob
 import hashlib
 import json
 import os
+import shutil
 import sys
 import time
 import urllib.error
@@ -198,6 +199,46 @@ def list_files():
     raw = os.popen(
         'git -c core.quotepath=false ls-files -z').read()
     return [p for p in raw.split('\0') if p.strip()]
+
+
+# 🔑 第一百一十八轮：**自测临时目录**（根因修复，取代"清理写在 finally 里"）
+#    🔴 第一百一十七轮真实事故：清理写在 `finally:` 里 → 进程被杀（沙盒 502）时
+#       **不执行** → 残留落在 scripts/ 里 → 被 `git add -A` 收进索引 → 推送报
+#       "文件在磁盘上不存在"（os.path.exists 跟随 dangling symlink → False）。
+#    🔑 三道防线，**都不依赖 finally**：
+#       ① 独立目录 `_selftest_tmp/` —— 残留只落在这里，不污染代码目录
+#       ② **启动即清理** —— 进入自测先清空，上次残留本次就没了（不靠"结束才清"）
+#       ③ `.gitignore` 排除 —— 即便残留，`git add -A` 也**收不进去**
+#    🔑 gitignore 与"自测需要 git 索引它"不冲突：自测用 `git add -f` **显式强制**。
+SELFTEST_TMP_DIR = '_selftest_tmp'
+
+
+def _selftest_reset():
+    """🔑 **启动即清理**（不依赖 finally）—— 返回该目录的绝对路径。
+
+    🔑 为什么"启动即清理"比"结束才清理"强：
+       🔴 "结束才清理"依赖进程**正常走到结尾**；进程被杀/断电/异常退出都不执行。
+       ✅ "启动即清理"依赖的只是"**下次还会跑**" —— 即便上次被杀，
+          下次启动的第一件事就是把残留清掉，残留的**生存期被压到最短**。
+    """
+    import subprocess   # 🔑 本文件**没有顶层** import subprocess（只在各函数内导入）
+    d = os.path.join(ROOT, SELFTEST_TMP_DIR)
+    # 先清 git 索引（残留若已被 add -f）
+    # 🔴 注意：这里的 try/except 曾**吞掉 NameError** —— subprocess 未导入时，
+    #    清理静默失效而调用方毫无察觉（与 106 轮"字段缺失静默跳过"同源）。
+    try:
+        got = subprocess.run(['git', 'ls-files', '--', SELFTEST_TMP_DIR],
+                             capture_output=True, text=True, cwd=ROOT).stdout
+        for ln in got.strip().split('\n'):
+            if ln.strip():
+                subprocess.run(['git', 'rm', '-f', '--cached', '--quiet',
+                                ln.strip()], capture_output=True, cwd=ROOT)
+    except Exception:
+        pass
+    # 再删磁盘（shutil.rmtree 能删掉目录里的 symlink）
+    shutil.rmtree(d, ignore_errors=True)
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 def blob_content(path):
@@ -1257,13 +1298,9 @@ def cmd_check_symlink():
     print('=' * 70)
     print('🔑 **symlink 处理自测**（G393）')
     print('=' * 70)
-    link = 'scripts/_symlink_selftest_tmp'
-    subprocess.run(['git', 'rm', '-f', '--cached', link],
-                   capture_output=True)
-    try:
-        os.remove(link)
-    except OSError:
-        pass
+    # 🔑 第一百一十八轮：**启动即清理**（不依赖 finally）
+    d = _selftest_reset()
+    link = os.path.join(SELFTEST_TMP_DIR, '_symlink_selftest')
 
     tgt_name = '_symlink_target_selftest.txt'
     tgt = os.path.join(tempfile.gettempdir(), tgt_name)
@@ -1272,8 +1309,10 @@ def cmd_check_symlink():
     ok_all = True
     try:
         os.symlink(tgt, link)
-        subprocess.run(['git', 'add', '-A'], capture_output=True,
-                       cwd=ROOT)
+        # 🔑 用 `git add -f` **显式强制**（该目录已被 .gitignore 排除），
+        #    🔴 不用 `git add -A` —— 那会把仓库里其它未跟踪文件一起收进索引。
+        subprocess.run(['git', 'add', '-f', '--', link],
+                       capture_output=True, cwd=ROOT)
         idx = local_index_entries()
         e = idx.get(link) if idx else None
         print(f'\n① git 索引 mode/sha：{e}')
@@ -1308,16 +1347,14 @@ def cmd_check_symlink():
         else:
             print(f'   ⚠️ 与索引 sha 相同（目标内容恰好等于链接路径？）')
     finally:
-        # 清理
+        # 🔑 清理（**双保险**）—— 即便本段没执行到，
+        #    ① 独立目录 ② 启动即清理 ③ .gitignore 三道防线仍生效。
         try:
-            subprocess.run(['git', 'rm', '-f', '--cached', link],
-                           capture_output=True, cwd=ROOT)
+            subprocess.run(['git', 'rm', '-f', '--cached', '--quiet', '--',
+                            link], capture_output=True, cwd=ROOT)
         except Exception:
             pass
-        try:
-            os.remove(link)
-        except OSError:
-            pass
+        shutil.rmtree(d, ignore_errors=True)
         try:
             os.remove(tgt)
         except OSError:
@@ -1659,8 +1696,15 @@ def cmd_assert_no_tmp_in_index():
         print('=' * 70)
         return 1
     marks = ('_selftest_tmp', '_tmp_', '_probe_tmp')
+    # 🔑 第一百一十八轮修一处**静默失效**：
+    #    🔴 原实现只查 `os.path.basename(p)` —— 而本轮把临时文件搬进
+    #       `_selftest_tmp/` 目录后，basename 变成 `_symlink_selftest`，
+    #       **不再含任何 mark** → G410 明明该报却报 rc=0。
+    #    🔑 判据：**特征可能在目录名上，不只文件名** —— 必须查**全路径**。
+    #    🔑 与第七十九轮（段体 vs 文件）、第八十一轮（每条 vs 整组）同源：
+    #       **判据对象选错层级，检查就静默变成恒真。**
     bad = sorted(p for p in ents
-                 if any(m in os.path.basename(p) for m in marks))
+                 if any(m in p or m in os.path.basename(p) for m in marks))
     for pth in bad:
         print(f'🔴 索引里残留临时文件: {pth}')
     if bad:
@@ -1669,6 +1713,60 @@ def cmd_assert_no_tmp_in_index():
         print('=' * 70)
         return 1
     print(f'✅ 无自测临时文件残留（索引 {len(ents)} 项）')
+    print('=' * 70)
+    return 0
+
+
+def cmd_assert_selftest_ignored():
+    """🔑 G411：**自测临时目录必须真被 gitignore**（第三道防线的前置断言）。
+
+    🔴 第一百一十八轮：三道防线里，只有 ③ gitignore 是**根治**——
+       ①②（独立目录 / 启动即清理）都只在"下次还会跑"时才生效；
+       ③ 却是**即便残留一直在，`git add -A` 也收不进去**。
+    🔴 但 ③ 只是一行文本 —— 将来被删掉或写错，**没有任何东西会提醒**，
+       而 G410 只在"已经进了索引"之后才发现（那时已需人工清理）。
+
+    🔑 两条判据：
+       ① `.gitignore` 里必须有该条目（**文本层**）
+       ② 🔑 **真跑 `git check-ignore`** —— 只验文本不够：
+          gitignore 语法写错（少了斜杠、路径不对、被后面的 `!` 取消）时，
+          **文本里明明有，实际却不生效**。
+          🔑 与第八十轮"存在性 + 唯一性"同源：**"写了"不等于"生效了"**。
+    """
+    print('🔑 **自测临时目录 gitignore 断言**（G411）')
+    print('=' * 70)
+    import subprocess
+    gi = os.path.join(ROOT, '.gitignore')
+    if not os.path.isfile(gi):
+        print('🔴 .gitignore 不存在 —— 拒绝给结论（不静默当"没有豁免"）')
+        print('=' * 70)
+        return 1
+    text = open(gi, encoding='utf-8').read()
+    lines = [ln.strip() for ln in text.split('\n')
+             if ln.strip() and not ln.strip().startswith('#')]
+    hit = [ln for ln in lines if SELFTEST_TMP_DIR in ln]
+    ok1 = bool(hit)
+    print(f'① .gitignore 条目：{"✅ " + str(hit) if ok1 else "🔴 未找到"}')
+    if not ok1:
+        print(f'   🔑 应含 `{SELFTEST_TMP_DIR}/`')
+        print('=' * 70)
+        return 1
+
+    # ② 真跑 git check-ignore（**造一个真实路径去问 git**，不是自己推理）
+    probe = os.path.join(SELFTEST_TMP_DIR, '_gitignore_probe')
+    r = subprocess.run(['git', 'check-ignore', '-v', '--', probe],
+                       capture_output=True, text=True, cwd=ROOT)
+    ok2 = (r.returncode == 0)
+    print(f'② 真跑 `git check-ignore {probe}`：'
+          f'{"✅ 已忽略" if ok2 else "🔴 未忽略（rc=%d）" % r.returncode}')
+    if not ok2:
+        print('   🔴 文本里有这一行，但 git **实际不忽略** —— '
+              '语法写错或被后面的 `!` 规则取消')
+        print('=' * 70)
+        return 1
+    print(f'   {r.stdout.strip()}')
+    print()
+    print('✅ 自测临时目录**确实**被忽略 —— 残留不会被 `git add -A` 收进索引')
     print('=' * 70)
     return 0
 
@@ -2329,6 +2427,8 @@ def main():
                     help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--assert-no-tmp-in-index', action='store_true',
                     help='G410：索引里不得残留自测临时文件（防中断后误传）')
+    ap.add_argument('--assert-selftest-ignored', action='store_true',
+                   help='G411 自测临时目录必须真被 gitignore')
     ap.add_argument('--check-gitlink', action='store_true',
                     help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
@@ -2385,6 +2485,9 @@ def main():
 
     if a.assert_no_tmp_in_index:
         return cmd_assert_no_tmp_in_index()
+
+    if a.assert_selftest_ignored:
+        return cmd_assert_selftest_ignored()
     if a.check_gitlink:
         os.chdir(ROOT)
         return cmd_check_gitlink()

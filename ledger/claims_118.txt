@@ -1,0 +1,14 @@
+# 第一百一十八轮声明清单
+# 根因修复：自测临时文件不再依赖 finally 清理
+
+grep:scripts/push_api.py::SELFTEST_TMP_DIR
+grep:scripts/push_api.py::def _selftest_reset
+grep:scripts/push_api.py::def cmd_assert_selftest_ignored
+grep:scripts/push_api.py::_selftest_ignored
+grep:scripts/run_all_gates.py::"G411"
+grep:.gitignore::_selftest_tmp/
+cmd:push_api.py --assert-selftest-ignored
+cmd:push_api.py --assert-no-tmp-in-index
+cmd:push_api.py --check-symlink
+gate:G411
+grep:references/游戏引擎复刻.md::只有 ③ 是根治
