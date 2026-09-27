@@ -1,2 +1,0 @@
-protocol_id,transport,message_framing,encoding,direction,caller_identity,callee_security,request_fields,response_fields,timeout,retry,ordering,side_effects,failure_mode
-??invalid-id??,__poison__,__poison__,__poison__,__poison__,??invalid-id??,not a url,__poison__,__poison__,__poison__,__poison__,__poison__,__INVALID_ENUM__,__INVALID_ENUM__
