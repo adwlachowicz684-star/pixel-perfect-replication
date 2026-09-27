@@ -363,6 +363,121 @@ def cmd_assert_baseline_shape():
     return 0
 
 
+# 🔑 第一百二十五轮：G417 —— 参照物的**分母不得自报自用**。
+#    🔴 G415 拿 `ledger/_chaos_last.json` 当"真实参照物"与基线比对，
+#       但判"这份产物是不是**全量**运行得来的"时，用的分母是
+#       `art.get('anchor_denom') or _anchor_denom()` —— **产物自己报的值优先**。
+#    🔑 这是自证循环（第七十九轮）在**数字层**的一次具体化：
+#       产物自报分母若为 5，则 `need = 5 × 0.90 = 4`，
+#       participated = 101 轻松"达标" —— **"全量"判据形同虚设**，
+#       而 G415 会拿这份"看起来全量"的参照物去背书基线。
+#    🔑 与第八十四轮同源：**自报的值必须能被外部事实约束**。
+#       这里外部事实 = 实时算出的台账型脚本数 `_anchor_denom()`。
+
+# 🔑 容差上界**由全量比率派生**：自报分母若允许偏差 δ，
+#      则真实门槛从 `real × 0.90` 被压到 `real × (1-δ) × 0.90`；
+#      δ ≥ 10% 时门槛系统性低于应有的 81% —— 判据失去意义。
+#    🔴 故容差必须**严格小于** `1 - CHAOS_ARTIFACT_FULL_RATIO`，
+#      改全量比率，上界自动跟着变，二者不可能脱节。
+CHAOS_DENOM_TOLERANCE = 0.05
+
+
+def _denom_tolerance_ceiling():
+    """自报分母容差的上界（派生，不是拍脑袋）。
+
+    🔑 返回 `None` 表示无从计算 —— 调用方**必须拒绝给结论**
+    （🔴 与第一百零六轮"字段缺失 → 判据静默跳过"同源）。
+    """
+    r = CHAOS_ARTIFACT_FULL_RATIO
+    if not isinstance(r, (int, float)) or not (0 < r < 1):
+        return None
+    return 1.0 - r
+
+
+def cmd_assert_artifact_denom():
+    """🔑 G417 —— 产物的自报分母必须与实时分母相符（防自报自用）。"""
+    print('=' * 70)
+    print('🔑 **参照物分母不得自报自用** —— G417')
+    print('=' * 70)
+    # ⓪ 判据自身可信性：容差不得被调成形同虚设
+    ceil_v = _denom_tolerance_ceiling()
+    if ceil_v is None:
+        print('\n🔴 全量比率 `CHAOS_ARTIFACT_FULL_RATIO` 缺失或不在 (0,1) —— '
+              '无从计算容差上界，**拒绝给结论**')
+        return 1
+    if not (0 <= CHAOS_DENOM_TOLERANCE < ceil_v):
+        print(f'\n🔴 自报分母容差 {CHAOS_DENOM_TOLERANCE} 不在 '
+              f'[0, {ceil_v}) 内 —— **拒绝给结论**')
+        print('   🔑 容差 ≥ 派生上界时，把自报分母改小就能压低"全量"门槛，'
+              '本门禁失去存在理由')
+        return 1
+    print(f'🔑 判据自校验：容差 {CHAOS_DENOM_TOLERANCE} < 上界 {ceil_v}')
+    keys = CAPABILITY_ARTIFACT_KEYS.get('chaos-full', ())
+    art_rel = CAPABILITY_ARTIFACT.get('chaos-full')
+    if not keys or not art_rel:
+        print('\n🔴 未登记 `chaos-full` 的产物键或产物路径 —— 无从比对')
+        return 1
+    art_path = os.path.join(ROOT, art_rel)
+    if not os.path.isfile(art_path):
+        print(f'\n🔴 产物文件不存在：{art_rel} —— 拒绝给结论')
+        return 1
+    try:
+        art = json.load(open(art_path, encoding='utf-8'))
+    except Exception as e:
+        print(f'\n🔴 产物无法解析：{e}')
+        return 1
+    ares = art.get('results') if isinstance(art.get('results'), dict) else art
+    if not isinstance(ares, dict):
+        print(f'\n🔴 产物缺少 `results` 对象（实际 {type(ares).__name__}）')
+        return 1
+    # ① 自报分母必须存在且为正整数（缺 → 拒绝给结论，不当"没有"）
+    rep = art.get('anchor_denom')
+    if not isinstance(rep, int) or rep <= 0:
+        print(f'\n🔴 产物的自报 `anchor_denom` = {rep!r} 不是正整数 —— '
+              '**拒绝给结论**')
+        print('   🔑 没有自报值就无从判断产物是否在全量口径下产生')
+        return 1
+    # ② 实时分母（**外部事实**，非自报）必须能算出
+    real = _anchor_denom()
+    if not isinstance(real, int) or real <= 0:
+        print(f'\n🔴 实时分母 `_anchor_denom()` = {real!r} 不是正整数 —— '
+              '**拒绝给结论**')
+        return 1
+    print(f'\n🔑 自报分母 = {rep} · **实时分母** = {real}')
+    # ③ 自报与实时不得显著偏离
+    dev = abs(rep - real) / real
+    if dev > CHAOS_DENOM_TOLERANCE:
+        d = '**偏小**' if rep < real else '**偏大**'
+        print(f'\n🔴 自报分母与实时分母偏离 {dev:.1%} > 容差 '
+              f'{CHAOS_DENOM_TOLERANCE:.0%}（自报 {d}）')
+        print('   🔑 偏小 → "全量"门槛被系统性压低，判据形同虚设；')
+        print('      偏大 → 产物口径与当前代码不符（产物陈旧）。')
+        print('      🔑 两种都说明这份产物**不能当参照物**')
+        return 1
+    print(f'  ✅ 自报分母与实时分母一致（偏离 {dev:.1%} ≤ '
+          f'{CHAOS_DENOM_TOLERANCE:.0%}）')
+    # ④ 🔑 全量判据用**实时分母**，不用自报值
+    need = int(real * CHAOS_ARTIFACT_FULL_RATIO)
+    part = ares.get('participated')
+    if not isinstance(part, int) or part < need:
+        print(f'\n🔴 产物 participated = {part!r} < 实时全量下界 {need}'
+              f'（实时分母 {real} × {CHAOS_ARTIFACT_FULL_RATIO}）')
+        print('   🔑 抽样 / 污染残渣不能当参照物 —— 处置：跑一次全量混沌')
+        return 1
+    print(f'  ✅ participated = {part} ≥ 实时全量下界 {need}')
+    # ⑤ 🔑 上界：参与数**不可能超过**台账型脚本数
+    #    🔴 此前所有检查都只有下界 —— 自报一个离谱的大数（如 500）
+    #       不会被发现，而它会成为 G415 背书基线的"真实参照物"。
+    if part > real:
+        print(f'\n🔴 产物 participated = {part} **超过**实时分母 {real}')
+        print('   🔑 参与混沌的脚本数不可能多于台账型脚本数 —— 自报值不可信')
+        return 1
+    print(f'  ✅ participated = {part} ≤ 实时分母 {real}（上界）')
+    print(f'\n✅ 参照物分母可信：自报 {rep} ≈ 实时 {real}；'
+          f'participated {part} ∈ [{need}, {real}]')
+    return 0
+
+
 def _scripts():
     return sorted(p for p in os.listdir('scripts') if p.endswith('.py')
                   and p not in ('run_all_gates.py', 'gate_chaos.py'))
@@ -2767,6 +2882,9 @@ def main():
     ap.add_argument('--assert-baseline-shape', action='store_true',
                     help='G416：基线产物键只准在 results 里'
                          '（防"同一个文件两个真相"）')
+    ap.add_argument('--assert-artifact-denom', action='store_true',
+                    help='G417：产物的自报分母必须与实时分母相符'
+                         '（防"自报自用"压低全量门槛）')
     ap.add_argument('--declare-capability', action='store_true',
                     help='自报本脚本提供的能力（供 G387 双向校验）')
     ap.add_argument('--self-test', action='store_true')
@@ -2782,6 +2900,8 @@ def main():
         return cmd_assert_baseline_vs_last()
     if a.assert_baseline_shape:
         return cmd_assert_baseline_shape()
+    if a.assert_artifact_denom:
+        return cmd_assert_artifact_denom()
     if a.coverage:
         return cmd_coverage(a)
     if a.probe is not None:

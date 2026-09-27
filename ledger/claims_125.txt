@@ -1,0 +1,22 @@
+# 第一百二十五轮声明清单
+# 🔑 优先引**代码标识符**（不随措辞变化）；文档锚点只引**不含引号**的稳定短串
+grep:scripts/gate_chaos.py::def cmd_assert_artifact_denom
+grep:scripts/gate_chaos.py::cmd_assert_artifact_denom
+grep:scripts/gate_chaos.py::assert-artifact-denom
+grep:scripts/gate_chaos.py::assert_artifact_denom
+grep:scripts/gate_chaos.py::CHAOS_DENOM_TOLERANCE
+grep:scripts/gate_chaos.py::_denom_tolerance_ceiling
+grep:scripts/gate_chaos.py::CHAOS_ARTIFACT_FULL_RATIO
+grep:scripts/gate_chaos.py::_anchor_denom
+grep:scripts/run_all_gates.py::"G417"
+grep:scripts/run_all_gates.py::assert-artifact-denom
+cmd:gate_chaos.py --assert-artifact-denom
+gate:G417
+# 🔑 互补层登记（124 轮诚实结论④）
+grep:scripts/run_all_gates.py::G415
+grep:scripts/run_all_gates.py::BOTH_LAYERS
+cmd:run_all_gates.py --check-both-layers
+# 🔑 文档锚点：只引本轮**核心结论**的稳定短串（避免整句，改措辞即失效）
+grep:references/游戏引擎复刻.md::自报分母
+grep:references/游戏引擎复刻.md::形同虚设
+grep:references/游戏引擎复刻.md::派生上界

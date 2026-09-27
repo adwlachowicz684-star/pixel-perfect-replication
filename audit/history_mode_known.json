@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-28T04:51:09+0800",
+  "generated_at": "2026-09-28T06:53:06+0800",
   "baseline_modes": {
-    "100644": 300
+    "100644": 303
   },
   "baseline_fp_history": [
     {
@@ -19,10 +19,26 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-28T04:51:09+0800"
+    },
+    {
+      "seq": 2,
+      "seq_in_round": 1,
+      "round": 125,
+      "from_fp": "2ffa187afc821f80695c7b1f31d80a05d7636ffd",
+      "to_fp": "d0ca1aabde91f648a7c268609d9b1231d1fe5870",
+      "from_modes": {
+        "100644": 300
+      },
+      "to_modes": {
+        "100644": 303
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-28T06:53:06+0800"
     }
   ],
-  "baseline_fp": "2ffa187afc821f80695c7b1f31d80a05d7636ffd",
-  "checked_commits": 42,
+  "baseline_fp": "d0ca1aabde91f648a7c268609d9b1231d1fe5870",
+  "checked_commits": 44,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -46,7 +62,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 300
+        "100644": 303
       }
     },
     {
@@ -71,7 +87,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 300
+        "100644": 303
       }
     },
     {
@@ -96,7 +112,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 300
+        "100644": 303
       }
     },
     {
@@ -121,7 +137,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 300
+        "100644": 303
       }
     },
     {
@@ -146,7 +162,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 300
+        "100644": 303
       }
     }
   ],
