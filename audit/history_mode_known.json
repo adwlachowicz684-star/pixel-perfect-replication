@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-28T00:58:41+0800",
+  "generated_at": "2026-09-28T01:06:52+0800",
   "baseline_modes": {
-    "100644": 443
+    "100644": 442
   },
   "baseline_fp_history": [
     {
@@ -246,10 +246,26 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-28T00:58:41+0800"
+    },
+    {
+      "seq": 16,
+      "seq_in_round": 6,
+      "round": 117,
+      "from_fp": "d1c768a56bb9af8412c39ec8bf3a9e373a7d1bbf",
+      "to_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
+      "from_modes": {
+        "100644": 443
+      },
+      "to_modes": {
+        "100644": 442
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-28T01:06:52+0800"
     }
   ],
-  "baseline_fp": "d1c768a56bb9af8412c39ec8bf3a9e373a7d1bbf",
-  "checked_commits": 31,
+  "baseline_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
+  "checked_commits": 32,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -273,7 +289,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 443
+        "100644": 442
       }
     },
     {
@@ -298,7 +314,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 443
+        "100644": 442
       }
     },
     {
@@ -323,7 +339,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 443
+        "100644": 442
       }
     },
     {
@@ -348,7 +364,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 443
+        "100644": 442
       }
     },
     {
@@ -373,7 +389,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 443
+        "100644": 442
       }
     }
   ],
