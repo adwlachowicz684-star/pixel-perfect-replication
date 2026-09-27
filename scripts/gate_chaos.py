@@ -96,6 +96,80 @@ def _anchor_denom():
     return n
 
 
+# 🔑 第一百二十二轮：**基线文件的独立守望者**（G414）。
+#    🔴 本轮实测：`ledger/_chaos_baseline.json` 只有**探针自己**读写 ——
+#       门禁表里**没有任何一条**读它。把基线污染成 0 后跑探针：
+#         · 探针 rc=0 —— 锚点（90）兜住了全 0 基线（这是**设计意图**）
+#         · 探针结束时**自动重写**基线为 101/101/99 —— 污染痕迹被抹平
+#    🔑 所以第一百二十一轮"断言失效"的说法**不准确**；真正的盲点是：
+#       **基线这一层没有独立守望者** —— 它既是被检查对象，
+#       又被被检查方自己重写（**自证循环**，与第七十九轮同源）。
+#    🔑 本条**不跑全量混沌**（快），因此可进自动门禁表。
+CHAOS_BASELINE_FILE = os.path.join('ledger', '_chaos_baseline.json')
+
+
+def cmd_assert_chaos_baseline():
+    """🔑 G414 —— 混沌能力基线必须可信（不得为 0 / 不得低于锚点）。"""
+    print('=' * 70)
+    print('🔑 **混沌基线可信性** —— G414')
+    print('=' * 70)
+    lb_path = os.path.join(ROOT, CHAOS_BASELINE_FILE)
+    keys = CAPABILITY_ARTIFACT_KEYS.get('chaos-full', ())
+    if not keys:
+        print('\n🔴 未登记 `chaos-full` 的产物键 —— 无从判断基线是否可信')
+        return 1
+    # ① 文件必须存在 —— 探针必须已成功跑过至少一次
+    if not os.path.isfile(lb_path):
+        print(f'\n🔴 基线文件不存在：{CHAOS_BASELINE_FILE}')
+        print('   🔑 探针若从未成功跑过，基线就无从谈起 —— 拒绝给结论')
+        return 1
+    try:
+        rec = json.load(open(lb_path, encoding='utf-8'))
+    except Exception as e:
+        print(f'\n🔴 基线文件无法解析：{e}')
+        return 1
+    res = rec.get('results')
+    if not isinstance(res, dict):
+        print(f'\n🔴 基线缺少 `results` 对象（实际 {type(res).__name__}）')
+        return 1
+    # ② generated_at_ns 必须为正 —— 证明真被写过，不是空壳
+    ns = rec.get('generated_at_ns')
+    if not isinstance(ns, int) or ns <= 0:
+        print(f'\n🔴 基线 `generated_at_ns` = {ns!r} 不是正整数 —— '
+              f'不像是探针真跑过写下的')
+        return 1
+    den = _anchor_denom()
+    print(f'\n🔑 台账型脚本（锚点分母）= {den}')
+    bad = []
+    for k in keys:
+        if k not in res:
+            bad.append(f'{k}：缺少该键')
+            continue
+        v = res.get(k)
+        if not isinstance(v, int) or v <= 0:
+            bad.append(f'{k} = {v!r} 不是正整数')
+            continue
+        ratio = CAPABILITY_ANCHOR_FLOOR.get(k, 0)
+        anchor = int(den * ratio) if ratio else 0
+        if anchor <= 0:
+            bad.append(f'{k}：锚点算出来为 0（比率 {ratio}）—— 判据退化')
+            continue
+        if v < anchor:
+            bad.append(f'{k} = {v} **低于锚点** {anchor}（比率 {ratio}）')
+    if bad:
+        print('\n🔴 基线不可信：')
+        for b in bad:
+            print(f'   - {b}')
+        print('\n🔑 基线是下界断言的**一半依据**；它若为 0，'
+              '探针会被锚点兜住而**照样通过**，'
+              '污染痕迹还会被探针自动抹平。')
+        return 1
+    for k in keys:
+        ratio = CAPABILITY_ANCHOR_FLOOR.get(k, 0)
+        print(f'  ✅ {k} = {res[k]}（正整数，≥ 锚点 {int(den * ratio)}）')
+    print(f'\n✅ 基线可信：{len(keys)} 个键均为正且达锚点下界')
+    return 0
+
 
 def _scripts():
     return sorted(p for p in os.listdir('scripts') if p.endswith('.py')
@@ -2483,6 +2557,8 @@ def main():
                     help='列出疑似目录完备型的候选（交人工登记）')
     ap.add_argument('--probe-capability', metavar='NAME', default=None,
                     help='**真跑一次**某个自报的能力（防自报撒谎）')
+    ap.add_argument('--assert-chaos-baseline', action='store_true',
+                    help='**基线可信性**（防基线被污染后无人发现）')
     ap.add_argument('--declare-capability', action='store_true',
                     help='自报本脚本提供的能力（供 G387 双向校验）')
     ap.add_argument('--self-test', action='store_true')
@@ -2492,6 +2568,8 @@ def main():
         return _declare_capability()
     if a.probe_capability is not None:
         return _probe_capability(a.probe_capability)
+    if a.assert_chaos_baseline:
+        return cmd_assert_chaos_baseline()
     if a.coverage:
         return cmd_coverage(a)
     if a.probe is not None:

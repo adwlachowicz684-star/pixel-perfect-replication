@@ -1,0 +1,12 @@
+# 第一百二十二轮声明清单
+grep:scripts/gate_chaos.py::CHAOS_BASELINE_FILE
+grep:scripts/gate_chaos.py::def cmd_assert_chaos_baseline
+grep:scripts/gate_chaos.py::assert_chaos_baseline
+grep:scripts/run_all_gates.py::"G414"
+cmd:gate_chaos.py --assert-chaos-baseline
+gate:G414
+# 🔑 文档锚点须避开标题行（以 # 开头会被判为说明行）—— 选正文片段
+grep:references/游戏引擎复刻.md::基线这一层没有独立守望者
+grep:references/游戏引擎复刻.md::污染痕迹被自动抹平
+# 🔑 121 轮未落地（代码/文档/清单三处零痕迹）—— 本轮如实记录，不补空轮清单
+grep:references/游戏引擎复刻.md::它没有发生

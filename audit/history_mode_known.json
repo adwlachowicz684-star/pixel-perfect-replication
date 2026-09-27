@@ -1,11 +1,28 @@
 {
-  "generated_at": "2026-09-28T04:12:46+0800",
+  "generated_at": "2026-09-28T04:51:09+0800",
   "baseline_modes": {
-    "100644": 299
+    "100644": 300
   },
-  "baseline_fp_history": [],
-  "baseline_fp": "9943a9d225b1f69ad7235a31ccceaf87421bbf12",
-  "checked_commits": 41,
+  "baseline_fp_history": [
+    {
+      "seq": 1,
+      "seq_in_round": 1,
+      "round": 122,
+      "from_fp": "9943a9d225b1f69ad7235a31ccceaf87421bbf12",
+      "to_fp": "2ffa187afc821f80695c7b1f31d80a05d7636ffd",
+      "from_modes": {
+        "100644": 299
+      },
+      "to_modes": {
+        "100644": 300
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-28T04:51:09+0800"
+    }
+  ],
+  "baseline_fp": "2ffa187afc821f80695c7b1f31d80a05d7636ffd",
+  "checked_commits": 42,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -29,7 +46,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 299
+        "100644": 300
       }
     },
     {
@@ -54,7 +71,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 299
+        "100644": 300
       }
     },
     {
@@ -79,7 +96,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 299
+        "100644": 300
       }
     },
     {
@@ -104,7 +121,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 299
+        "100644": 300
       }
     },
     {
@@ -129,7 +146,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 299
+        "100644": 300
       }
     }
   ],
