@@ -1,2 +1,0 @@
-match_type,confidence,similarity,algorithm,primary_address,secondary_address,name_match,signature_match,cfg_edit_distance,callgraph_support,manual_review,disposition
-__INVALID_ENUM__,high,-999999999,__INVALID_ENUM__,__PAIR_DIFF___4,__PAIR_DIFF___5,__INVALID_ENUM__,__INVALID_ENUM__,-999999999,__poison__,__poison__,__INVALID_ENUM__
