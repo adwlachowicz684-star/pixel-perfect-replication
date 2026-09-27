@@ -171,6 +171,198 @@ def cmd_assert_chaos_baseline():
     return 0
 
 
+# 🔑 第一百二十三轮：基线的**第二个守望者**（G415）—— 与最近一次真实产物比对。
+#    🔴 第一百二十二轮诚实结论①：G414 只比"基线 vs 锚点" ——
+#       把基线写成 **90**（刚好达锚点 90）而真实是 101 时，G414 **照样通过**。
+#    🔑 解法：读 `ledger/_chaos_last.json`（最近一次混沌的**真实产物**），
+#       与基线**逐键比对** —— **不跑混沌**，因此可进自动门禁表。
+#    🔑 容差理由：毒化含随机成分，强证据数会小幅抖动（实测 99~101），故留 5%；
+#       而"刚好达锚点"的假基线偏离 ≥ 11%，**必然被抓**。
+CHAOS_BASELINE_TOLERANCE = 0.05
+# 🔑 产物必须来自**全量**运行：participated ≥ 锚点分母 × 0.90
+#    🔴 抽样 / 被污染的残渣（如 participated=1）**不能当参照物** ——
+#       否则基线会"正确地错"（与"读不到 ≠ 没有"同源）。
+CHAOS_ARTIFACT_FULL_RATIO = 0.90
+
+
+# 🔑 第一百二十三轮：**容差上界是派生的，不是拍脑袋的**。
+#    🔴 "刚好达锚点"的假基线（90）偏离真实值（101）恰好 = 1 − 锚点比率 = 10%。
+#       🔑 若容差 ≥ 10%，该假基线**会溜过去**，G415 形同虚设 —— 而它
+#          **恰恰是本门禁存在的唯一理由**（第一百二十二轮诚实结论①）。
+#    🔑 所以容差上界由 `CAPABILITY_ANCHOR_FLOOR` 算出，二者**不可能脱节**：
+#       改锚点比率，容差上界自动跟着变。
+def _tolerance_ceiling():
+    """容差必须**严格小于**此值，否则抓不到"刚好达锚点"的假基线。
+
+    🔑 返回 `None` 表示**无从计算**（锚点比率缺失 / 不在 (0,1)）—— 调用方
+    **必须拒绝给结论**。🔴 不能退化成 1.0：那样容差 0.5 也会通过，
+    判据⓪**静默失效**（与第一百零六轮"字段缺失 → 判据静默跳过"同源）。
+    """
+    if 'participated' not in CAPABILITY_ANCHOR_FLOOR:
+        return None
+    r = CAPABILITY_ANCHOR_FLOOR['participated']
+    if not isinstance(r, (int, float)) or not (0 < r < 1):
+        return None
+    return 1.0 - r
+
+
+def cmd_assert_baseline_vs_last():
+    """🔑 G415 —— 基线必须与最近一次真实混沌产物对得上（不跑混沌）。"""
+    print('=' * 70)
+    print('🔑 **基线 ↔ 最近一次真实产物** —— G415')
+    print('=' * 70)
+    # ① 判据自身可信性：**容差与全量比率不得被调成形同虚设**
+    ceil_v = _tolerance_ceiling()
+    if ceil_v is None:
+        print('\n🔴 锚点比率 `participated` 缺失或不在 (0,1) —— '
+              '无从计算容差上界，**拒绝给结论**')
+        print('   🔑 上界若退化成 1.0，容差 0.5 也会通过，判据⓪失去意义')
+        return 1
+    if not (0 < CHAOS_BASELINE_TOLERANCE < ceil_v):
+        print(f'\n🔴 容差 {CHAOS_BASELINE_TOLERANCE} 不在 (0, {ceil_v}) 内 —— '
+              '**拒绝给结论**')
+        print('   🔑 容差 ≥ 派生上界时，"刚好达锚点"的假基线会溜过去，'
+              '本门禁失去存在理由')
+        return 1
+    ratio_floor = min(CAPABILITY_ANCHOR_FLOOR.values())
+    if CHAOS_ARTIFACT_FULL_RATIO < ratio_floor:
+        print(f'\n🔴 全量比率 {CHAOS_ARTIFACT_FULL_RATIO} < 锚点比率 '
+              f'{ratio_floor} —— **拒绝给结论**')
+        print('   🔑 低于锚点的"全量产物"可能是污染残渣，不能当参照物')
+        return 1
+    print(f'🔑 判据自校验：容差 {CHAOS_BASELINE_TOLERANCE} < 上界 {ceil_v}'
+          f' · 全量比率 {CHAOS_ARTIFACT_FULL_RATIO} ≥ {ratio_floor}')
+    keys = CAPABILITY_ARTIFACT_KEYS.get('chaos-full', ())
+    art_rel = CAPABILITY_ARTIFACT.get('chaos-full')
+    if not keys or not art_rel:
+        print('\n🔴 未登记 `chaos-full` 的产物键或产物路径 —— 无从比对')
+        return 1
+    lb_path = os.path.join(ROOT, CHAOS_BASELINE_FILE)
+    art_path = os.path.join(ROOT, art_rel)
+    for p in (lb_path, art_path):
+        if not os.path.isfile(p):
+            print(f'\n🔴 文件不存在：{os.path.relpath(p, ROOT)}')
+            print('   🔑 缺少任一侧都无从比对 —— 拒绝给结论')
+            return 1
+    try:
+        base = json.load(open(lb_path, encoding='utf-8'))
+        art = json.load(open(art_path, encoding='utf-8'))
+    except Exception as e:
+        print(f'\n🔴 文件无法解析：{e}')
+        return 1
+    bres = base.get('results') if isinstance(base.get('results'), dict) else base
+    ares = art.get('results') if isinstance(art.get('results'), dict) else art
+    if not isinstance(bres, dict) or not isinstance(ares, dict):
+        print('\n🔴 基线与产物都必须是含 `results` 的对象')
+        return 1
+    # ① 产物必须来自**全量**运行
+    den = art.get('anchor_denom') or _anchor_denom()
+    if not isinstance(den, int) or den <= 0:
+        print(f'\n🔴 产物的 `anchor_denom` = {den!r} 不是正整数 —— 拒绝给结论')
+        return 1
+    need = int(den * CHAOS_ARTIFACT_FULL_RATIO)
+    part = ares.get('participated')
+    print(f'\n🔑 锚点分母 = {den} · 产物 participated = {part!r}')
+    if not isinstance(part, int) or part < need:
+        print(f'\n🔴 最近一次产物**不是全量**（participated {part!r} '
+              f'< 全量下界 {need}）')
+        print('   🔑 抽样 / 污染残渣不能当参照物 —— 拒绝给结论')
+        print('   🔑 处置：跑一次全量混沌，让产物回到真实值')
+        return 1
+    # ② 逐键比对：基线不得偏离最近实测超过容差
+    bad = []
+    for k in keys:
+        bv, av = bres.get(k), ares.get(k)
+        if not isinstance(av, int) or av <= 0:
+            bad.append(f'{k}：产物值 {av!r} 不是正整数')
+            continue
+        if not isinstance(bv, int) or bv <= 0:
+            bad.append(f'{k}：基线值 {bv!r} 不是正整数')
+            continue
+        lo = av * (1 - CHAOS_BASELINE_TOLERANCE)
+        hi = av * (1 + CHAOS_BASELINE_TOLERANCE)
+        if bv < lo:
+            bad.append(f'{k}：基线 {bv} **低于**最近实测 {av} '
+                       f'×{1 - CHAOS_BASELINE_TOLERANCE} = {lo:.1f}'
+                       ' —— 疑似被压到"刚好达锚点"的假基线')
+        elif bv > hi:
+            bad.append(f'{k}：基线 {bv} **高于**最近实测 {av} '
+                       f'×{1 + CHAOS_BASELINE_TOLERANCE} = {hi:.1f}'
+                       ' —— 基线陈旧 / 虚高')
+        else:
+            print(f'  ✅ {k}：基线 {bv} ≈ 最近实测 {av}（容差 '
+                  f'±{int(CHAOS_BASELINE_TOLERANCE * 100)}%）')
+    if bad:
+        print('\n🔴 基线与最近一次真实产物**对不上**：')
+        for b in bad:
+            print(f'   - {b}')
+        return 1
+    print(f'\n✅ 基线与最近一次全量产物一致（{len(keys)} 键，容差 '
+          f'±{int(CHAOS_BASELINE_TOLERANCE * 100)}%）')
+    return 0
+
+
+# 🔑 第一百二十四轮：G416 —— 基线文件**不得有两个真相**。
+#    🔴 本轮实测事故：做 G415 破坏实验时，我把假值 90 写到了**顶层**
+#       （`rec['participated'] = 90`），而探针真实读写的是 **`results` 子对象**。
+#       结果：文件里同时存在 顶层 90 与 results 101 —— **同一个文件两个值**。
+#    🔑 后果有两层：
+#       ① 破坏实验**看起来没生效**（G414/G415 都 rc=0），
+#          极易被误读成"**G415 失效**"—— 而实际是我的污染位置错了；
+#       ② 若残留未清理，将来任何读顶层的新代码都会读到**与探针不同的值**。
+#    🔑 与第八十八轮同源：**层级假设错了，读到的就是"不存在"**；
+#       这里反过来 —— **写错了层，污染就完全不生效，且没有任何报错**。
+def cmd_assert_baseline_shape():
+    """🔑 G416 —— 基线产物键**只能**存在于 `results` 里，顶层不得有裸键。"""
+    print('=' * 70)
+    print('🔑 **基线文件不得有两个真相** —— G416')
+    print('=' * 70)
+    keys = CAPABILITY_ARTIFACT_KEYS.get('chaos-full', ())
+    if not keys:
+        print('\n🔴 未登记 `chaos-full` 的产物键 —— 无从判断文件结构')
+        print('   🔑 判据缺失时**拒绝给结论**，不能退化成"没问题"')
+        return 1
+    lb_path = os.path.join(ROOT, CHAOS_BASELINE_FILE)
+    if not os.path.isfile(lb_path):
+        print(f'\n🔴 基线文件不存在：{CHAOS_BASELINE_FILE} —— 拒绝给结论')
+        return 1
+    try:
+        rec = json.load(open(lb_path, encoding='utf-8'))
+    except Exception as e:
+        print(f'\n🔴 基线文件无法解析：{e}')
+        return 1
+    if not isinstance(rec, dict):
+        print(f'\n🔴 基线不是对象（实际 {type(rec).__name__}）')
+        return 1
+    # ① 顶层不得出现任何产物键 —— 两个真相比没有真相更危险
+    bare = [k for k in keys if k in rec]
+    if bare:
+        print(f'\n🔴 顶层出现**裸的产物键**：{bare}')
+        for k in bare:
+            rk = rec.get('results', {}).get(k) if isinstance(
+                rec.get('results'), dict) else None
+            print(f'   - `{k}`：顶层 = {rec[k]!r} · results = {rk!r}'
+                  + ('  🔴 **两个值不一致**' if rec[k] != rk else ''))
+        print('\n🔑 探针只读写 `results`；顶层裸键通常是**破坏实验的残留**，')
+        print('   会让"污染无效"看起来像"门禁失效"，也会让新代码读到错值。')
+        return 1
+    # ② 必须有 results 对象 —— 否则顶层裸键检查失去参照
+    res = rec.get('results')
+    if not isinstance(res, dict):
+        print(f'\n🔴 基线缺少 `results` 对象（实际 {type(res).__name__}）')
+        print('   🔑 results 是探针唯一写入层，缺了它整个基线无从解释')
+        return 1
+    miss = [k for k in keys if k not in res]
+    if miss:
+        print(f'\n🔴 `results` 缺少产物键：{miss}')
+        return 1
+    print(f'🔑 顶层键 = {sorted(rec.keys())}（无裸的产物键）')
+    for k in keys:
+        print(f'  ✅ `{k}` 只存在于 results = {res[k]!r}')
+    print(f'\n✅ 基线结构单一真相：{len(keys)} 个键均只在 `results` 中')
+    return 0
+
+
 def _scripts():
     return sorted(p for p in os.listdir('scripts') if p.endswith('.py')
                   and p not in ('run_all_gates.py', 'gate_chaos.py'))
@@ -1563,7 +1755,19 @@ def cmd_chaos(a):
     # 🔑 实测：强证据的 strength 值叫 'strict'（不是 'strong'）
     _n_str = len([r for r in results if r.get('strength') == 'strict'])
     _art = CAPABILITY_ARTIFACT.get('chaos-full')
-    if _art:
+    # 🔑 第一百二十三轮：**抽样不得覆盖全量能力产物**。
+    #    🔴 实测根因：污染测试（`cmd_assert_no_pollute`）会跑 `--limit 4` 抽样，
+    #       无条件覆盖 → 产物变成 `1/1/1` → 后面的 **G415 拿抽样值当
+    #       "最近一次全量"参照物**，反过来说"基线 101 虚高"（**倒因为果**）。
+    #    🔑 这与第七十二~七十四轮对 `audit/.chaos_last.json` 做的
+    #       **full/sampled 分离**是同一条规律 ——
+    #       🔴 但第九十轮把能力框架推广到 `chaos-full` 时**未继承该教训**。
+    if not _art:
+        print('\n🔴 `CAPABILITY_ARTIFACT` 未登记 —— 无法证明外部副作用')
+    elif _lim:
+        print(f'\n🔑 抽样运行（limit={_lim}）—— **不覆盖**全量能力产物 `{_art}`')
+        print('   🔑 抽样不是全量：覆盖会让 G415 拿抽样当参照物（与 72 轮同源）')
+    else:
         _ap2 = os.path.join(ROOT, _art)
         os.makedirs(os.path.dirname(_ap2), exist_ok=True)
         # 🔑 第九十三轮：把**锚点分母**缓存进产物。
@@ -1582,8 +1786,6 @@ def cmd_chaos(a):
         print(f'\n🔑 能力产物已写入: `{_art}` '
               f'（participated={_n_part} intercepted={_n_int} '
               f'strong={_n_str}）')
-    else:
-        print('\n🔴 `CAPABILITY_ARTIFACT` 未登记 —— 无法证明外部副作用')
     # 🔑 第六十轮：把拦截率写进**稳定缓存**，供 run_all_gates 汇总读取
     _cache = os.path.join('audit', '.chaos_last.json')
     try:
@@ -2559,6 +2761,12 @@ def main():
                     help='**真跑一次**某个自报的能力（防自报撒谎）')
     ap.add_argument('--assert-chaos-baseline', action='store_true',
                     help='**基线可信性**（防基线被污染后无人发现）')
+    ap.add_argument('--assert-baseline-vs-last', action='store_true',
+                    help='G415：基线 ↔ 最近一次真实混沌产物'
+                         '（防"刚好达锚点"的假基线）')
+    ap.add_argument('--assert-baseline-shape', action='store_true',
+                    help='G416：基线产物键只准在 results 里'
+                         '（防"同一个文件两个真相"）')
     ap.add_argument('--declare-capability', action='store_true',
                     help='自报本脚本提供的能力（供 G387 双向校验）')
     ap.add_argument('--self-test', action='store_true')
@@ -2570,6 +2778,10 @@ def main():
         return _probe_capability(a.probe_capability)
     if a.assert_chaos_baseline:
         return cmd_assert_chaos_baseline()
+    if a.assert_baseline_vs_last:
+        return cmd_assert_baseline_vs_last()
+    if a.assert_baseline_shape:
+        return cmd_assert_baseline_shape()
     if a.coverage:
         return cmd_coverage(a)
     if a.probe is not None:

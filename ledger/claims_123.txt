@@ -1,0 +1,14 @@
+# 第一百二十三轮声明清单
+# 🔑 优先引**代码标识符**（不随措辞变化）；文档锚点只引**不含引号**的稳定短串
+grep:scripts/gate_chaos.py::CHAOS_BASELINE_TOLERANCE
+grep:scripts/gate_chaos.py::CHAOS_ARTIFACT_FULL_RATIO
+grep:scripts/gate_chaos.py::def cmd_assert_baseline_vs_last
+grep:scripts/gate_chaos.py::assert_baseline_vs_last
+grep:scripts/gate_chaos.py::def _tolerance_ceiling
+grep:scripts/gate_chaos.py::_tolerance_ceiling
+grep:scripts/run_all_gates.py::"G415"
+cmd:gate_chaos.py --assert-baseline-vs-last
+gate:G415
+# 🔑 文档锚点：只引本轮**核心结论**的稳定短串（避免整句，改措辞即失效）
+grep:references/游戏引擎复刻.md::G414 真的守不住
+grep:references/游戏引擎复刻.md::派生上界
