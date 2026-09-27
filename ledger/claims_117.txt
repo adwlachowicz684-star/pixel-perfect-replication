@@ -61,3 +61,8 @@ grep:scripts/push_api.py::def cmd_assert_no_tmp_in_index
 grep:scripts/push_api.py::_selftest_tmp
 cmd:push_api.py --assert-no-tmp-in-index
 gate:G410
+
+# ⑧ 收尾：最终数字与文档
+# 🔑 117 轮发现：grep 对 .md 的 **# 标题行**不适用（`#` 被 _code_lines 当注释排除）
+#    → 引 md 时必须选**正文**短语，不能引标题
+grep:references/游戏引擎复刻.md::从 216 个降到 22 个
