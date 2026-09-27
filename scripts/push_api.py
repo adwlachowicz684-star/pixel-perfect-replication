@@ -962,6 +962,39 @@ def _trust_root():
         return None
 
 
+def _norm(v):
+    """🔑 归一：tuple/list 视为等价（JSON 只有 list，代码里可能是 tuple）。"""
+    if isinstance(v, (list, tuple)):
+        return [_norm(x) for x in v]
+    return v
+
+
+def _const_value(name):
+    """🔑 取某常量在 scripts/*.py 中的**定义值**（AST literal_eval）。找不到返回 None。"""
+    import ast as _ast
+    # 🔑 HERE 本身就是 scripts/ —— 不要再加一层 'scripts'
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            t = _ast.parse(open(f, encoding='utf-8').read())
+        except Exception:
+            continue
+        for n in t.body:
+            if isinstance(n, _ast.Assign) and isinstance(n.value, _ast.Constant):
+                for tg in n.targets:
+                    if isinstance(tg, _ast.Name) and tg.id == name:
+                        try:
+                            return _ast.literal_eval(n.value)
+                        except Exception:
+                            return None
+            if isinstance(n, _ast.Assign) and isinstance(n.value, (_ast.Tuple, _ast.List)):
+                for tg in n.targets:
+                    if isinstance(tg, _ast.Name) and tg.id == name:
+                        try:
+                            return _ast.literal_eval(n.value)
+                        except Exception:
+                            return None
+    return None
+
 def cmd_assert_trust_root():
     """🔑 G408：**信任根闭合** —— 代码里的元登记项必须与信任根一致。
 
@@ -1008,9 +1041,43 @@ def cmd_assert_trust_root():
     if in_tbl:
         bad.append(f'信任根/元项**被登记进 DEPENDENT_NAMES**：{in_tbl} —— '
                    f'🔴 这会让递推重新开始，信任根必须停在根上')
+    # 🔑 判据④（116 轮新增）：**值型根** —— VALUE_ROOTS 中每个常量，
+    #    代码中**实际的值**必须 == 信任根记录值。
+    #    🔴 与判据②（只比名字列表）的区别：这里比的是**值**。
+    #       GATE_RC_DOMAIN 改成 (9,9) 时，名字仍在、仍被引用 —— G405/G406/G407
+    #       **全部照绿**，只有值比对能抓到。
+    vroots = tr.get('VALUE_ROOTS') or {}
+    for nm, spec in sorted(vroots.items()):
+        if not isinstance(spec, dict):
+            bad.append(f'值型根 {nm} 的登记不是 dict —— 拒绝给结论')
+            continue
+        why = (spec.get('why') or '').strip()
+        if len(why) < 20:
+            bad.append(f'值型根 {nm} 的 why 过短（{len(why)}<20）—— 🔴 必须写明"为什么算根"')
+        want_v = spec.get('value')
+        if want_v is None:
+            bad.append(f'值型根 {nm} 未登记 value —— 拒绝给结论')
+            continue
+        di = (spec.get('defined_in') or '').strip()
+        if not di:
+            bad.append(f'值型根 {nm} 未登记 defined_in —— 🔴 必须写明它定义在哪')
+        elif not os.path.exists(os.path.join(ROOT, di)):
+            bad.append(f'值型根 {nm} 的 defined_in 指向不存在的文件：{di}')
+        got = _const_value(nm)
+        if got is None:
+            bad.append(f'值型根 {nm} **在代码中找不到定义** —— 拒绝给结论（读不到≠没有）')
+        elif _norm(got) != _norm(want_v):
+            bad.append(f'值型根 {nm} 代码值 {got!r} ≠ 信任根 {want_v!r}')
+
     print(f'   信任根 {TRUST_ROOT_FILE}')
     print(f'   代码值 {len(cur)} 项 · 信任根 {len(want)} 项')
     print(f'   理由：{(tr.get("_why") or "")[:60]}…')
+    crit = tr.get('_root_criteria') or {}
+    if not crit:
+        bad.append('信任根未登记 _root_criteria —— 🔴 必须写明"什么算根"')
+    else:
+        print(f'   🔑 算根标准：{len(crit.get("三条人工判据") or [])} 条人工判据'
+              f' · 自动标准已记录为失效: {"失效" in json.dumps(crit, ensure_ascii=False)}')
     if bad:
         print()
         for b in bad:

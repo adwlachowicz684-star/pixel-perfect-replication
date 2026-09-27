@@ -1,0 +1,49 @@
+# 第一百一十六轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**值型根** —— GATE_RC_DOMAIN 纳入信任根 + 明确"什么算根"
+
+# ① 值型根能力
+grep:scripts/push_api.py::def _const_value
+grep:scripts/push_api.py::def _norm
+grep:scripts/push_api.py::VALUE_ROOTS
+grep:scripts/push_api.py::_root_criteria
+cmd:push_api.py --assert-trust-root
+# ② 报告入口（不是门禁）
+file:scripts/_scan_cross_ref_consts.py
+grep:scripts/_scan_cross_ref_consts.py::不是根判定
+cmd:_scan_cross_ref_consts.py --limit
+# ③ 既有能力仍工作
+cmd:push_api.py --assert-meta-names
+cmd:push_api.py --assert-dependent-names
+cmd:push_api.py --assert-path-consts
+cmd:push_api.py --assert-mirror-fn
+cmd:push_api.py --assert-write-pairing
+cmd:push_api.py --assert-fp-mirror
+cmd:push_api.py --assert-fp-history
+cmd:push_api.py --assert-baseline-fp
+cmd:push_api.py --assert-history-known
+cmd:push_api.py --assert-legacy-files
+cmd:push_api.py --assert-legacy-dump
+cmd:push_api.py --audit-history
+cmd:push_api.py --verify-push
+cmd:push_api.py --check-leak
+cmd:push_api.py --check-symlink
+cmd:push_api.py --check-gitlink
+cmd:run_all_gates.py --check-both-layers
+cmd:run_all_gates.py --check-dup-cmds
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:claim_verify.py --verify-all
+gate:G388
+gate:G405
+gate:G406
+gate:G407
+gate:G408
+# ④ 产物不得被误删
+file:ledger/trust_root.json
+file:audit/history_mode_known.json
+file:ledger/baseline_fp_mirror.json
+file:ledger/claims_115.txt
+file:scripts/push_api.py
+file:scripts/claim_verify.py
