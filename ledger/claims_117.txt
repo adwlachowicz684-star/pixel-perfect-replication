@@ -66,3 +66,6 @@ gate:G410
 # 🔑 117 轮发现：grep 对 .md 的 **# 标题行**不适用（`#` 被 _code_lines 当注释排除）
 #    → 引 md 时必须选**正文**短语，不能引标题
 grep:references/游戏引擎复刻.md::从 216 个降到 22 个
+grep:.gitignore::work/
+# 🔑 117 轮发现（第三次）：grep 串含**全角逗号**也不命中 —— 与 114 轮同源
+grep:references/游戏引擎复刻.md::每次跑都被重写的东西不是
