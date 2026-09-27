@@ -1,0 +1,12 @@
+# 第一百一十九轮声明清单
+grep:scripts/push_api.py::import subprocess
+grep:scripts/push_api.py::清理后目录**非空**
+grep:scripts/push_api.py::def cmd_check_selftest_reset
+grep:scripts/push_api.py::check_selftest_reset
+grep:scripts/run_all_gates.py::"G412"
+cmd:push_api.py --check-selftest-reset
+cmd:push_api.py --check-symlink
+gate:G412
+grep:references/游戏引擎复刻.md::让它不可能发生
+# 🔑 该句是文档结论，不在代码里 —— 按 83 轮规则，清单只引代码标识符
+grep:references/游戏引擎复刻.md::清理的结果必须被验证

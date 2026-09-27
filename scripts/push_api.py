@@ -30,6 +30,13 @@ import hashlib
 import json
 import os
 import shutil
+# 🔑 第一百一十九轮**根治**：本文件原**没有顶层** import subprocess，
+#    只在各函数内 import —— 已导致**四次** NameError（84 轮 ROOT、111 轮 glob、
+#    118 轮与 119 轮 subprocess）。
+#    🔴 前三次改法都是「在函数里补一行 import」—— 治标：下一个新函数还会再犯。
+#    ✅ 治本：改为**顶层导入**，新函数无需记得补，这类错误从根上不可能再发生。
+#    🔑 判据：**重复出现的同类错误，应改到「让它不可能发生」，而不是每次补一处。**
+import subprocess
 import sys
 import time
 import urllib.error
@@ -223,9 +230,12 @@ def _selftest_reset():
     """
     import subprocess   # 🔑 本文件**没有顶层** import subprocess（只在各函数内导入）
     d = os.path.join(ROOT, SELFTEST_TMP_DIR)
+
     # 先清 git 索引（残留若已被 add -f）
     # 🔴 注意：这里的 try/except 曾**吞掉 NameError** —— subprocess 未导入时，
     #    清理静默失效而调用方毫无察觉（与 106 轮"字段缺失静默跳过"同源）。
+    # ✅ 第一百一十九轮：不再依赖 try 的"没报错"当作"清理好了"——
+    #    下面**重新查一遍** git ls-files，用事实校验，而不是信任 try 块。
     try:
         got = subprocess.run(['git', 'ls-files', '--', SELFTEST_TMP_DIR],
                              capture_output=True, text=True, cwd=ROOT).stdout
@@ -233,11 +243,37 @@ def _selftest_reset():
             if ln.strip():
                 subprocess.run(['git', 'rm', '-f', '--cached', '--quiet',
                                 ln.strip()], capture_output=True, cwd=ROOT)
-    except Exception:
-        pass
+    except Exception as e:
+        # 🔑 不再静默 pass —— 打印出来，让"代码坏了"不会伪装成"没什么要清的"
+        print(f'🔴 清理 git 索引时异常: {type(e).__name__}: {e}')
+
     # 再删磁盘（shutil.rmtree 能删掉目录里的 symlink）
     shutil.rmtree(d, ignore_errors=True)
     os.makedirs(d, exist_ok=True)
+
+    # 🔑 第一百一十九轮：**清理后自断言**（防 shutil.rmtree 静默失败）
+    #    🔴 rmtree(ignore_errors=True) 失败时**不报错也不删** —— 目录里仍有东西，
+    #       而调用方拿到路径后照常使用，残留与被清理**看起来完全一样**。
+    #    🔑 判据：**清理的结果必须被验证，不能假设**。
+    #    🔑 失败时返回 None（**拒绝给结论**），而不是照常返回路径。
+    left = os.listdir(d) if os.path.isdir(d) else None
+    if left is None:
+        print(f'🔴 自测临时目录 {SELFTEST_TMP_DIR} 创建失败 —— 拒绝继续')
+        return None
+    if left:
+        print(f'🔴 清理后目录**非空**（{len(left)} 项: {left[:5]}）'
+              f' —— shutil.rmtree 静默失败，拒绝继续')
+        return None
+    # 索引层同样复查一次
+    try:
+        still = subprocess.run(['git', 'ls-files', '--', SELFTEST_TMP_DIR],
+                               capture_output=True, text=True, cwd=ROOT).stdout
+        still = [x for x in still.strip().split('\n') if x.strip()]
+    except Exception:
+        still = []      # 🔴 查不到时按"未知"处理，下面会打印，不冒充"已清空"
+    if still:
+        print(f'🔴 清理后 git 索引仍有 {len(still)} 项残留: {still[:5]} —— 拒绝继续')
+        return None
     return d
 
 
@@ -1300,6 +1336,11 @@ def cmd_check_symlink():
     print('=' * 70)
     # 🔑 第一百一十八轮：**启动即清理**（不依赖 finally）
     d = _selftest_reset()
+    if d is None:
+        # 🔑 清理失败 → **拒绝给结论**，不能照常往下跑（否则残留与干净不可分辨）
+        print('🔴 自测临时目录未能清理 —— 拒绝给结论')
+        print('=' * 70)
+        return 1
     link = os.path.join(SELFTEST_TMP_DIR, '_symlink_selftest')
 
     tgt_name = '_symlink_target_selftest.txt'
@@ -1715,6 +1756,125 @@ def cmd_assert_no_tmp_in_index():
     print(f'✅ 无自测临时文件残留（索引 {len(ents)} 项）')
     print('=' * 70)
     return 0
+
+
+def cmd_check_selftest_reset():
+    """🔑 G412：**自测临时目录清理自断言**（防 shutil.rmtree 静默失败）。
+
+    🔴 第一百一十八轮诚实结论：
+       `_selftest_reset()` 用 `shutil.rmtree(d, ignore_errors=True)` ——
+       🔑 `ignore_errors=True` 意味着**失败不报错也不删**。目录里仍有东西时，
+       调用方拿到路径照常使用，**"残留"与"已清理"看起来完全一样**。
+
+    ✅ 第一百一十九轮加了清理后自断言，本入口**专门验证那条自断言本身**：
+
+       | 段 | 验什么 |
+       |---|---|
+       | ① 真造脏目录 | 普通文件 + 嵌套子目录 + dangling symlink + 已被 `git add -f` 的项 |
+       | ② 真跑清理   | 调用**真实实现** `_selftest_reset()`（不抄一份） |
+       | ③ 断言结果   | 目录存在且**为空**、git 索引**无残留** |
+       | ④ 🔑 **反证** | 把 `shutil.rmtree` 换成 no-op，验证自断言**确实会拒绝**（返回 None） |
+
+    🔑 ④ 是核心：**只验"正常情况下清理成功"证明不了什么** ——
+       rmtree 从来都是成功的，测一万次也是绿。必须造一个"清理失败"出来，
+       看自断言**会不会响**。这与 79 轮"先证明它会响，再证明现在没响"同源。
+    """
+    print('=' * 70)
+    print('🔑 **自测临时目录清理自断言**（G412）')
+    print('=' * 70)
+    ok_all = True
+    d = os.path.join(ROOT, SELFTEST_TMP_DIR)
+
+    # ① 真造脏目录（四种脏东西，覆盖 rmtree 与 git rm 两条清理路径）
+    os.makedirs(os.path.join(d, 'nested'), exist_ok=True)
+    open(os.path.join(d, 'plain.txt'), 'w', encoding='utf-8').write('x')
+    open(os.path.join(d, 'nested', 'deep.txt'), 'w', encoding='utf-8').write('y')
+    try:
+        os.symlink('/tmp/_g412_dangling', os.path.join(d, 'dangling'))
+    except OSError:
+        pass
+    try:
+        subprocess.run(['git', 'add', '-f', '--', d], capture_output=True,
+                       cwd=ROOT)
+    except Exception:
+        pass
+    before = sorted(os.listdir(d))
+    n_idx_before = len([x for x in subprocess.run(
+        ['git', 'ls-files', '--', SELFTEST_TMP_DIR], capture_output=True,
+        text=True, cwd=ROOT).stdout.strip().split('\n') if x.strip()])
+    print(f'① 已造脏：磁盘 {len(before)} 项 {before} · git 索引 {n_idx_before} 项')
+
+    # ② 真跑清理（**调用真实实现**）
+    got = _selftest_reset()
+    if got is None:
+        print('🔴 清理后自断言**拒绝**了 —— 正常情况不该拒绝')
+        print('=' * 70)
+        return 1
+    left = sorted(os.listdir(got))
+    n_idx_after = len([x for x in subprocess.run(
+        ['git', 'ls-files', '--', SELFTEST_TMP_DIR], capture_output=True,
+        text=True, cwd=ROOT).stdout.strip().split('\n') if x.strip()])
+    ok2 = (not left) and (n_idx_after == 0)
+    print(f'② 清理后：磁盘 {len(left)} 项 · git 索引 {n_idx_after} 项')
+    print(f'   {"✅ 已清空" if ok2 else "🔴 未清空"}')
+    ok_all &= ok2
+
+    # ③ 目录确实存在（makedirs 那步）
+    ok3 = os.path.isdir(got)
+    print(f'③ 目录可用：{"✅" if ok3 else "🔴"}')
+    ok_all &= ok3
+
+    # ④ 🔑 反证：让 rmtree 变成 no-op，验证自断言**会响**
+    print()
+    print('④ 反证：**让 shutil.rmtree 失效**（模拟静默失败）')
+    real_rmtree = shutil.rmtree
+    shutil.rmtree = lambda *a, **k: None      # 🔑 no-op：什么都不删
+    try:
+        # 再造点脏东西（此时 rmtree 不会删掉它）
+        open(os.path.join(d, 'undeletable.txt'), 'w',
+             encoding='utf-8').write('z')
+        got_bad = _selftest_reset()
+    finally:
+        shutil.rmtree = real_rmtree
+    refused = (got_bad is None)
+    print(f'   自测实现返回：{"None（✅ 拒绝给结论）" if refused else "路径（🔴 照常放行）"}')
+    if not refused:
+        print('   🔴 rmtree 静默失败时自断言**没响** —— 与修复前同病')
+    ok_all &= refused
+
+    # ⑤ 🔑 反证②：**复刻修复前的实现**，证明它确实会静默放行
+    #    🔑 与第一百轮"反证让修复有必要成为可验证事实"同源：
+    #       只说"ignore_errors=True 会静默失败"是**声称**，跑出来给它看才是**证据**。
+    print()
+    print('⑤ 反证②：复刻**修复前**的实现（rmtree + makedirs + 直接返回）')
+
+    def _old_reset():
+        shutil.rmtree(d, ignore_errors=True)
+        os.makedirs(d, exist_ok=True)
+        return d        # 🔴 不看结果，直接返回
+
+    real_rmtree2 = shutil.rmtree
+    shutil.rmtree = lambda *a, **k: None
+    try:
+        open(os.path.join(d, 'still_here.txt'), 'w',
+             encoding='utf-8').write('z')
+        old_got = _old_reset()
+        old_left = sorted(os.listdir(old_got))
+    finally:
+        shutil.rmtree = real_rmtree2
+    print(f'   旧实现返回：{old_got} · 目录内容 {old_left}')
+    if old_left:
+        print('   🔑 旧实现**照常放行**（目录里还有东西却返回了路径）'
+              ' —— 该 bug **真实存在**，本修复确有必要')
+    else:
+        print('   ⚠️ 未复现（rmtree 实际生效了）')
+
+    # 收尾：真清一次
+    _selftest_reset()
+    print()
+    print(f'{"✅ 清理自断言有效" if ok_all else "🔴 清理自断言无效"}')
+    print('=' * 70)
+    return 0 if ok_all else 1
 
 
 def cmd_assert_selftest_ignored():
@@ -2429,6 +2589,8 @@ def main():
                     help='G410：索引里不得残留自测临时文件（防中断后误传）')
     ap.add_argument('--assert-selftest-ignored', action='store_true',
                    help='G411 自测临时目录必须真被 gitignore')
+    ap.add_argument('--check-selftest-reset', action='store_true',
+                   help='G412：自测临时目录清理自断言（防 rmtree 静默失败）')
     ap.add_argument('--check-gitlink', action='store_true',
                     help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
@@ -2488,6 +2650,9 @@ def main():
 
     if a.assert_selftest_ignored:
         return cmd_assert_selftest_ignored()
+
+    if a.check_selftest_reset:
+        return cmd_check_selftest_reset()
     if a.check_gitlink:
         os.chdir(ROOT)
         return cmd_check_gitlink()

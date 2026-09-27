@@ -784,6 +784,10 @@ GATES = [
     #    断言 gitignore 那道防线**真生效**。缺了它，删掉一行文本就悄悄回到 117 轮事故。
     ("G411", "**自测临时目录必须真被 gitignore**（防根治防线被悄悄删掉）",
      ["{py}", "{s}/push_api.py", "--assert-selftest-ignored"], "hard", []),
+    # 🔑 第一百一十九轮：G411 守的是"gitignore 那行还在"，本条守的是
+    #    "**清理真的发生了**" —— rmtree(ignore_errors=True) 失败时不报错也不删。
+    ("G412", "**自测临时目录清理自断言**（防 shutil.rmtree 静默失败）",
+     ["{py}", "{s}/push_api.py", "--check-selftest-reset"], "hard", []),
 ]
 
 # 🔑 第一百零五轮：**必须并存的层**（在线 ↔ 离线）
