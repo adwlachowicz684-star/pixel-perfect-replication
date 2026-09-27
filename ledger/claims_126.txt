@@ -1,0 +1,22 @@
+# 第一百二十六轮声明清单
+# 🔑 优先引**代码标识符**（不随措辞变化）；文档锚点只引**不含引号**的稳定短串
+grep:scripts/claim_verify.py::def cmd_assert_since_active
+grep:scripts/claim_verify.py::cmd_assert_since_active
+grep:scripts/claim_verify.py::assert-since-active
+grep:scripts/claim_verify.py::assert_since_active
+grep:scripts/claim_verify.py::DEFAULT_REQUIRE_SINCE
+grep:scripts/claim_verify.py::ROUND_GAP_ALLOWLIST
+grep:scripts/claim_verify.py::_load_round_gaps
+grep:scripts/claim_verify.py::round_gap_allowlist
+grep:scripts/claim_verify.py::require_since=getattr
+grep:scripts/run_all_gates.py::"G418"
+grep:scripts/run_all_gates.py::assert-since-active
+cmd:claim_verify.py --assert-since-active
+cmd:claim_verify.py --check-allowlist
+gate:G418
+# 🔑 断号豁免（121 轮从未发生）
+grep:ledger/round_gap_allowlist.txt::121
+# 🔑 文档锚点：只引本轮**核心结论**的稳定短串（避免整句，改措辞即失效）
+grep:references/游戏引擎复刻.md::形同虚设
+grep:references/游戏引擎复刻.md::整轮空转
+grep:references/游戏引擎复刻.md::读不到

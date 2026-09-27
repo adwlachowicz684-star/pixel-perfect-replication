@@ -52,6 +52,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 #    🔑 设为 None 表示"只守最新一轮"（逐轮要求需显式开启）。
 DEFAULT_REQUIRE_SINCE = 75
 
+# 🔑 第一百二十六轮：**轮次断号豁免清单**。
+#    🔴 某些轮次**确实没有**声明清单（如 121 轮：整轮从未发生，
+#       补一份空清单等于**伪造记录**）。这类断号必须**显式登记**并写明理由，
+#       否则 `DEFAULT_REQUIRE_SINCE` 的逐轮要求会阻断。
+ROUND_GAP_ALLOWLIST = os.path.join(ROOT, 'ledger', 'round_gap_allowlist.txt')
+
 # 🔑 第七十九轮：`--all` 三段的**稳定标记行**。
 #    🔴 G385 此前与 G382~G384 **跑同一条命令**，三者不再独立：
 #       若 `--all` 内部漏跑某项，三条仍会显示同一 rc，G385 也发现不了。
@@ -644,7 +650,31 @@ def _load_rc_domain_allowlist():
 ALLOWLIST_FILES = {
     'rc_domain_allowlist.txt': 'file',   # 键 = 文件名 → 须存在于 scripts/
     'scan_doc_allowlist.txt': 'gate',    # 键 = 门禁号 → 须在文档里出现
+    # 🔑 第一百二十六轮：键 = 轮次 → 该轮**确实没有** claims_<N>.txt
+    'round_gap_allowlist.txt': 'round',
 }
+
+
+def _load_round_gaps():
+    """🔑 已登记的"该轮没有声明清单"轮次集合。
+
+    🔑 返回 **None = 读不到** —— 与"没有豁免"**严格区分**：
+       🔴 读不到必须**拒绝给结论**，否则等于默认放行
+       （与"空台账不得当通过""豁免文件读不到 ≠ 没有豁免"同源）。
+    """
+    try:
+        with open(ROUND_GAP_ALLOWLIST, encoding='utf-8') as f:
+            out = set()
+            for ln in f:
+                ln = ln.strip()
+                if not ln or ln.startswith('#'):
+                    continue
+                k = ln.split(':', 1)[0].strip()
+                if k.isdigit():
+                    out.add(int(k))
+            return out
+    except Exception:
+        return None
 
 
 def cmd_check_allowlist():
@@ -745,6 +775,14 @@ def cmd_check_allowlist():
                 gid = 'G' + k if not k.startswith('G') else k
                 if gid not in all_doc:
                     print(f'  🔴 `{gid}` **僵尸豁免** —— 文档中未出现')
+                    bad += 1
+            elif kind == 'round':
+                # 🔑 僵尸豁免 = 登记了"第 N 轮没有清单"，但清单**其实存在**
+                #    → 说明记录本身不准：要么撤回豁免，要么写清为什么。
+                cf = os.path.join(ROOT, 'ledger', 'claims_%s.txt' % k)
+                if os.path.exists(cf):
+                    print(f'  🔴 `{k}` **僵尸豁免** —— '
+                          f'ledger/claims_{k}.txt **其实存在**，豁免与事实不符')
                     bad += 1
         print(f'  共 {n} 条豁免')
     print()
@@ -965,9 +1003,22 @@ def cmd_check_current(a):
 
     since = a.require_since
     if since is not None:
-        miss = [n for n in range(since, mx + 1) if n not in have]
+        raw = [n for n in range(since, mx + 1) if n not in have]
+        # 🔑 第一百二十六轮：断号须**显式登记**才允许存在。
+        gaps = _load_round_gaps()
+        if gaps is None:
+            print('\n🔴 **断号豁免清单不可读** —— 拒绝给结论'
+                  '（不静默当"没有豁免"，否则等于默认放行）')
+            print('\n' + '=' * 70 + '\n🔴 守卫失效\n' + '=' * 70)
+            return 1
+        miss = [n for n in raw if n not in gaps]
         print(f'\n🔑 自第 {since} 轮起**逐轮**要求清单：'
-              f'缺 {len(miss)} 轮' + (f' → {miss}' if miss else ''))
+              f'缺 {len(raw)} 轮' + (f' → {raw}' if raw else ''))
+        if gaps:
+            print(f'   已登记断号豁免 {len(gaps)} 轮 → {sorted(gaps)}'
+                  f'（由 G389 审计：批准轮次 / 僵尸豁免 / 理由充分）')
+        if miss:
+            print(f'\n🔴 **未登记的断号** {len(miss)} 轮 → {miss}')
         bad = bool(miss)
         # 🔑 即便逐轮都齐，"最新一轮"仍须单独确认（since 可能设得比 mx 大）
         if mx not in have:
@@ -988,6 +1039,44 @@ def cmd_check_current(a):
         return 1
     print(f'✅ 守卫成立：最新一轮（第 {mx} 轮）**已写清单**'
           + (f'，且第 {since}~{mx} 轮无缺失' if since is not None else ''))
+    print('=' * 70)
+    return 0
+
+
+def cmd_assert_since_active():
+    """🔑 G418：**逐轮要求必须真的在门禁运行中生效**。
+
+    🔴 第一百二十六轮**实测发现**：`--all` 把原始 Namespace 传给
+       cmd_check_current，而 `require_since` 默认 None ——
+       🔑 于是"第 N 轮没写清单"的**断号检查从未真正跑过**；
+       G384 表面上是"逐轮覆盖"，实际只守了"最新一轮"。
+       （121 轮整轮空转、一整轮没有任何痕迹，直到 122 轮人工核对才暴露。）
+    🔑 本条在**行为层**验证：真跑一次 `--all`，断言输出里出现
+       逐轮要求的标记 —— 与实现解耦（重构/改名都不会让它静默失效）。
+    """
+    print('=' * 70)
+    print('G418 · 🔑 **逐轮要求须真的生效**（防断号检查形同虚设）')
+    print('=' * 70)
+    import subprocess as _sp
+    pp = _sp.run([sys.executable, os.path.abspath(__file__), '--all'],
+                 capture_output=True, text=True)
+    out = pp.stdout or ''
+    # 🔑 标记来自 cmd_check_current 在 since 非 None 时才打印的那一句
+    need = '自第 '
+    need2 = '轮起**逐轮**要求清单'
+    ok = need in out and need2 in out
+    print(f'\n🔑 子进程 `--all` rc={pp.returncode}')
+    if ok:
+        for ln in out.splitlines():
+            if need2 in ln:
+                print('   ' + ln.strip())
+    print()
+    if not ok:
+        print('🔴 `--all` 输出里**没有**逐轮要求的标记 —— '
+              '断号检查**未生效**（G384 实际只守最新一轮）')
+        print('=' * 70)
+        return 1
+    print('✅ 守卫成立：逐轮要求在真实门禁运行中**确实执行**')
     print('=' * 70)
     return 0
 
@@ -1016,7 +1105,15 @@ def cmd_all(a):
     results.append(('G383 持续兑现', r2))
 
     print('\n' + '-' * 70 + '\n③ G384 最新一轮已写清单\n' + '-' * 70)
-    r3 = cmd_check_current(a)
+    # 🔑 第一百二十六轮修：**此前把原始 Namespace 直接传下去** ——
+    #    🔴 而 `require_since` 默认 None，于是 **逐轮要求从未在真实门禁运行中生效**；
+    #       G384 实际只守了"最新一轮有没有清单"，**中间的断号无人发现**
+    #       （121 轮整轮空转，直到 122 轮人工核对才暴露）。
+    #    🔑 显式带上 DEFAULT_REQUIRE_SINCE；用户显式传值时以其为准。
+    r3 = cmd_check_current(argparse.Namespace(
+        docs=a.docs,
+        require_since=getattr(a, 'require_since', None) or DEFAULT_REQUIRE_SINCE,
+    ))
     results.append(('G384 已写清单', r3))
 
     print('\n' + '=' * 70)
@@ -1268,6 +1365,9 @@ def main():
                     help='扫描轮次的文档（可重复，默认全部 md）')
     ap.add_argument('--all', action='store_true',
                     help='G385：一次进程跑完 G382+G383+G384')
+    ap.add_argument('--assert-since-active', action='store_true',
+                    help='G418：逐轮要求须真的在门禁运行中生效'
+                         '（防断号检查因 require_since=None 而形同虚设）')
     ap.add_argument('--audit-all', action='store_true',
                     help='G385：独立校验 --all 三段是否都跑了')
     ap.add_argument('--probe-capability', metavar='NAME', default=None,
@@ -1291,6 +1391,8 @@ def main():
         return cmd_check_current(a)
     if a.all:
         return cmd_all(a)
+    if a.assert_since_active:
+        return cmd_assert_since_active()
     if a.audit_all:
         return cmd_audit_all(a)
     if a.probe_capability is not None:
