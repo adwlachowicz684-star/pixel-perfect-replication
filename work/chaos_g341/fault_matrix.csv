@@ -1,0 +1,2 @@
+id,category,name,precondition,fault,observed_error,recovery,postcondition,user_visible_message,old_behavior,new_behavior,status
+??invalid-id??,__INVALID_ENUM__,__poison__,__poison__,__poison__,__PAIR_DIFF___5,__poison__,__poison__,__poison__,__PAIR_DIFF___9,__PAIR_DIFF___10,done

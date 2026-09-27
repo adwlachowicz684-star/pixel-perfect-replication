@@ -81,6 +81,8 @@ DEPENDENT_NAMES_REQUIRED = ('HISTORY_KNOWN', 'MIRROR_WRITE_FN', '_write_mirror')
 #    🔴 112 轮①：G405 只能守住"已登记的"，守不住"该登记没登记的"。
 #    🔑 豁免**不得静默**：每条都要理由，且理由非空（与 94/95 轮同构）。
 PATH_CONST_ALLOW = {
+    # 🔑 117 轮：只**读**信任根作对照，不是产物路径 → 走 ALLOW 而非 DEPENDENT_NAMES
+    '_scan_cross_ref_consts.py::TRUST_ROOT_FILE': '只读信任根作对照，不写产物；由 G406 抓到后登记',
     # registry.yaml 是工具注册表，不是产物路径；改它不会让门禁静默失效
     'registry_normalize.py::REG': '工具注册表路径，非产物/台账路径',
     'tool_run.py::REGISTRY': '工具注册表路径，非产物/台账路径',
@@ -963,9 +965,18 @@ def _trust_root():
 
 
 def _norm(v):
-    """🔑 归一：tuple/list 视为等价（JSON 只有 list，代码里可能是 tuple）。"""
-    if isinstance(v, (list, tuple)):
-        return [_norm(x) for x in v]
+    """🔑 归一：tuple/list/set 视为等价且**排序**（JSON 只有 list，代码里可能是 tuple/set）。
+
+    🔑 排序是必须的：`{"G21"}` 与 `["G21"]` 内容相同，但 set 遍历顺序不确定 ——
+       不排序会让台账在每次运行时抖动（与 103 轮 `odd_sample` 必须排序同源）。
+    """
+    if isinstance(v, (list, tuple, set, frozenset)):
+        try:
+            return sorted((_norm(x) for x in v), key=lambda z: (str(type(z)), str(z)))
+        except TypeError:
+            return sorted((str(_norm(x)) for x in v))
+    if isinstance(v, dict):
+        return {k: _norm(x) for k, x in sorted(v.items())}
     return v
 
 
@@ -986,13 +997,29 @@ def _const_value(name):
                             return _ast.literal_eval(n.value)
                         except Exception:
                             return None
-            if isinstance(n, _ast.Assign) and isinstance(n.value, (_ast.Tuple, _ast.List)):
+            # 🔑 117 轮：补 Set/Dict —— LEGAL_GATES = {"G21"} 是 Set 字面量，
+            #    原实现只认 Constant/Tuple/List → 会报"找不到定义"（拒绝而非放行，但登记会失效）
+            if isinstance(n, _ast.Assign) and isinstance(
+                    n.value, (_ast.Tuple, _ast.List, _ast.Set, _ast.Dict)):
                 for tg in n.targets:
                     if isinstance(tg, _ast.Name) and tg.id == name:
                         try:
                             return _ast.literal_eval(n.value)
                         except Exception:
                             return None
+            # 🔑 117 轮下一轮指引：补**空调用形式** set() / dict() / list() / tuple()。
+            #    🔴 破坏③实测：`LEGAL_GATES = set()` 是 Call 节点，不是 Set 字面量 →
+            #       报"找不到定义"。虽是**拒绝**而非误放行（安全），但会让登记失效：
+            #       人改用调用写法即可让值型根检查**永远拒绝**，看似"很严"实则失守。
+            if isinstance(n, _ast.Assign) and isinstance(n.value, _ast.Call):
+                fn = n.value.func
+                fnm = fn.id if isinstance(fn, _ast.Name) else None
+                if fnm in ('set', 'dict', 'list', 'tuple', 'frozenset') and \
+                        not n.value.args and not n.value.keywords:
+                    for tg in n.targets:
+                        if isinstance(tg, _ast.Name) and tg.id == name:
+                            return {'set': set(), 'frozenset': frozenset(),
+                                    'dict': {}, 'list': [], 'tuple': ()}[fnm]
     return None
 
 def cmd_assert_trust_root():
@@ -1068,6 +1095,12 @@ def cmd_assert_trust_root():
             bad.append(f'值型根 {nm} **在代码中找不到定义** —— 拒绝给结论（读不到≠没有）')
         elif _norm(got) != _norm(want_v):
             bad.append(f'值型根 {nm} 代码值 {got!r} ≠ 信任根 {want_v!r}')
+        else:
+            # 🔑 117 轮补：判据④**通过时完全不打印** —— 看不出检查了几个值型根，
+            #    "静默通过"与"没跑"在输出上无法区分（与 79 轮"跑了≠做了"同源）。
+            av = spec.get('allowed_values')
+            tail = f'（合法值 {av}）' if av else ''
+            print(f'   ✅ 值型根 {nm} = {got!r}{tail}')
 
     print(f'   信任根 {TRUST_ROOT_FILE}')
     print(f'   代码值 {len(cur)} 项 · 信任根 {len(want)} 项')
@@ -1601,6 +1634,42 @@ def cmd_audit_history():
     _LAST_DETAILS = details
     print('=' * 70)
     # 🔑 审计本身不算失败 —— 它**不被掩盖**即算达标（由 G396 守）
+    return 0
+
+
+def cmd_assert_no_tmp_in_index():
+    """🔑 G410：**索引里不得残留自测临时文件**。
+
+    🔴 第一百一十七轮真实事故：
+       `--check-symlink` 自测会建 `scripts/_symlink_selftest_tmp`（dangling symlink），
+       清理写在 `finally:` 里 —— 但**进程被中断时 finally 不执行**
+       （本轮遇到沙盒 502，进程被杀）。
+       残留随后被 `git add -A` 收进索引 → 推送时报
+       "🔴 1 个文件在磁盘上不存在"（os.path.exists 跟随 dangling symlink → False）。
+
+    🔑 为什么必须单独一条门禁：
+       G390 只查"**未 add** 的"（漏传），查不出"**已 add 但本不该存在**"（误传）。
+       两者方向相反 —— 与 G406（代码→表）补 G405（表→代码）是同一种互补。
+    """
+    print('🔑 **索引残留自测临时文件断言**（G410）')
+    print('=' * 70)
+    ents = local_index_entries()
+    if ents is None:
+        print('🔴 无法读取 git 索引 —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    marks = ('_selftest_tmp', '_tmp_', '_probe_tmp')
+    bad = sorted(p for p in ents
+                 if any(m in os.path.basename(p) for m in marks))
+    for pth in bad:
+        print(f'🔴 索引里残留临时文件: {pth}')
+    if bad:
+        print('🔑 处置：git rm --cached <路径> 并删除磁盘文件')
+        print('   🔴 不要改检查逻辑放过它 —— 它是真实残留物')
+        print('=' * 70)
+        return 1
+    print(f'✅ 无自测临时文件残留（索引 {len(ents)} 项）')
+    print('=' * 70)
     return 0
 
 
@@ -2258,6 +2327,8 @@ def main():
                     help='G400：断言基准指纹未被改过（防遗留“消失”被误读成“修复”）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
+    ap.add_argument('--assert-no-tmp-in-index', action='store_true',
+                    help='G410：索引里不得残留自测临时文件（防中断后误传）')
     ap.add_argument('--check-gitlink', action='store_true',
                     help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
@@ -2312,6 +2383,8 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_history_known()
 
+    if a.assert_no_tmp_in_index:
+        return cmd_assert_no_tmp_in_index()
     if a.check_gitlink:
         os.chdir(ROOT)
         return cmd_check_gitlink()

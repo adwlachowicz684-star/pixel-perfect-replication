@@ -1,0 +1,3098 @@
+{
+  "accesskit": {
+    "name": "AccessKit",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**跨平台可序列化辅助树**（整数 ID + role + 可选属性；Rust 为规范定义）"
+  },
+  "acl": {
+    "name": "Animation Compression Library",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "动画压缩库与质量度量；可做**末端误差压力测试**"
+  },
+  "ags": {
+    "name": "Adventure Game Studio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(editor) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "库存物品热区对齐与序列化的界面行为取证旁证"
+  },
+  "alicevision_ref": {
+    "name": "AliceVision",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**摄影测量框架**：SfM·MVS·HDR·RAW·相机跟踪"
+  },
+  "allure": {
+    "name": "Allure Report",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "allure 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "可归档的逐张视觉验收报告（step/timing/attachment/metadata）"
+  },
+  "android_retail_demo_ref": {
+    "name": "Android Retail Demo Mode",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**会话清场样本**：90 秒空闲提示 · 5 秒重置 · 复位亮度/自动旋转/手电筒/语言/无障碍"
+  },
+  "angr": {
+    "name": "angr",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "符号执行 / IR 提升 / 控制流 / 数据依赖 / 值集分析"
+  },
+  "antimicrox": {
+    "name": "AntiMicroX",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "antimicrox 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "键鼠到手柄重映射（GUI）"
+  },
+  "apitrace": {
+    "name": "apitrace",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "apitrace 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "老 OpenGL/D3D 工作流 API 录制回放，可脚本化 diff、无头测试"
+  },
+  "apted": {
+    "name": "APTED",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "树编辑距离与 node mapping（L4，仅未匹配连通块）"
+  },
+  "assetripper": {
+    "name": "AssetRipper",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "AssetRipper 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Unity 资产与 AssetBundle 恢复"
+  },
+  "assetripper_ref": {
+    "name": "AssetRipper",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "AssetRipperCLI 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**Unity 资源导出 · 引用图 · 类型树取证** —— 幽灵内容六级判定"
+  },
+  "assetstudio_legacy": {
+    "name": "AssetStudio (legacy)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "AssetStudioGUI 未在 PATH 中",
+    "evidence_level": "E",
+    "degrade": "optional",
+    "purpose": "旧版 Unity 资产只读兜底"
+  },
+  "assimp": {
+    "name": "Assimp",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "assimp 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "模型/动画格式导入导出（FBX/glTF/OBJ…）"
+  },
+  "assimp_dup2": {
+    "name": "Assimp",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "assimp 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "导入统一结构；骨骼/动画导入"
+  },
+  "ast_grep": {
+    "name": "ast-grep",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Usage: sg group [[-c] command]",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "AST 精确查询（补正则的漏）"
+  },
+  "atlas": {
+    "name": "Atlas",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "atlas 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "声明式/版本化 schema 迁移；diff、apply、**lint**、dev URL"
+  },
+  "attract_mode_ref": {
+    "name": "Attract-Mode",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "attract 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**Attract 循环 / 输入映射 / 状态返回的验证台**"
+  },
+  "audfprint_ref": {
+    "name": "audfprint",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(py) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**地标指纹**：片段检索与离线索引"
+  },
+  "behavior3js_ref": {
+    "name": "behavior3js",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(npm) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "保存节点/黑板/条件/随机种子/版本/**运行时追踪**（可导出行为）"
+  },
+  "behaviortree_cpp": {
+    "name": "BehaviorTree.CPP",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "C++17 行为树框架，支持**状态转移记录、回放、可视化与分析**"
+  },
+  "behaviortree_cpp_ref": {
+    "name": "BehaviorTree.CPP",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "行为树实现 + 可导出运行时追踪"
+  },
+  "bepinex": {
+    "name": "BepInEx",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Unity plugin) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Unity 运行时注入与插件生命周期参考"
+  },
+  "bepinx_configmanager_ref": {
+    "name": "BepInEx ConfigurationManager",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(plugin) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "运行时**枚举难度系数**并生成当前配置快照"
+  },
+  "bevy_ref": {
+    "name": "Bevy",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(engine) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "ECS 的 **Asset/Handle 版本**与命令缓冲何时应用"
+  },
+  "bindiff": {
+    "name": "BinDiff",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "bindiff 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "函数级二进制 diff（识别相同/相似/改名函数）"
+  },
+  "bizhawk": {
+    "name": "BizHawk",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "EmuHawk 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "多系统模拟器，输入录制/无限 savestate/逐帧编辑(TAStudio)/Lua 脚本"
+  },
+  "bizhawk_dup2": {
+    "name": "BizHawk",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "EmuHawk 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "多系统模拟器；**内存查看/搜索/编辑 + TAS 输入记录**"
+  },
+  "box2d": {
+    "name": "Box2D",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(库，非 CLI) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "2D 物理，官方给出跨平台确定性条件"
+  },
+  "box2d_ref": {
+    "name": "Box2D",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**代码量小**，适合做碰撞事件消费时机的最小复现"
+  },
+  "bpftrace": {
+    "name": "bpftrace",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "bpftrace 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "临时 eBPF 追踪（Linux）"
+  },
+  "bullet3": {
+    "name": "Bullet Physics",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "物理引擎参考；**层过滤与求解器行为**"
+  },
+  "bullet3_ref": {
+    "name": "Bullet Physics",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**确定性** · 约束 · **碰撞事件排序**的最小复现参照"
+  },
+  "bullet3_ref_dup2": {
+    "name": "Bullet SDK",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "碰撞与多物理；**地形碰撞 · 车辆/浮力代理 · 角色控制器 · 空间查询**"
+  },
+  "calibrate_joystick_ref": {
+    "name": "calibrate-joystick",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(script) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**摇杆范围与死区校准**（Linux）"
+  },
+  "cargo_deny": {
+    "name": "cargo-deny",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cargo-deny 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "依赖图 / 许可 / 安全公告门禁"
+  },
+  "cargo_geiger": {
+    "name": "cargo-geiger",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cargo-geiger 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "统计 unsafe 用量"
+  },
+  "cargo_llvm_cov": {
+    "name": "cargo-llvm-cov",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cargo-llvm-cov 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "LLVM 源级覆盖（行/区域/分支），兼容 nextest"
+  },
+  "cargo_nextest": {
+    "name": "cargo-nextest",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cargo-nextest 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "并发测试与重试"
+  },
+  "castle_game_engine_ref": {
+    "name": "Castle Game Engine",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "castle-editor 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "跨平台完整引擎；**跨引擎交叉验证对象**（场景切换/UI/相机/音频总线/资源加载）"
+  },
+  "cataclysm_dda": {
+    "name": "Cataclysm: Dark Days Ahead",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ source) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "身体部位、体温、口渴、睡眠、变异、阵营、生态字段**考古样本**"
+  },
+  "cdda_economy_ref": {
+    "name": "Cataclysm-DDA（时间/季节/经济/派系/天气/光照/物理耦合样本）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cataclysm 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "持久程序生成世界；**时间—天气—经济—派系—保存**耦合压力测试样本"
+  },
+  "cdda_ref2": {
+    "name": "Cataclysm: Dark Days Ahead（持久世界演化观察）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cataclysm-tiles 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**持久程序世界中时间 · 对象 · 死亡后果**的高密度观察对象"
+  },
+  "chromaprint_ref": {
+    "name": "Chromaprint",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "fpcalc 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**窗口级音频指纹**：识别近相同音频，按时间窗切段比对"
+  },
+  "chrono": {
+    "name": "chrono",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "日期时间（纳秒精度，纪元前后约 26.2 万年）"
+  },
+  "clap": {
+    "name": "clap",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "CLI 参数解析（**仅当原版确有 CLI**）"
+  },
+  "cldr_ldml_ref": {
+    "name": "Unicode CLDR / LDML",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(data) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**locale 数据标准**：数字/货币 · 日期 · 排序 · 显示名 · 单位 · 日历 · 复数 · 书写方向"
+  },
+  "cldr_ref": {
+    "name": "Unicode CLDR",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(data) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "日期 · 时间 · 数字 · 货币 · 单位 · 复数 · 区域数据"
+  },
+  "cldr_ref_dup2": {
+    "name": "Unicode CLDR",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(data) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**复数 · 排序 · 单位**等地域数据（保证句子结构不被破坏）"
+  },
+  "colmap_ref": {
+    "name": "COLMAP",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "colmap 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**SfM/MVS**：可复核尺度的物理表面重建（有序或无序照片）"
+  },
+  "comcast": {
+    "name": "comcast",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "comcast 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "Linux 网络故障注入（延迟/丢包/带宽）"
+  },
+  "cosign": {
+    "name": "cosign",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cosign 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "产物签名（golden、安装包、证据包）"
+  },
+  "cosign_dup2": {
+    "name": "cosign",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cosign 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "制品与证据链签名（keyless、Fulcio、Rekor、KMS；2.x 稳定）"
+  },
+  "crashpad_ref": {
+    "name": "crashpad",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "crashpad_handler 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "崩溃 **minidump / 附件 / 数据库**收集器（最后一帧环的基础）"
+  },
+  "cue4parse": {
+    "name": "CUE4Parse",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(库 / FModel 前端) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "UE4/UE5 归档、包、纹理、网格、动画、音频解析"
+  },
+  "daikon": {
+    "name": "Daikon",
+    "available": false,
+    "reason": "版本校验失败（**可能是同名不同工具**）",
+    "detail": "rc=1：Error: Could not find or load main class daikon.Daikon\nCaused by: java.lang.ClassNotFoundE",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "动态不变量检测 —— 原版运行时值序列 → 候选不变量清单"
+  },
+  "dbmate": {
+    "name": "dbmate",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "dbmate 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "单一二进制、事务迁移、schema dump"
+  },
+  "dear_imgui_ref": {
+    "name": "Dear ImGui",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "复刻**调试可视化与性能 HUD**的基线工具"
+  },
+  "death_recap_ref": {
+    "name": "DeathRecap",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(plugin) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**死亡伤害复盘** —— failure_explanation 实现参考"
+  },
+  "decomp_permuter": {
+    "name": "decomp-permuter",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "permuter 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "自动生成候选 C 代码变体，汇编并比较输出（95-99% 匹配时找寄存器分配/声明顺序）"
+  },
+  "decompme": {
+    "name": "decomp.me",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Web 服务 + CLI 导出) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "协作式**函数匹配**服务（重编译并用 objdump 比较指令，给匹配分数）"
+  },
+  "defold": {
+    "name": "Defold",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "bob 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "官方仓库同时含 engine + editor + command line tools"
+  },
+  "devbox": {
+    "name": "Devbox",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "devbox 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "宿主外工具与服务隔离（Nix 的友好包装）"
+  },
+  "diaphora": {
+    "name": "Diaphora",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(IDA 插件) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "汇编/CFG/符号/注释迁移、手动匹配、调用图、微码、伪代码启发"
+  },
+  "difftastic": {
+    "name": "difftastic",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "difft 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "语法感知 diff（比行级 diff 少大量噪声）"
+  },
+  "difftest": {
+    "name": "difftest",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "difftest 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "同输入跑两程序，比对 stdout/exit/stderr"
+  },
+  "doom3_ref": {
+    "name": "DOOM 3 (id-Software)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(source) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "官方 GPL 源码发布；**硬阴影与可见性**历史证据"
+  },
+  "dotnet_diagnostics": {
+    "name": ".NET diagnostics",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "dotnet-counters 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "dotnet-counters / trace / dump / gcdump 的**跨平台 EventPipe 来源**"
+  },
+  "dreamx_world": {
+    "name": "DreamX-World",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(research) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "重访持久性与相机轨迹；\"离开视口后是否保留语义\"测试灵感"
+  },
+  "duckdb": {
+    "name": "DuckDB",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "duckdb 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "证据检索层 —— 上万条 JSON/CSV 直接 SQL 查询"
+  },
+  "dunce": {
+    "name": "dunce",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "把 Windows UNC 转为尽量兼容形式；不可无损转换时保留 UNC"
+  },
+  "dxvk": {
+    "name": "DXVK",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(DLL，随 Wine/Proton 使用) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "D3D11 → Vulkan（旧 DirectX 原版取证）"
+  },
+  "dynamorio": {
+    "name": "DynamoRIO",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "drrun 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "运行时代码操纵（函数/指令追踪、覆盖率、内存追踪、缓存模拟）"
+  },
+  "earthly": {
+    "name": "Earthly",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "earthly 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "容器化隔离构建/度量步骤"
+  },
+  "egosound_ref": {
+    "name": "EgoSound",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(dataset) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "第一人称声音的\"**哪里、何时、为何**\"空间/时序/因果任务数据集"
+  },
+  "electron_builder_ref": {
+    "name": "electron-builder",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "electron-builder 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "多平台安装包构建与**产物元数据**（latest.yml 等，含 SHA-512）"
+  },
+  "electron_forge_ref": {
+    "name": "Electron Forge",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "electron-forge 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "同一配置输出 Windows/macOS/Linux 安装或分发包"
+  },
+  "enet": {
+    "name": "ENet",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "UDP 连接、可靠/不可靠通道、分片"
+  },
+  "entt_ref": {
+    "name": "EnTT",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**稀疏集存储 · 事件调度 · 依赖管理**"
+  },
+  "eos_overview_ref": {
+    "name": "Epic Online Services Overview",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**身份与数据是两条链**：Epic 账号（社交层）vs 第三方身份（多人/数据/成就/统计/排行榜）"
+  },
+  "evdev_joystick_cal_ref": {
+    "name": "evdev-joystick-calibration",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(script) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "原始采样 + 自动建议死区（Linux evdev）"
+  },
+  "exiftool_ref": {
+    "name": "ExifTool",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "exiftool 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**截图与录像元数据出处链**：哈希 · 时间线 · 关卡/区域 · 会话 ID · 玩家坐标"
+  },
+  "extism": {
+    "name": "Extism",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "多语言 PDK / WASM 插件运行时（支持燃料限制、计时器、宿主控制）"
+  },
+  "factorio_migrations_ref": {
+    "name": "Factorio Migrations (official Lua API docs)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**存档迁移与同形异质**：原型改名/替换 + 运行时状态迁移"
+  },
+  "faker": {
+    "name": "Faker",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "合成测试数据（姓名/地址/日期/路径）"
+  },
+  "fastnoise2": {
+    "name": "FastNoise2",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "PCG 主噪声库；SIMD、node graph、encoded tree"
+  },
+  "fastnoise_lite_ref": {
+    "name": "FastNoiseLite",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "跨平台噪声 · 分形 · domain warp · **float/double**"
+  },
+  "ffmpeg": {
+    "name": "FFmpeg",
+    "available": true,
+    "reason": "可用",
+    "detail": "/usr/bin/ffmpeg",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "抽帧、时间基对齐、转码"
+  },
+  "ffmpeg_local": {
+    "name": "FFmpeg",
+    "available": true,
+    "reason": "可用",
+    "detail": "/usr/bin/ffmpeg",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**抽帧与抽音**（visual 路入口）；合成样本编码与解码"
+  },
+  "fheroes2_compat_ref": {
+    "name": "fheroes2（原版行为重建参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "fheroes2 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "原版逐行为重建的长期项目模式参考"
+  },
+  "fidelityfx": {
+    "name": "FidelityFX",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(SDK) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "AMD 开源超分与画质 SDK；FSR 实现"
+  },
+  "fides": {
+    "name": "Fides",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "fides 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "隐私工程平台（数据发现/映射、Privacy Access Request）"
+  },
+  "filament": {
+    "name": "Filament",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "跨平台实时渲染引擎；研究 MSAA/FXAA/TAA、后处理栈、动态分辨率、HDR"
+  },
+  "fivem_seasonal_weather_ref": {
+    "name": "BySteel-RealTime-Seasonal-Weather（天气模组候选）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(mod) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "实时**季节天气模组**的字段与状态机候选"
+  },
+  "flatbuffers": {
+    "name": "FlatBuffers",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "flatc 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "序列化格式；table、可选字段、默认值"
+  },
+  "flaui": {
+    "name": "FlaUI",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "dotnet 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "原版 WPF 控件树驱动（UIA 封装）"
+  },
+  "flecs_ref": {
+    "name": "Flecs",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**组件存储 · 查询 · 关系 · 热重载 · 模块 API**"
+  },
+  "freetype": {
+    "name": "FreeType",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "freetype-config 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "hinting / gamma / LCD filter / stem darkening → 字形外观"
+  },
+  "frida": {
+    "name": "Frida",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "frida 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "**跨平台动态插桩主入口**（黑盒注入脚本、钩任意函数、监视私有代码）"
+  },
+  "game_accessibility_guidelines_ref": {
+    "name": "Game Accessibility Guidelines",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**跨语言协作契约**：文字与语音并存 · 可只与愿开语音者玩 · 符号化聊天 · 重要语音字幕与说话人视觉指示"
+  },
+  "game_doctor_ref": {
+    "name": "Game Doctor",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(web) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**HTML5/WebGL** 玩家自助诊断报告原型"
+  },
+  "game_networking_sockets": {
+    "name": "GameNetworkingSockets",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "可靠 UDP 传输；**价值在连接质量指标，不只是传输**"
+  },
+  "gameplay_cue_ref": {
+    "name": "Unreal GameplayCueManager",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(engine) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**表现事件与逻辑解耦**（HandleGameplayCue · 实例缓存 · 生命周期）"
+  },
+  "gametest": {
+    "name": "GameTest",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "C/C++ **确定性 record/replay + inline assertions**"
+  },
+  "gdsdecomp": {
+    "name": "gdsdecomp",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "gdsdecomp 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Godot PCK / GDNative / GDExtension 与脚本恢复"
+  },
+  "gfxreconstruct": {
+    "name": "GFXReconstruct",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "gfxrecon-capture 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "Vulkan layer / D3D12 录制 API 调用 → `.gfxr` **可重放**（CI 首选）"
+  },
+  "gfxreconstruct_ref": {
+    "name": "GFXReconstruct",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "gfxrecon-capture 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "捕获 Vulkan/D3D12 调用并**在同机或不同硬件重放**"
+  },
+  "gfxreconstruct_ref2": {
+    "name": "GFXReconstruct（录制语义边界提示）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "gfxrecon-replay 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**只复现图形 API**，用于说明帧画面录制的边界"
+  },
+  "ggpo": {
+    "name": "GGPO",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(库，非 CLI) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "回滚网络 —— **确定性要求的完整工程表达**"
+  },
+  "ggpo_ref": {
+    "name": "GGPO（回滚网络库）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "输入同步 · save/load state · 预测与回滚边界记录"
+  },
+  "ghidra_social_ref": {
+    "name": "Ghidra (取证环境)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ghidraRun 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**受控取证环境** —— 反汇编 · 反编译 · 调试 · 脚本扩展"
+  },
+  "ghidriff": {
+    "name": "ghidriff",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ghidriff 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**基于 Ghidra** 的二进制 diff，命令行/批量/CI 化"
+  },
+  "git_appraise": {
+    "name": "git-appraise",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "git-appraise 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "离线评审历史（Git notes 存储，无需服务器）"
+  },
+  "git_cliff": {
+    "name": "git-cliff",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "git-cliff 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "Conventional Commits 驱动的 changelog"
+  },
+  "gltf_validator": {
+    "name": "glTF Validator",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "gltf_validator 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "glTF 资产规范化校验（**跨引擎交换的推荐中间格式**）"
+  },
+  "godot_audio_bus_ref": {
+    "name": "Godot（AudioBus / Tween / Camera3D 参照）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "godot 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "AudioBus / Tween / AnimationPlayer / Camera3D 便于实现 A-D 模板"
+  },
+  "godot_e2e": {
+    "name": "GodotE2E",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Python) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**外进程 TCP** E2E：输入、属性、帧同步、截图"
+  },
+  "godot_engine": {
+    "name": "Godot Engine",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "godot 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "目标/源引擎（**右手系 Y-up, -Z 前**）"
+  },
+  "godot_material_footsteps_ref": {
+    "name": "godot-material-footsteps",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(plugin) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**表面检测四策略并列**：元数据 / GridMap 瓦片 / HTerrain 层 / 实际材质表面"
+  },
+  "godot_ref": {
+    "name": "Godot Engine",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "godot 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "跨平台**渲染 · 输入 · 粒子 · XR**参考实现（主分支 4.8-dev 活跃）"
+  },
+  "gog_galaxy_sdk_ref": {
+    "name": "GOG GALAXY SDK (official docs)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**外围层失败态与降级序列**：Init 失败不停止加载、认证可选、离线无缝、成就本地缓存"
+  },
+  "graphviz_ref": {
+    "name": "Graphviz",
+    "available": true,
+    "reason": "可用",
+    "detail": "/usr/bin/dot",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "生成\"**问题—系统—证据—责任**\"图谱与偏离依赖图"
+  },
+  "gumtree": {
+    "name": "GumTree",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "gumtree 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "树 diff，识别 move / rename / insert / delete（L3 结构细化）"
+  },
+  "harfbuzz": {
+    "name": "HarfBuzz",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "hb-shape 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "文本 shaping 金标准（L1 字形簇合同：glyph/cluster/advance）"
+  },
+  "harfbuzz_dup2": {
+    "name": "HarfBuzz",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "hb-shape 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "文本整形；**决定文本长度与字符索引**"
+  },
+  "harfbuzz_ref": {
+    "name": "HarfBuzz",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "hb-shape 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "复杂文本整形引擎，校验**阿拉伯/印度系连字与 OpenType 特性**"
+  },
+  "hawkthorne_credits_ref": {
+    "name": "Hawkthorne Journey Credits",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(source) 未在 PATH 中",
+    "evidence_level": "E",
+    "degrade": "optional",
+    "purpose": "**Credits 架构参考**：`CONTRIBUTORS 数据 + Jinja2 模板 + 运行时状态` 三层拆解"
+  },
+  "hyperfine": {
+    "name": "hyperfine",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "hyperfine 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "命令行程序基准（含统计与异常值检测）"
+  },
+  "hypothesis_ref": {
+    "name": "Hypothesis",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(python-module) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**生成边界用例**（0/1/最大±1/NaN/±∞/反序列化缺字段）"
+  },
+  "icu": {
+    "name": "ICU",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C/C++/Java lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "Unicode 排序、字符集转换、日期时间格式化、**双向文本**"
+  },
+  "icu4x": {
+    "name": "ICU4X",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "Unicode 官方 Rust 国际化库（数字分组/货币/日期历法/双向文本）"
+  },
+  "icu_ref": {
+    "name": "International Components for Unicode (ICU)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "icuinfo 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "本地化数字/日期/货币格式化底座"
+  },
+  "icu_ref_dup2": {
+    "name": "ICU",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**稳定区域化比较与格式化**：排序 · 数字/日期/单位 · 双向文本 · 规范化"
+  },
+  "igda_crediting_ref": {
+    "name": "IGDA Game Crediting Guidelines 10.1",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**派生作品署名规范**：原始团队与新团队分列 · 原始在前 · 两类同时可见 · 离职者仍署名"
+  },
+  "il2cppdumper": {
+    "name": "Il2CppDumper",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "Il2CppDumper 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "从 libil2cpp.so + 元数据恢复类型、字符串、方法表"
+  },
+  "ilspycmd": {
+    "name": "ilspycmd",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ilspycmd 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": ".NET 反编译（**源码不全才启用**）"
+  },
+  "imagemagick": {
+    "name": "ImageMagick",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "magick 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "图像转换、ICO 生成、比对"
+  },
+  "imgui_hud_ref": {
+    "name": "Dear ImGui（调试 HUD 与波形回放）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "实时查看扫描码 · 轴值 · LOD · 死区 · **设备指纹** · 触觉事件时间线"
+  },
+  "immudb": {
+    "name": "immudb",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "immudb 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "防篡改只增数据库（不信任存储或不能共用公网 Rekor 时）"
+  },
+  "ink_commit_ref": {
+    "name": "inkle/ink",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**交互叙事语言** —— 把 commitment_ledger 编成可测试剧本"
+  },
+  "inky_ref": {
+    "name": "Inky（ink 编辑器）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "inky 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**边写边测**的叙事分支编辑与播放，可导出编译 JSON"
+  },
+  "interprocess": {
+    "name": "interprocess",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**跨平台 IPC**（Windows Named Pipe / Unix UDS），同步+异步 API"
+  },
+  "ioquake3_netref": {
+    "name": "ioquake3（命中回溯与快照插值实现参照）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ioquake3 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "研究**命中时回退历史状态**与快照广播"
+  },
+  "isaacsim_testonly": {
+    "name": "NVIDIA Isaac Sim（**仅仿真基础设施**）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "isaacsim 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "仿真与生成测试基础设施"
+  },
+  "jolt": {
+    "name": "Jolt Physics",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(库，非 CLI) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "确定性物理（含 `CROSS_PLATFORM_DETERMINISTIC` 与 Check Determinism 模式）"
+  },
+  "jscpd": {
+    "name": "jscpd",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "jscpd 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "多语言克隆检测（Type-1/2/3）"
+  },
+  "jsonschema_ref": {
+    "name": "JSON Schema",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**数据契约**：字段 · 单位 · 枚举 · 必填项 · 时区 · 精度"
+  },
+  "kaitai": {
+    "name": "Kaitai Struct",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ksc 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "声明式 .ksy → 多语言 parser；私有格式考古"
+  },
+  "klee": {
+    "name": "KLEE",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "klee 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "LLVM 上的符号虚拟机"
+  },
+  "koala_kiosk_ref": {
+    "name": "Koala Kiosk",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "E",
+    "degrade": "optional",
+    "purpose": "**仅用于确认现代 Kiosk 字段**：开机自启 · 空闲超时 · PIN · 锁定应用"
+  },
+  "landmarks_ref": {
+    "name": "Landmarks",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**Unity 空间导航与记忆实验**样本"
+  },
+  "ldtk": {
+    "name": "LDtk",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "LDtk 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "现代 2D 关卡编辑器；强调易用性"
+  },
+  "legendary_ref": {
+    "name": "Legendary (open-source Epic launcher)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "legendary 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**安装器/修复器实现参照**：认证、增量更新、云存档同步、清单校验"
+  },
+  "libfiu": {
+    "name": "libfiu",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "fiu-run 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "POSIX 故障注入，LD_PRELOAD + errno，fiu-ctrl 运行时启停"
+  },
+  "libretranslate_ref": {
+    "name": "LibreTranslate",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "libretranslate 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**本地预翻译 · 回译 · 异常检测**（社区文本与占位文本）"
+  },
+  "librosa_ref": {
+    "name": "librosa",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(py) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**音频特征**：频谱·节拍·响度相似度分析"
+  },
+  "libtas": {
+    "name": "libTAS",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "libTAS 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**原生 Linux 游戏**确定性录制回放（LD_PRELOAD 注入，帧边界同步输入）"
+  },
+  "livesplit_ref": {
+    "name": "LiveSplit",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "LiveSplit 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**速通切图与分段配置** —— 游戏内时间结构化、可共享 splits"
+  },
+  "llama_ref": {
+    "name": "LLAMA",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**AoS / SoA / AoSoA · 视图 · 迭代器 · 缓存行 · 分配器解耦**"
+  },
+  "luanti_ref": {
+    "name": "Luanti (Minetest)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "luanti 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**世界按文件夹保存于 user/worlds/** —— 地图块 · 节点 · 对象状态取证载体"
+  },
+  "luau_ref": {
+    "name": "Luau",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**渐进类型 · 静态分析 · 能力控制 · 受控运行时**"
+  },
+  "luban": {
+    "name": "Luban",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(dotnet / Luban.Agent CLI) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "游戏配置解决方案；schema + 校验 + **多语言代码生成**"
+  },
+  "ludusavi": {
+    "name": "Ludusavi",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ludusavi 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "游戏存档备份/恢复；**存档可见性与损坏恢复取证**"
+  },
+  "ludusavi_ref": {
+    "name": "Ludusavi",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ludusavi 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**存档备份测试基础设施**：跨平台存档路径发现 · 备份完整性验证 · 原版与复刻存档位置比对"
+  },
+  "mame_input_ref": {
+    "name": "MAME (official input system docs)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "mame 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**物理外设四类抽象**：开关 0/1、绝对轴 -65536~65536、相对轴、单端轴负半区"
+  },
+  "materialx_ref": {
+    "name": "MaterialX",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "跨应用跨渲染器的**材质与 look-dev 交换开放标准**"
+  },
+  "meilisearch_ref": {
+    "name": "Meilisearch",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "meilisearch 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**证据检索**索引（\"问题→系统→证据→责任\"图谱的可检索层）"
+  },
+  "menge_ref": {
+    "name": "Menge",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "模块化**人群运动框架** —— 可换邻近搜索 · 速度策略 · 事件 · 行为模型"
+  },
+  "mesa_llvmpipe": {
+    "name": "Mesa llvmpipe / lavapipe",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "glxinfo 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "**软件渲染基线**（消除 GPU 噪声）"
+  },
+  "miniaudio": {
+    "name": "miniaudio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(single header) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "单文件 C 音频库；播放、解码、混音、输出"
+  },
+  "miniaudio_ref": {
+    "name": "miniaudio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "建立**离线分析播放链**与统一 PCM 输出"
+  },
+  "minidump_stackwalk": {
+    "name": "rust-minidump",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "minidump-stackwalk 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "minidump 解析与符号化"
+  },
+  "miri": {
+    "name": "Miri",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "cargo-miri 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "Rust UB 解释器"
+  },
+  "mise": {
+    "name": "mise-en-place",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "mise 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "工具版本固定（比 asdf 快，支持 .mise.toml）"
+  },
+  "mitmproxy": {
+    "name": "mitmproxy",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "mitmproxy 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "HTTP/1/2/WS 拦截、录制、重放、addon 故障注入（内容层）"
+  },
+  "mlagents_testonly": {
+    "name": "Unity ML-Agents（**仅测试用途**）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "mlagents-learn 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "生成测试对手 / 模仿玩家行为 / 参数搜索"
+  },
+  "msdfgen": {
+    "name": "msdfgen",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "msdfgen 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "多通道带符号距离场字体图集生成"
+  },
+  "music_sync_ref": {
+    "name": "Unity-Music-Sync-System",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**音频 onset → 动画速度**工程路径参考"
+  },
+  "nakama_ref": {
+    "name": "Nakama",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "nakama 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "实时通信 · 匹配 · **组队 · 好友 · 存储 · 排行榜原语**"
+  },
+  "normpath": {
+    "name": "normpath",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**词法**路径规范化（不做 I/O、不解析符号链接）"
+  },
+  "nuclei": {
+    "name": "Nuclei",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "nuclei 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "YAML DSL 版本化漏洞模板回归"
+  },
+  "numpy_local": {
+    "name": "NumPy",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**逐帧差与 N×N 滑窗最大差**（pixelmatch windowSize 语义）；FFT 降级特征"
+  },
+  "nvda": {
+    "name": "NVDA",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "nvda 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "Windows 免费开源屏幕阅读器；**Speech Viewer 产出朗读事件序列**"
+  },
+  "nvidia_blast_ref": {
+    "name": "NVIDIA Blast SDK",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(sdk) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**层级分块 + 支撑图 + 键合**结构化破坏参照"
+  },
+  "nvidia_flow_ref": {
+    "name": "NVIDIA Flow",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(sdk) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**四密度通道 + 四速度通道**流体/燃烧模拟参照"
+  },
+  "o3de": {
+    "name": "O3DE",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(CMake) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "开源 3D 引擎；明确把 project + **Asset Processor** + Editor 一起构建"
+  },
+  "o3de_ref": {
+    "name": "O3DE",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(engine) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "大型模块化 3D 引擎，**地形 · 渲染 · 动画 · 物理**参考"
+  },
+  "obi_rope_ref": {
+    "name": "Obi（软体/绳索/布料）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**约束参数审计**：迭代 × 子步 × 时间步"
+  },
+  "obs_studio_ref": {
+    "name": "OBS Studio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "obs 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "成品**捕获 · 混音 · 编码 · 录制 · 插件 API** 参照"
+  },
+  "obs_studio_ref_dup2": {
+    "name": "OBS Studio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "obs 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**外部录制基线** —— 记录玩家行为、直播、多音轨输出"
+  },
+  "obs_websocket_js_ref": {
+    "name": "obs-websocket-js",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**观众层与直播状态桥接**：读取场景 · 录制 · 直播状态"
+  },
+  "ocat_ref": {
+    "name": "OCAT",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "OCAT.exe 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**帧时间与帧节奏**覆盖层测量"
+  },
+  "odiff": {
+    "name": "odiff",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "odiff 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "图像 diff，抗锯齿识别 / 区域忽略 / YIQ 阈值"
+  },
+  "odiff_ref": {
+    "name": "ODiff",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "odiff 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**批量 CI 层图像 diff**：Zig+SIMD，支持不同布局/尺寸与忽略区"
+  },
+  "open_match": {
+    "name": "Open Match",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(K8s) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "匹配框架；前后端/可定制编排分层"
+  },
+  "open_match_ref": {
+    "name": "Open Match",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(service) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "匹配编排 · 服务器分配 · **会话租约**记录"
+  },
+  "open_match_ref_dup2": {
+    "name": "Open Match",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(k8s) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "可插拔**匹配编排**（非游戏引擎绑定）"
+  },
+  "open_source_ldat": {
+    "name": "Open-Source-LDAT",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(firmware) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "DIY click-to-photon 测量（Teensy 4.1 + TEMT6000 + OLED + 按键）"
+  },
+  "openal_soft": {
+    "name": "OpenAL Soft",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "openal-info 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "跨平台软件音频基线（HRTF/距离衰减/多普勒/EFX 混响/Ambisonics/loopback）"
+  },
+  "openal_soft_dup2": {
+    "name": "OpenAL Soft",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "跨平台音频底座；**HRTF、B-Format/Ambisonics、EFX occlusion/obstruction/reverb**"
+  },
+  "openal_soft_dup3": {
+    "name": "OpenAL Soft",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "openal-info 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "HRTF、直接路径、距离模型、滤波、声源速度的**基础 API 对照**"
+  },
+  "openapi_ref": {
+    "name": "OpenAPI Specification",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**接口契约**：端点 · 参数 · 请求 · 响应 · 认证 · 错误码 · 示例"
+  },
+  "openblocks_ref": {
+    "name": "Google Blocks / Open Blocks",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(app) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "VR 低多边形**建模与吸附手势**参照"
+  },
+  "opencolorio_ref": {
+    "name": "OpenColorIO",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ocioconvert 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "色彩管理规范与配置参考（工作色彩空间/显示变换/LUT）"
+  },
+  "opencv_ref": {
+    "name": "OpenCV",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "批处理**色彩空间 · 掩膜 · SSIM · 直方图 · 特征比较**"
+  },
+  "opendiablo2": {
+    "name": "OpenDiablo2",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Go) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "ARPG 执行边界样本（d2game/d2common/d2core/d2networking 拆分）"
+  },
+  "openenroth": {
+    "name": "OpenEnroth",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "Might and Magic VII 重实现；规则层与系统层**联合取证候选**"
+  },
+  "openmw": {
+    "name": "OpenMW",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "openmw 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "Morrowind 数据兼容的引擎重实现；**任务一次性语义与死亡重生的反例库**"
+  },
+  "openmw_mechanics_ref": {
+    "name": "OpenMW（机制层与对话层参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "openmw 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "目录含 `mwmechanics` / `mwdialogue`，适合参考机制与派系副作用"
+  },
+  "openmw_ref2": {
+    "name": "OpenMW（对象状态迁移锚点）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "openmw 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "老式开放世界**对象状态 · 存档 · 任务 · NPC** 迁移锚点"
+  },
+  "openpbr_ref": {
+    "name": "OpenPBR Surface",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "跨引擎**表面着色模型标准**，减少同一材质在不同渲染器的外观差异"
+  },
+  "openra_compat_ref": {
+    "name": "OpenRA（跨版本确定性治理参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(launcher) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "固定步长 + 确定性 + 回放 + 延迟抽象分层的治理参考"
+  },
+  "openra_netref": {
+    "name": "OpenRA（固定步长/确定性/回放/延迟抽象分层）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(launcher) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "观察策略游戏如何把固定步长、确定性、回放和延迟抽象分层"
+  },
+  "openra_ref": {
+    "name": "OpenRA",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(game) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**规则化单位数据 · 阵营 · 地图修改**观察样本"
+  },
+  "opentelemetry_ref": {
+    "name": "OpenTelemetry",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**遥测契约**：事件 · 指标 · 日志 · 资源 · 采样 · 导出目标"
+  },
+  "openttd": {
+    "name": "OpenTTD",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "多人、聊天、命令、社交平台插件、平台集成"
+  },
+  "openxr_sdk": {
+    "name": "OpenXR SDK Source",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(SDK) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**跨进程输入契约范式**：应用声明动作与动作集，运行时负责映射"
+  },
+  "openxr_sdk_ref": {
+    "name": "OpenXR SDK Source",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**跨 XR API**：session · 输入 · 输出帧 · 参考空间 · 交互配置"
+  },
+  "otel_semconv": {
+    "name": "OpenTelemetry Semantic Conventions",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(规范) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "稳定异常/事件字段与命名规范"
+  },
+  "otel_spec_ref": {
+    "name": "OpenTelemetry Specification",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "日志与追踪**字段命名参考**（跨语言实现要求与期望）"
+  },
+  "p1proto": {
+    "name": "p1proto",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Godot project) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Godot 4 + Rust GDExtension 2D 平台示例；**coyote time、jump buffering、jump cut、snappy ground turning**"
+  },
+  "perfetto_ref": {
+    "name": "Perfetto",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "perfetto 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "系统级追踪（CPU/GPU/内存/IO 队列），配合降级链与流式卡顿取证"
+  },
+  "perfview": {
+    "name": "PerfView",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "PerfView 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Windows ETW 分析器（CPU/GC/堆/WPF 事件）"
+  },
+  "physx": {
+    "name": "PhysX",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "物理引擎；**enhanced determinism**、CCD、substep 参考"
+  },
+  "physx_ref": {
+    "name": "PhysX",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "刚体 · 布料 · 关节 · **连续碰撞阶段**的模拟阶段对照"
+  },
+  "pixelmatch_ref": {
+    "name": "pixelmatch",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**滑窗级差异检测**：windowSize=N 输出任意 N×N 滑窗最大差异数"
+  },
+  "playwright_ref": {
+    "name": "Playwright",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**主驱动**：整屏快照断言 + 可编程逐帧抓取；trace 含 DOM/网络/控制台/截图"
+  },
+  "pointerevents_ref": {
+    "name": "W3C Pointer Events",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**pointerId · 事件目标重映射 · 坐标 · 压力 · 宽高 · touch-action**"
+  },
+  "presentmon": {
+    "name": "PresentMon",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "presentmon 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "从 Windows 图形呈现管线采集 —— 扩展已有的端到端分段测量"
+  },
+  "presentmon_ref": {
+    "name": "PresentMon",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "presentmon 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "采集 **CPU/GPU/Display 帧时与延迟**并输出 CSV"
+  },
+  "presidio": {
+    "name": "Microsoft Presidio",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "PII 识别与脱敏（测试真实数据前的降风险手段）"
+  },
+  "protobuf": {
+    "name": "Protocol Buffers",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "protoc 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "语言中立序列化；配置传输格式或二进制布局候选"
+  },
+  "psychopy_ref": {
+    "name": "PsychoPy",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**受控听觉 · 视觉 · 注意任务**离线基线实验"
+  },
+  "pywinauto": {
+    "name": "pywinauto",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "原版驱动交叉验证"
+  },
+  "qiling": {
+    "name": "Qiling Framework",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**完整执行环境**模拟（可执行文件加载/动态链接/系统调用/IO/异常钩子）"
+  },
+  "quake2_ref": {
+    "name": "Quake II (id-Software)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(source) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "经典第一人称**痕迹 · 环境改变 · 对象持久化 · 客户端预测 · 相机追踪**代码研究"
+  },
+  "quickbms": {
+    "name": "QuickBMS",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "quickbms 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**通用游戏归档提取**（脚本驱动，覆盖大量格式）"
+  },
+  "r2modman_ref": {
+    "name": "r2modman",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "r2modman 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**配置与版本可迁移反向参照**：配置档案含 Mod、精确版本、禁用状态、配置文件"
+  },
+  "rand_portable_ref": {
+    "name": "rust-random/rand",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**可移植可复现**随机基元（运气层实现基线）"
+  },
+  "recast_ref": {
+    "name": "Recast & Detour",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "RecastDemo 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "生成**参照导航数据** · 标注行走表面 · **发现网格差异**"
+  },
+  "recast_ref_dup2": {
+    "name": "Recast Navigation",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**NavMesh 烘焙 · Detour 查询 · DetourTileCache · DetourCrowd** —— 客观可达性基线"
+  },
+  "recastnavigation": {
+    "name": "Recast Navigation",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C++ lib) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "导航网格与寻路工具集（Recast / Detour / DetourCrowd）"
+  },
+  "reccmp": {
+    "name": "reccmp",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "reccmp 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "原版二进制 vs 重编译二进制，比对函数/全局数据/栈布局/vtable/导出"
+  },
+  "reclassex_ref": {
+    "name": "ReClassEx",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ReClassEx 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**按类型浏览进程内存** —— RTTI 与 PDB 符号，说明矿工依赖运行时类型信息"
+  },
+  "refinery": {
+    "name": "Refinery",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**Rust 内嵌** SQL 迁移、版本与历史校验"
+  },
+  "reflex": {
+    "name": "NVIDIA Reflex",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(SDK) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "引擎埋点：sleep mode、PC latency、flash indicator"
+  },
+  "reko_decompiler_ref": {
+    "name": "Reko Decompiler",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(app) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "机器码**反编译**（与 Ghidra 交叉验证）"
+  },
+  "rekor": {
+    "name": "Rekor",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "rekor 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "透明日志 —— 签字可追溯、不可抵赖"
+  },
+  "renderdoc": {
+    "name": "RenderDoc",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "renderdoccmd 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "required",
+    "purpose": "**交互式单帧取证**（原版渲染事实源）"
+  },
+  "repomix": {
+    "name": "repomix",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "repomix 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "代码库 → 单文件上下文（含令牌估算与敏感扫描选项）"
+  },
+  "reproducible_builds_ref": {
+    "name": "reproducible-builds.org（规范）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**逐字节可复现**构建原则与构建环境锁定清单"
+  },
+  "resonance_audio_ref": {
+    "name": "Resonance Audio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(SDK) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "高阶 Ambisonics、房间混响、跨引擎插件结构参考"
+  },
+  "resvg": {
+    "name": "resvg",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "resvg 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "SVG 确定性位图渲染"
+  },
+  "retdec": {
+    "name": "RetDec",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "retdec-decompiler 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "基于 LLVM 的**可重定向反编译器** —— 第二套伪代码交叉验证"
+  },
+  "retroarch_ref": {
+    "name": "RetroArch",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "retroarch 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**黄金回放基线**：savestate · rewind · runahead · netplay · shader stack"
+  },
+  "rgp_ref": {
+    "name": "Radeon GPU Profiler",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(tool) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "GPU 执行时戳与提交时戳分析"
+  },
+  "rrweb": {
+    "name": "rrweb",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：File \"<string>\", line 1\n    \"print('rrweb\n    ^\nSyntaxError: unterminated string literal (",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "Web 端会话录制与回放（**仅复刻后的 WebView**）"
+  },
+  "rsgain_ref": {
+    "name": "rsgain",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "rsgain 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "ReplayGain 2.0 批量响度测量，**输出 CSV**"
+  },
+  "rune_script_ref": {
+    "name": "Rune",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "Rust 嵌入脚本语言的**宿主—脚本调用/异步/恢复**边界参照"
+  },
+  "ryu": {
+    "name": "ryu",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**最短往返浮点格式化**（Ulf Adams 算法，有 PLDI'18 正确性证明）"
+  },
+  "sdl": {
+    "name": "SDL",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "sdl2-config 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "跨平台输入抽象（SDL_GameController / SDL_Joystick）"
+  },
+  "sdl3_ref": {
+    "name": "Simple DirectMedia Layer (SDL3)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "sdl3-config 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "物理扫描码/逻辑键码分离 · 多设备增删 · 原始轴采集 · rumble 与力反馈能力查询"
+  },
+  "sdl_dup2": {
+    "name": "SDL",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "跨平台设备抽象；`SDL_GameControllerGetBindForAxis` 区分逻辑轴与设备轴"
+  },
+  "sdl_gamecontroller_ref": {
+    "name": "SDL GameController / Haptic",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(lib) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**跨设备映射层参考**：GUID,name,mapping 字符串、按钮与轴互映、xinput 保留 GUID、振动线程排队"
+  },
+  "sdl_gamecontrollerdb_ref": {
+    "name": "SDL_GameControllerDB",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(data) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "控制器映射数据库，记录\"**同键码不同语义**\""
+  },
+  "semgrep": {
+    "name": "Semgrep",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "semgrep 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "语义模式查询"
+  },
+  "sentry_unity_ref": {
+    "name": "Sentry Unity SDK",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "Unity 复刻的**崩溃与附件基线**（错误样本/追踪/日志/附件）"
+  },
+  "spark": {
+    "name": "Spark",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(research) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "大世界预算化流式；连续 LoD、渐进流、固定 GPU 内存页"
+  },
+  "spdlog_ref": {
+    "name": "spdlog",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "保存每个 **layer event 的时钟 · 触发条件 · 丢弃原因**"
+  },
+  "spdx_build_ref": {
+    "name": "SPDX 3.0 Build 类",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**build manifest 主 schema**：buildId/buildStartTime/buildEndTime/buildType/configSourceDigest/configSourceUri/environment/parameter + externalRef/verifiedUsing/creationInfo"
+  },
+  "sphere_rng_ref": {
+    "name": "Sphere Engine RNG::state",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(engine) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**32 字节十六进制 RNG 状态**，可跨会话恢复序列"
+  },
+  "spirv_cross": {
+    "name": "SPIRV-Cross",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "spirv-cross 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "SPIR-V 反转为可读 GLSL/MSL/HLSL 与 C++ 反射 JSON"
+  },
+  "spirv_cross_dup2": {
+    "name": "SPIRV-Cross",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "spirv-cross 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**着色器中间表示** —— HLSL ↔ GLSL ↔ MSL ↔ WGSL ↔ SPIR-V"
+  },
+  "splat": {
+    "name": "splat",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "splat 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "二进制切分，输出符号/段/目标汇编/上下文"
+  },
+  "sqldef": {
+    "name": "sqldef",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "sqlite3def 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "从目标 SQL 导出/生成幂等 DDL；**`--check` 漂移门禁** + `--dry-run`"
+  },
+  "sqlite_fts": {
+    "name": "SQLite FTS5",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "sqlite3 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "全文检索证据（文案、BUG、unknown）"
+  },
+  "stardew_migration_ref": {
+    "name": "Stardew Valley 1.6 Migration (modding wiki)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(doc) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**同名物品限定 ID**：`(O)128` / `(BC)128` 区分同名不同类"
+  },
+  "steam_audio_ref": {
+    "name": "Steam Audio",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(SDK) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "射线、实时/烘焙传播、遮挡、反射、材质与空间化的**传播算法基准**"
+  },
+  "steamworks_net": {
+    "name": "Steamworks.NET",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C# lib) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "C# Steamworks 封装参考（平台集成表面）"
+  },
+  "stick_drift_detect_ref": {
+    "name": "stick-drift-detect-PC",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(tool) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**摇杆漂移检测**：阈值与轨迹可视化"
+  },
+  "stride": {
+    "name": "Stride",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(CLI / GameStudio) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "带 **Game Studio** 的 C# 引擎；编辑器—运行时同源"
+  },
+  "surface_metadata_ref": {
+    "name": "SurfaceMetadata（Unity）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "Unity 表面元数据 · 射线检测 · 脚步组件（**仅作线索**）"
+  },
+  "tankgame_split_ref": {
+    "name": "TankGame（本地分屏最小原型样本）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(java) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "本地分屏多人的**最小可运行原型参考**"
+  },
+  "taskfile": {
+    "name": "Task",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "task 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "任务编排（比 Make 易读，比 Bazel 轻）"
+  },
+  "tes5edit_audit_ref": {
+    "name": "TES5Edit",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "TES5Edit 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**记录式、冲突式内容检查**；可作\"字段逐项记录、冲突可审计\"范式"
+  },
+  "tesseract": {
+    "name": "Tesseract OCR",
+    "available": true,
+    "reason": "可用",
+    "detail": "/usr/bin/tesseract",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "从截图反推文案（**拿不到源码时的候选证据**）"
+  },
+  "tiled": {
+    "name": "Tiled",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "tiled 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "灵活的关卡编辑器；可作为**归一化中间格式**"
+  },
+  "tiled_dup2": {
+    "name": "Tiled",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "tiled 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "2D 关卡编辑器；导出 tile、对象层与自定义属性"
+  },
+  "tiled_editor_ref": {
+    "name": "Tiled Map Editor",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "tiled 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**官方编辑器 / 导出器**契约参照"
+  },
+  "tm2_split_collision_ref": {
+    "name": "TM2SplitScreenCollisions（分屏碰撞参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(project) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "分屏**碰撞处理**参考实现"
+  },
+  "torque3d_ref": {
+    "name": "Torque 3D",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "Torque3D 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "老式脚本运行时 · 引擎对象 · **实时编辑**的边界参照"
+  },
+  "touchscript_ref": {
+    "name": "TouchScript",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**多点触控手势竞争 · 手指生命周期 · 历史轨迹**设计参照"
+  },
+  "toxiproxy": {
+    "name": "Toxiproxy",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "toxiproxy-server 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "传输层故障注入 latency/down/timeout/slicer/limit_data…"
+  },
+  "tracing_fluent_assertions": {
+    "name": "tracing-fluent-assertions",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(dev-dependency) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "断言 **span 生命周期**（创建/进入/关闭及次数）"
+  },
+  "tracing_test": {
+    "name": "tracing-test",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(dev-dependency) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "Rust 单测中捕获多线程 tracing 输出并断言"
+  },
+  "tracy": {
+    "name": "Tracy Profiler",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(需编译，含 capture 工具) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**帧级 profiler**（游戏首选）"
+  },
+  "tracy_profiler_ref": {
+    "name": "Tracy Profiler",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "tracy-profiler 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "帧级混合采样分析（帧时 P95/P99 长尾卡顿取证）"
+  },
+  "tracy_ref": {
+    "name": "Tracy Profiler",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "tracy-profiler 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "用**同一时间线**标记声音事件、视觉事件、逻辑事件与报告提交"
+  },
+  "trash": {
+    "name": "trash",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust crate) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "跨平台回收站（Windows / macOS / FreeDesktop）"
+  },
+  "triton": {
+    "name": "Triton",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "动态符号执行、污点分析、AST、ISA 语义、SMT 转换"
+  },
+  "tuf": {
+    "name": "TUF",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Python ref impl) 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "更新框架规范与 Python 参考实现（root/targets/snapshot/timestamp 四角色）"
+  },
+  "uabea_ref": {
+    "name": "UABEA",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "UABEAvalonia 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "Unity 资产读取/研究辅助"
+  },
+  "ue_anim_budget_allancer_ref": {
+    "name": "Unreal Engine Animation Budget Allancer",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(plugin) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "动画预算 · 重要性 · URO · tick 跳过的**动态预算**模板"
+  },
+  "undertalemodtool": {
+    "name": "UndertaleModTool",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "UndertaleModTool 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "GameMaker: Studio 1.4 与 GMS2 bytecode 13-17；可重建**字节级精确副本**并反汇编"
+  },
+  "unicorn": {
+    "name": "Unicorn Engine",
+    "available": false,
+    "reason": "版本校验失败（未安装或不可用）",
+    "detail": "rc=1：Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nModuleNotFoundEr",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "**只模拟 CPU** —— 把已恢复状态放入单元测试验算法片段"
+  },
+  "unity_asset_danshari_ref": {
+    "name": "UnityAssetDanshari",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity editor) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "重复资源、引用关系与删除预览（基于 ripgrep）"
+  },
+  "unity_deps_hunter_ref": {
+    "name": "Unity-Dependencies-Hunter",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity editor) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "扫描 Unity 项目查找**未被引用的资产**（识别 Addressable / AssetReference / 运行时引用盲点）"
+  },
+  "unity_input_system_ref": {
+    "name": "Unity Input System",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(package) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**Action / Action Map / Binding / Control Scheme** —— 意图层主模型"
+  },
+  "unity_input_system_ref_dup2": {
+    "name": "Unity Input System（时序审计接口）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**started/performed/canceled/duration** 与 composite/interaction 参数审计"
+  },
+  "unity_inputsystem_ref": {
+    "name": "Unity InputSystem (official samples)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "**输入事件录制与动作映射**：InputEventTrace / InputRecorder"
+  },
+  "unity_runtime_inspector_ref": {
+    "name": "Unity Runtime Inspector",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-package) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "运行时**观察实际数值**（世界状态 · 组件字段）"
+  },
+  "unity_seasonal_events_ref": {
+    "name": "Unity Seasonal Events sample",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity-sample) 未在 PATH 中",
+    "evidence_level": "E",
+    "degrade": "optional",
+    "purpose": "**现实时间活动配置**：服务器时间 + Remote Config + 云端发奖"
+  },
+  "unitycsreference": {
+    "name": "UnityCsReference",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(source) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "核实引擎**默认行为与版本差异**"
+  },
+  "universal_ctags": {
+    "name": "Universal Ctags",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "ctags 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "符号表（定义、调用点、覆写）"
+  },
+  "univrm_ref": {
+    "name": "UniVRM / VRM",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(unity) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "人形角色导入导出、第一人称与注视设置、BlendShape、 **头发与配件物理**；外观数据**可导出/可交换/跨版本读取**参考"
+  },
+  "vcmi_compat_ref": {
+    "name": "VCMI（长期兼容治理模式参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "vcmiclient 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "长期兼容治理参考：原版基线树 / 兼容层 / 偏离账本分离模式"
+  },
+  "velopack": {
+    "name": "Velopack",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "vpk 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Windows 安装包与更新（比 Omaha 更适合复刻）"
+  },
+  "veloren": {
+    "name": "Veloren",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(Rust) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "开放世界、持久化、社区架构参照"
+  },
+  "veloren_ref": {
+    "name": "Veloren",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "veloren 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "持续演进的开放世界机制参考"
+  },
+  "vgmstream": {
+    "name": "vgmstream",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "vgmstream-cli 未在 PATH 中",
+    "evidence_level": "A",
+    "degrade": "optional",
+    "purpose": "游戏音频流解码 —— **数百种**游戏编码与循环信息"
+  },
+  "vitepress": {
+    "name": "VitePress",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "vitepress 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "报告静态站点（base 可设相对路径，产物可迁移）"
+  },
+  "vitest": {
+    "name": "Vitest",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "vitest 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "单元/组件测试（配 @testing-library/react）"
+  },
+  "vivox_positional_ref": {
+    "name": "Vivox（Unity 位置频道）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(sdk) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**位置频道**：距离衰减 · 朝向渐变 · 人群噪声 · 进入/退出事件"
+  },
+  "vmaf": {
+    "name": "VMAF",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "vmaf 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "感知视频质量（VIF/ADM/Motion/SSIM/MS-SSIM/CIEDE2000）"
+  },
+  "walt_latency": {
+    "name": "WALT (Webpage/App Latency Tool)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(hardware + tool) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "外部硬件同步输入与输出，测点击/拖动/屏幕/**音频**延迟"
+  },
+  "warpframe_ref": {
+    "name": "WarpFrame",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(renderer) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**技术限制风格**实现样例：仿射映射 · 顶点抖动 · 16 位色深 · 低分辨率 · 抖动 · 固定管线"
+  },
+  "web_vitals": {
+    "name": "web-vitals",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(JS 库) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "INP / LCP / CLS 测量（**仅作参考**）"
+  },
+  "weblate": {
+    "name": "Weblate",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "weblate 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "翻译协作与评审（**不是自动翻译**）"
+  },
+  "wesnoth_faction_ref": {
+    "name": "Battle for Wesnoth（阵营/时代/战役参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "wesnoth 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "参考阵营、时代、战役与多人结构"
+  },
+  "wesnoth_ref2": {
+    "name": "Battle for Wesnoth（回溯与保存点参考）",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "wesnoth 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "回合**保存点 · 回放 · 撤销结构**参考"
+  },
+  "wfc_ref": {
+    "name": "WaveFunctionCollapse",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "约束生成 · 局部相似 · **矛盾失败**的一手实现"
+  },
+  "wikiblame_ref": {
+    "name": "Wikiblame",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(tool) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**按字符串搜索 Wiki 修订历史** —— 追踪错误知识何时进入/被纠正"
+  },
+  "wine": {
+    "name": "Wine",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "wine 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Windows 原版在 Linux 上跑起来取证"
+  },
+  "wix": {
+    "name": "WiX Toolset",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "wix 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "**安装契约源码**（不是临时打包脚本）"
+  },
+  "xliff_ref": {
+    "name": "OASIS XLIFF 2.0",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(spec) 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "保存**原文 · 目标文 · 状态 · 注释 · 上下文**"
+  },
+  "xsimd_ref": {
+    "name": "xsimd",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**SIMD 内部函数抽象**"
+  },
+  "yarn_spinner": {
+    "name": "Yarn Spinner",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C# / Rust) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "对话/叙事脚本；变量与命令模型"
+  },
+  "yarn_spinner_ref": {
+    "name": "Yarn Spinner",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**对话分支 · 变量 · 命令接口**验证"
+  },
+  "yarn_spinner_rt": {
+    "name": "Yarn Spinner",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(C# / Rust) 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "对话运行时；**变量存储交由宿主游戏** —— 正适合记录\"变量由谁写、何时写、是否持久化\""
+  },
+  "yarnspinner_core_ref": {
+    "name": "YarnSpinner (core)",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "**把台词·标签·条件·选择重建为可重放规范** —— 重复叙事取证中间表示"
+  },
+  "yarnspinner_godot_ref": {
+    "name": "YarnSpinner-Godot-GDScript",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(godot-addon) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "Godot 侧对话回放原型"
+  },
+  "yarnspinner_ref": {
+    "name": "YarnSpinner",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "(library) 未在 PATH 中",
+    "evidence_level": "D",
+    "degrade": "optional",
+    "purpose": "运行时发对话行 · `options` · 场景 `commands` —— 驱动「选项—命令—后果」回放"
+  },
+  "zap": {
+    "name": "ZAP",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "zap-cli 未在 PATH 中",
+    "evidence_level": "B",
+    "degrade": "optional",
+    "purpose": "Web 应用安全扫描（**人工 + 基线**）"
+  },
+  "zoekt": {
+    "name": "Zoekt",
+    "available": false,
+    "reason": "命令不存在",
+    "detail": "zoekt-index 未在 PATH 中",
+    "evidence_level": "C",
+    "degrade": "optional",
+    "purpose": "大规模低延迟代码搜索"
+  }
+}

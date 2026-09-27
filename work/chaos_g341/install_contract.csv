@@ -1,0 +1,24 @@
+# 安装契约
+
+## 必录字段
+- [x] **安装范围**（`install_scope`）— PerUser / PerMachine / Either
+- [x] **安装目录**（`install_dir`）— Program Files / AppData 等
+- [x] **MSI ProductCode**（`product_code`）— 升级与卸载标识
+- [x] **MSI UpgradeCode**（`upgrade_code`）— **跨版本升级的锚**
+- [x] **快捷方式**（`shortcuts`）— 名称/目标/**参数**/工作目录/图标/显示方式
+- [x] **开始菜单项**（`start_menu`）— ⚠️ 需 Shortcut + RemoveFolder + KeyPath，否则卸载残留
+- [x] **文件关联**（`file_assoc`）— 扩展名 → ProgID → 打开命令
+- [x] **URL/CLI 协议**（`url_protocol`）— 自定义 scheme 与命令行参数
+- [x] **注册表键与值**（`registry_keys`）— HKCU/HKLM 全量
+- [x] **服务与驱动**（`services_drivers`）— 含先决运行库（WebView2 等）
+- [x] **静默参数**（`silent_args`）— 安装/升级/降级/修复/卸载各自命令行
+- [x] **更新机制**（`update_mechanism`）— Velopack / tauri-plugin-updater / WinSparkle / Omaha
+- [x] **签名与供应链**（`signature`）— 安装包、更新包、symbols 均签
+
+## 残留数据迁移矩阵
+
+| 位置 | 内容 | Owner（只读快照 / 迁移 / 兼容 / 双写 / 废弃） | schema 版本 | 迁移方式 | 回滚点 | 幂等键 |
+|---|---|---|---|---|---|---|
+| __poison__ | __poison__ | __INVALID_ENUM__ | __poison__ | __poison__ | __poison__ | __poison__ |
+
+**⚠️ 每个残留项必须有 owner** —— 没有 owner 的数据在升级时一定会被漏掉。

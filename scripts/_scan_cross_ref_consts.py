@@ -5,6 +5,10 @@
 #    绝不作为门禁（否则会漏掉真根，同时把 216 个台账规则常量误报成根）。
 import ast, glob, os, json, sys, argparse
 
+# 🔑 117 轮：G406 抓到本文件用了 os.path.join(ROOT,'ledger',...) 形式却**未登记**。
+#    ✅ 登记进 PATH_CONST_ALLOW（它只是**读**信任根，不是产物路径，无需进 DEPENDENT_NAMES）。
+TRUST_ROOT_FILE = os.path.join(ROOT, 'ledger', 'trust_root.json')
+
 files = sorted(glob.glob('scripts/*.py'))
 asts, loads = {}, {}
 for f in files:
@@ -35,7 +39,7 @@ ap = argparse.ArgumentParser(description='🔑 跨文件引用常量候选（**�
 ap.add_argument('--limit', type=int, default=60, help='打印前 N 条（默认 60）')
 _a = ap.parse_args()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-tr_path = os.path.join(ROOT, 'ledger', 'trust_root.json')
+tr_path = TRUST_ROOT_FILE
 tr = json.load(open(tr_path, encoding='utf-8'))
 vr = set(tr.get('VALUE_ROOTS') or {})
 print('🔑 跨文件引用常量候选（**仅供人工参考，不是根判定**）')

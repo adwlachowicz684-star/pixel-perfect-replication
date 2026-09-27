@@ -1,0 +1,2 @@
+event_domain,event_name,trigger,level,attributes,pii_class,sampling,correlation,retention,old_format,new_format,evidence
+__INVALID_ENUM__,__poison__,__poison__,-999999999,__poison__,__INVALID_ENUM__,__poison__,__poison__,__poison__,__PAIR_DIFF___9,__PAIR_DIFF___10,__INVALID_ENUM__

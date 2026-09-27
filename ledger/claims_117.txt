@@ -1,0 +1,63 @@
+# 第一百一十七轮声明清单 —— 每轮结束前必须跑 `--verify` 核实
+# 🔑 本轮主题：**按三条判据人工审值型根候选**（22 个候选 → 登记 2 个）
+
+# ① 值型根候选扫描器（报告入口，不是门禁）
+file:scripts/_scan_value_root_cands.py
+grep:scripts/_scan_value_root_cands.py::判据①「值被门禁断言」
+cmd:_scan_value_root_cands.py --limit
+# ② _const_value 补 Set/Dict + _norm 排序
+grep:scripts/push_api.py::_ast.Set
+grep:scripts/push_api.py::def _norm
+grep:scripts/push_api.py::def _const_value
+grep:scripts/push_api.py::allowed_values
+# ③ 判据④通过时必须打印（防"静默通过"与"没跑"无法区分）
+grep:scripts/push_api.py::✅ 值型根
+cmd:push_api.py --assert-trust-root
+# ④ 两个新登记的值型根
+grep:ledger/trust_root.json::_ANCHOR_DENOM_MODE
+grep:ledger/trust_root.json::LEGAL_GATES
+grep:ledger/trust_root.json::_root_criteria
+# ⑤ 既有能力仍工作
+cmd:push_api.py --assert-dependent-names
+cmd:push_api.py --assert-path-consts
+cmd:push_api.py --assert-meta-names
+cmd:push_api.py --assert-write-pairing
+cmd:push_api.py --assert-mirror-fn
+cmd:push_api.py --assert-fp-mirror
+cmd:push_api.py --assert-fp-history
+cmd:push_api.py --assert-baseline-fp
+cmd:push_api.py --assert-history-known
+cmd:push_api.py --assert-legacy-files
+cmd:push_api.py --assert-legacy-dump
+cmd:push_api.py --audit-history
+cmd:push_api.py --verify-push
+cmd:push_api.py --check-leak
+cmd:push_api.py --check-symlink
+cmd:push_api.py --check-gitlink
+cmd:run_all_gates.py --check-both-layers
+cmd:run_all_gates.py --check-dup-cmds
+cmd:claim_verify.py --check-rc-domain
+cmd:claim_verify.py --check-allowlist
+cmd:claim_verify.py --all
+cmd:claim_verify.py --audit-all
+cmd:claim_verify.py --verify-all
+cmd:_scan_cross_ref_consts.py --limit
+gate:G388
+gate:G405
+gate:G406
+gate:G407
+gate:G408
+# ⑥ 产物不得被误删
+file:ledger/trust_root.json
+file:audit/history_mode_known.json
+file:ledger/baseline_fp_mirror.json
+file:ledger/claims_116.txt
+file:scripts/gate_chaos.py
+file:scripts/run_all_gates.py
+file:scripts/push_api.py
+
+# ⑦ 117 轮新增：G410 索引残留断言
+grep:scripts/push_api.py::def cmd_assert_no_tmp_in_index
+grep:scripts/push_api.py::_selftest_tmp
+cmd:push_api.py --assert-no-tmp-in-index
+gate:G410

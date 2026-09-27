@@ -1,0 +1,2 @@
+evidence_id,original_build_id,tool,target_module,address,symbol_origin,hook_strategy,call_index,inputs_hash,outputs_hash,side_effects,clock_monotonic_ns,captured_bytes_path,redacted,replay_command
+__INVALID_ENUM__,??invalid-id??,__INVALID_ENUM__,__PAIR_DIFF___3,__poison__,__poison__,-999999999,-999999999,zz-not-a-hex,zz-not-a-hex,__INVALID_ENUM__,__poison__,not a url,__poison__,__poison__
