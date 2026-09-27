@@ -1,0 +1,16 @@
+# 第一百二十轮声明清单
+grep:scripts/push_api.py::CLEANUP_CALLS
+grep:scripts/push_api.py::CLEANUP_VERIFY_FNS
+grep:scripts/push_api.py::CLEANUP_SCAN_MIN
+grep:scripts/push_api.py::def _scan_cleanup_calls
+grep:scripts/push_api.py::def _read_cleanup_allowlist
+grep:scripts/push_api.py::def cmd_assert_cleanup_verified
+grep:scripts/push_api.py::assert_cleanup_verified
+grep:scripts/run_all_gates.py::"G413"
+grep:ledger/cleanup_allowlist.txt::_old_reset
+cmd:push_api.py --assert-cleanup-verified
+gate:G413
+# 🔑 锚点须避开 markdown 标记：文档写的是 **限定名**匹配，连写"限定名匹配"并不存在
+grep:references/游戏引擎复刻.md::限定名
+# 🔑 锚点须避开标题行（以 # 开头会被判为说明行）—— 选正文表格里的片段
+grep:references/游戏引擎复刻.md::扫描器自己失效

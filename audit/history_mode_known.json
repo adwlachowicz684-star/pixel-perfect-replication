@@ -1,335 +1,11 @@
 {
-  "generated_at": "2026-09-28T03:40:33+0800",
+  "generated_at": "2026-09-28T04:12:46+0800",
   "baseline_modes": {
-    "100644": 297
+    "100644": 299
   },
-  "baseline_fp_history": [
-    {
-      "round": 108,
-      "from_fp": "b375095cd44a4be09f11cb568071019be612dbf5",
-      "to_fp": "53b9749a79344f81fd1f7dd3fb0256049f310754",
-      "from_modes": {
-        "100644": 280
-      },
-      "to_modes": {
-        "100644": 281
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-25T05:20:05+0800",
-      "note": "🔴 本条轮次曾被误记为 100 —— 中文数字解析 bug（\"一百零七\"的\"零七\"未处理 → 100）。 ✅ 第一百零八轮修复解析后回填真实轮次 108。",
-      "seq": 1,
-      "seq_in_round": 1
-    },
-    {
-      "round": 108,
-      "from_fp": "53b9749a79344f81fd1f7dd3fb0256049f310754",
-      "to_fp": "f5ec0e778c473e8f5ffe4eae934c545387b81871",
-      "from_modes": {
-        "100644": 281
-      },
-      "to_modes": {
-        "100644": 282
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T04:58:49+0800",
-      "seq": 2,
-      "seq_in_round": 2
-    },
-    {
-      "seq": 3,
-      "seq_in_round": 3,
-      "round": 108,
-      "from_fp": "f5ec0e778c473e8f5ffe4eae934c545387b81871",
-      "to_fp": "cff3cedcab26f175730c17d1d1e9106e1414124d",
-      "from_modes": {
-        "100644": 282
-      },
-      "to_modes": {
-        "100644": 283
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T05:03:38+0800"
-    },
-    {
-      "seq": 4,
-      "seq_in_round": 1,
-      "round": 109,
-      "from_fp": "cff3cedcab26f175730c17d1d1e9106e1414124d",
-      "to_fp": "c88985e84eb8806d1446db6e49f667d80316ce2b",
-      "from_modes": {
-        "100644": 283
-      },
-      "to_modes": {
-        "100644": 284
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T05:32:59+0800"
-    },
-    {
-      "seq": 5,
-      "seq_in_round": 1,
-      "round": 110,
-      "from_fp": "c88985e84eb8806d1446db6e49f667d80316ce2b",
-      "to_fp": "b5f33fd59ed1e8d90e0b5cb0989a664bdb1d7fb1",
-      "from_modes": {
-        "100644": 284
-      },
-      "to_modes": {
-        "100644": 285
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T05:41:14+0800"
-    },
-    {
-      "seq": 6,
-      "seq_in_round": 1,
-      "round": 111,
-      "from_fp": "b5f33fd59ed1e8d90e0b5cb0989a664bdb1d7fb1",
-      "to_fp": "3f5b2e62161379d28f6b22d8a91acb724fe00e29",
-      "from_modes": {
-        "100644": 285
-      },
-      "to_modes": {
-        "100644": 286
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T05:50:10+0800"
-    },
-    {
-      "seq": 7,
-      "seq_in_round": 1,
-      "round": 112,
-      "from_fp": "3f5b2e62161379d28f6b22d8a91acb724fe00e29",
-      "to_fp": "54927ef73b9006bf5c09e7037f4a8c3e8221b6a2",
-      "from_modes": {
-        "100644": 286
-      },
-      "to_modes": {
-        "100644": 287
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T05:57:12+0800"
-    },
-    {
-      "seq": 8,
-      "seq_in_round": 1,
-      "round": 113,
-      "from_fp": "54927ef73b9006bf5c09e7037f4a8c3e8221b6a2",
-      "to_fp": "ed2b3988e30412b3075881985293b153d2812d6d",
-      "from_modes": {
-        "100644": 287
-      },
-      "to_modes": {
-        "100644": 288
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T06:42:35+0800"
-    },
-    {
-      "seq": 9,
-      "seq_in_round": 1,
-      "round": 114,
-      "from_fp": "ed2b3988e30412b3075881985293b153d2812d6d",
-      "to_fp": "0d95715a6d78a6effccd26b33f9befe128cfe495",
-      "from_modes": {
-        "100644": 288
-      },
-      "to_modes": {
-        "100644": 289
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T06:56:23+0800"
-    },
-    {
-      "seq": 10,
-      "seq_in_round": 2,
-      "round": 114,
-      "from_fp": "0d95715a6d78a6effccd26b33f9befe128cfe495",
-      "to_fp": "a36f89a620e86cfecc967854b24800971c4349bc",
-      "from_modes": {
-        "100644": 289
-      },
-      "to_modes": {
-        "100644": 290
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T06:59:41+0800"
-    },
-    {
-      "seq": 11,
-      "seq_in_round": 1,
-      "round": 117,
-      "from_fp": "a36f89a620e86cfecc967854b24800971c4349bc",
-      "to_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
-      "from_modes": {
-        "100644": 290
-      },
-      "to_modes": {
-        "100644": 442
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T19:21:12+0800"
-    },
-    {
-      "seq": 12,
-      "seq_in_round": 2,
-      "round": 117,
-      "from_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
-      "to_fp": "6247878f746b52de8d7552323afaaafe379dede2",
-      "from_modes": {
-        "100644": 442
-      },
-      "to_modes": {
-        "100644": 443,
-        "120000": 1
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T19:35:02+0800"
-    },
-    {
-      "seq": 13,
-      "seq_in_round": 3,
-      "round": 117,
-      "from_fp": "6247878f746b52de8d7552323afaaafe379dede2",
-      "to_fp": "d1c768a56bb9af8412c39ec8bf3a9e373a7d1bbf",
-      "from_modes": {
-        "100644": 443,
-        "120000": 1
-      },
-      "to_modes": {
-        "100644": 443
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T21:41:56+0800"
-    },
-    {
-      "seq": 14,
-      "seq_in_round": 4,
-      "round": 117,
-      "from_fp": "d1c768a56bb9af8412c39ec8bf3a9e373a7d1bbf",
-      "to_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
-      "from_modes": {
-        "100644": 443
-      },
-      "to_modes": {
-        "100644": 442
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-27T22:17:48+0800"
-    },
-    {
-      "seq": 15,
-      "seq_in_round": 5,
-      "round": 117,
-      "from_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
-      "to_fp": "d1c768a56bb9af8412c39ec8bf3a9e373a7d1bbf",
-      "from_modes": {
-        "100644": 442
-      },
-      "to_modes": {
-        "100644": 443
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-28T00:58:41+0800"
-    },
-    {
-      "seq": 16,
-      "seq_in_round": 6,
-      "round": 117,
-      "from_fp": "d1c768a56bb9af8412c39ec8bf3a9e373a7d1bbf",
-      "to_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
-      "from_modes": {
-        "100644": 443
-      },
-      "to_modes": {
-        "100644": 442
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-28T01:06:52+0800"
-    },
-    {
-      "seq": 17,
-      "seq_in_round": 7,
-      "round": 117,
-      "from_fp": "db35e08e52db1b6cf3bb700962bbd0ad6a5b35b9",
-      "to_fp": "ffe035ca44392324ffd5137bc2e4c8d39db1b067",
-      "from_modes": {
-        "100644": 442
-      },
-      "to_modes": {
-        "100644": 351
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-28T01:13:59+0800"
-    },
-    {
-      "seq": 18,
-      "seq_in_round": 8,
-      "round": 117,
-      "from_fp": "ffe035ca44392324ffd5137bc2e4c8d39db1b067",
-      "to_fp": "34df67f2fb84a434dddc45b22a4ae034107b6223",
-      "from_modes": {
-        "100644": 351
-      },
-      "to_modes": {
-        "100644": 295
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-28T01:16:07+0800"
-    },
-    {
-      "seq": 19,
-      "seq_in_round": 9,
-      "round": 117,
-      "from_fp": "34df67f2fb84a434dddc45b22a4ae034107b6223",
-      "to_fp": "69845f5d9dd5381d5f98851948a0bb0e3ffe8f6f",
-      "from_modes": {
-        "100644": 295
-      },
-      "to_modes": {
-        "100644": 296
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-28T03:24:39+0800"
-    },
-    {
-      "seq": 20,
-      "seq_in_round": 1,
-      "round": 118,
-      "from_fp": "69845f5d9dd5381d5f98851948a0bb0e3ffe8f6f",
-      "to_fp": "ab2f753c47f617c0c961c053e2037519f9366102",
-      "from_modes": {
-        "100644": 296
-      },
-      "to_modes": {
-        "100644": 297
-      },
-      "legacy_from": 5,
-      "legacy_to": 5,
-      "at": "2026-09-28T03:40:33+0800"
-    }
-  ],
-  "baseline_fp": "ab2f753c47f617c0c961c053e2037519f9366102",
-  "checked_commits": 40,
+  "baseline_fp_history": [],
+  "baseline_fp": "9943a9d225b1f69ad7235a31ccceaf87421bbf12",
+  "checked_commits": 41,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -353,7 +29,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 297
+        "100644": 299
       }
     },
     {
@@ -378,7 +54,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 297
+        "100644": 299
       }
     },
     {
@@ -403,7 +79,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 297
+        "100644": 299
       }
     },
     {
@@ -428,7 +104,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 297
+        "100644": 299
       }
     },
     {
@@ -453,7 +129,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 297
+        "100644": 299
       }
     }
   ],

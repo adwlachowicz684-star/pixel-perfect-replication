@@ -70,6 +70,8 @@ DEPENDENT_NAMES = {
     'HISTORY_KNOWN': ('const', '历史 mode 台账路径'),
     'FP_HISTORY_MIRROR': ('const', '变更史镜像路径'),
     'LEGACY_FILES_DIR': ('const', '异常文件完整清单落盘目录'),
+    # 🔑 第一百二十轮：G406 报出「未登记」—— 新增常量时忘了登记（第二次真实生效）
+    'CLEANUP_ALLOWLIST': ('const', '清理类调用豁免表路径'),
     # ── 登记项本身：改名会让 G403/G404 静默失效 ──
     'MIRROR_WRITE_FN': ('const', '镜像写入函数名登记项'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
@@ -217,6 +219,24 @@ def list_files():
 #       ② **启动即清理** —— 进入自测先清空，上次残留本次就没了（不靠"结束才清"）
 #       ③ `.gitignore` 排除 —— 即便残留，`git add -A` 也**收不进去**
 #    🔑 gitignore 与"自测需要 git 索引它"不冲突：自测用 `git add -f` **显式强制**。
+# 🔑 第一百二十轮：**清理类调用** —— 凡是"删东西"的调用，
+#    都必须**验证结果**（带 ignore_errors=True 的不报错也不删；os.remove 失败抛异常但可能被 except 吞掉）。
+#    🔴 第一百一十九轮诚实结论①：G412 只守 `_selftest_reset()` 一个函数，
+#       其它 6 处 shutil.rmtree / os.remove 未验证 —— **同一模式可能在别处重演**。
+# 🔴 必须匹配**限定名**（os.remove / shutil.rmtree / os.unlink），不能只匹配方法名：
+#    `remove` 是极常见的方法名（`list.remove` / `set.remove`），只按方法名扫会
+#    **把业务调用误判成清理调用** —— 实测 param_extract.py 的 only_old.remove(ko)
+#    就被误报了两次。🔑 与 110 轮「grep 分不清写与只读」同源：**判据对象选错层级**。
+CLEANUP_CALLS = ('os.remove', 'os.unlink', 'shutil.rmtree',
+                 'os.rmdir', 'shutil.rmtree')
+# 🔑 什么算"结果校验"：调用之后**查询了**被删路径的状态，或**显式处理了失败**。
+CLEANUP_VERIFY_FNS = ('exists', 'lexists', 'isdir', 'isfile', 'listdir',
+                      'islink', 'access')
+# 🔑 豁免表（外部文件，与 scan_doc_allowlist.txt / rc_domain_allowlist.txt 同构）
+CLEANUP_ALLOWLIST = os.path.join(ROOT, 'ledger', 'cleanup_allowlist.txt')
+# 🔑 扫描下限：低于此数说明**扫描器本身失效了**（文件改名/调用方式变了）
+CLEANUP_SCAN_MIN = 4
+
 SELFTEST_TMP_DIR = '_selftest_tmp'
 
 
@@ -1400,6 +1420,19 @@ def cmd_check_symlink():
             os.remove(tgt)
         except OSError:
             pass
+        # 🔑 第一百二十轮：**清理后自断言**（G413 要求）
+        #    🔴 117 轮事故正源于此：进程被杀 → finally 未执行 → 残留被 git add -A 收走。
+        #    🔑 这里再加一层：即便 rmtree/remove 静默失败，也要**查出来并报出来**。
+        leftover = sorted(os.listdir(d)) if os.path.isdir(d) else []
+        if leftover:
+            print(f'\n🔴 自测清理后目录**非空** {leftover[:5]} —— 清理静默失败')
+            ok_all = False
+        idx_left = subprocess.run(['git', 'ls-files', '--', SELFTEST_TMP_DIR],
+                                  capture_output=True, text=True,
+                                  cwd=ROOT).stdout.strip()
+        if idx_left:
+            print(f'\n🔴 自测清理后 git 索引仍有残留 {idx_left.split()[:5]}')
+            ok_all = False
 
     print()
     print('=' * 70)
@@ -1758,6 +1791,194 @@ def cmd_assert_no_tmp_in_index():
     return 0
 
 
+def _scan_cleanup_calls():
+    """🔑 扫出全部**清理类调用**并判定"是否带结果校验"。
+
+    🔑 返回 `[(key, kind, verified, src)]`：
+       - `key`  = `文件名::函数名::参数表达式`（比行号稳定，行号随代码增删漂移）
+       - `kind` = rmtree / remove / unlink
+       - `verified` = 调用之后是否**查询了状态**或**显式处理了失败**
+
+    🔑 判据：什么算"结果校验"（三选一）
+       ① 调用点之后出现**存在性检查**（exists/lexists/isdir/listdir/…）
+       ② 调用被 `try` 包裹且 `except` 分支**不只是 pass**（真的处理了失败）
+       ③ 之后直接 `return None` / `raise`（拒绝继续）
+    🔴 反之：`shutil.rmtree(d, ignore_errors=True)` 后直接往下走、
+       `try: os.remove(p) except OSError: pass` —— **都不算**。
+       🔑 后者尤其要说明：except 确实**接住了**异常，但接着 `pass` 掉，
+          与"没发生过"**完全无法区分**（与 118 轮 `except Exception: pass` 吞掉 NameError 同源）。
+    """
+    import ast
+    out = []
+    # 🔴 HERE 是 scripts/ 本身，不能写成 HERE/scripts —— 那样匹配到 0 个文件，
+    #    扫描器会**静默返回空**（不报错），正因此需要下面的 CLEANUP_SCAN_MIN 下限。
+    for fp in sorted(glob.glob(os.path.join(ROOT, 'scripts', '*.py'))):
+        base = os.path.basename(fp)
+        try:
+            src = open(fp, encoding='utf-8').read()
+            tree = ast.parse(src)
+        except Exception:
+            continue
+        for fn in [n for n in ast.walk(tree)
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+            fn_end = getattr(fn, 'end_lineno', fn.lineno)
+            # 该函数内所有"校验性"调用的行号
+            verify_lines = set()
+            for c in ast.walk(fn):
+                if isinstance(c, ast.Call):
+                    nm = c.func.attr if isinstance(c.func, ast.Attribute) else (
+                        c.func.id if isinstance(c.func, ast.Name) else '')
+                    if nm in CLEANUP_VERIFY_FNS:
+                        verify_lines.add(c.lineno)
+            # 该函数内所有 try：行号区间 → handler 是否有实质处理
+            try_zones = []
+            for t in ast.walk(fn):
+                if isinstance(t, ast.Try):
+                    lo = min(x.lineno for x in t.body)
+                    hi = max(getattr(x, 'end_lineno', x.lineno) for x in t.body)
+                    real = False
+                    for h in t.handlers:
+                        for st in h.body:
+                            if not isinstance(st, ast.Pass):
+                                real = True
+                    try_zones.append((lo, hi, real,
+                                      max(getattr(x, 'end_lineno', x.lineno)
+                                          for x in t.finalbody)
+                                      if t.finalbody else -1))
+            for c in ast.walk(fn):
+                if not isinstance(c, ast.Call):
+                    continue
+                if isinstance(c.func, ast.Attribute) and \
+                        isinstance(c.func.value, ast.Name):
+                    nm = f'{c.func.value.id}.{c.func.attr}'
+                elif isinstance(c.func, ast.Name):
+                    nm = c.func.id
+                else:
+                    nm = ''
+                if nm not in CLEANUP_CALLS:
+                    continue
+                kind = nm.split('.')[-1]
+                ln = c.lineno
+                arg = ''
+                if c.args:
+                    try:
+                        arg = ast.unparse(c.args[0])
+                    except Exception:
+                        arg = '<?>'
+                verified = False
+                # ① 之后有存在性检查
+                if any(v > ln for v in verify_lines):
+                    verified = True
+                # ② 在 try 内且 handler 有实质处理（或在 finally 里查了）
+                for lo, hi, real, fend in try_zones:
+                    if lo <= ln <= hi and real:
+                        verified = True
+                # ③ 之后 return None / raise
+                for n2 in ast.walk(fn):
+                    if isinstance(n2, ast.Raise) and n2.lineno > ln:
+                        verified = True
+                    if isinstance(n2, ast.Return) and n2.lineno > ln \
+                            and isinstance(n2.value, ast.Constant) \
+                            and n2.value.value is None:
+                        verified = True
+                out.append((f'{base}::{fn.name}::{arg}', kind, verified, ln))
+    return out
+
+
+def _read_cleanup_allowlist():
+    """🔑 读豁免表；🔴 不可读返回 None（**拒绝给结论**，不静默当"没有豁免"）。"""
+    try:
+        txt = open(CLEANUP_ALLOWLIST, encoding='utf-8').read()
+    except OSError:
+        return None
+    res = {}
+    for ln in txt.strip().split('\n'):
+        ln = ln.strip()
+        if not ln or ln.startswith('#'):
+            continue
+        # 🔑 键形如 `文件::函数::参数`，内部含 `::` —— 不能按第一个冒号切，
+        #    否则键会被切成 `push_api.py`（实测过，导致全部豁免判定为僵尸）。
+        #    ✅ 键内部无空格，故以 **`: `（冒号+空格）** 作分隔，只切一次。
+        if ': ' not in ln:
+            return None
+        k, reason = ln.split(': ', 1)
+        res[k.strip()] = reason.strip()
+    return res
+
+
+def cmd_assert_cleanup_verified():
+    """🔑 G413：全部**清理类调用**都必须带结果校验（或被登记豁免）。
+
+    🔴 第一百一十九轮诚实结论①：G412 只守 `_selftest_reset()` 一个函数，
+       其它 6 处 `shutil.rmtree` / `os.remove` 未验证 —— **同一模式可能在别处重演**。
+    ✅ 本条把它从"**一个函数**"推广成"**一类写法**"。
+
+    | 判据 | 防什么 |
+    |---|---|
+    | ① 扫描到 ≥ CLEANUP_SCAN_MIN 处 | 🔑 **扫描器自己失效**（返回空集） |
+    | ② 未带校验的必须在豁免表内 | 清理静默失败 |
+    | ③ 豁免键必须真实存在于扫描结果 | 僵尸豁免（豁免了不存在的东西） |
+    | ④ 豁免理由非空且 ≥ 10 字符 | 豁免退化成"随便放行" |
+    | ⑤ 豁免表不可读 → 拒绝给结论 | "读不到" ≠ "没有豁免" |
+    """
+    print('=' * 70)
+    print('🔑 **清理类调用结果校验**（G413）')
+    print('=' * 70)
+    rows = _scan_cleanup_calls()
+    ok_all = True
+
+    # ① 下限 —— 防扫描器静默失效
+    print(f'① 扫描到 {len(rows)} 处清理调用（下限 {CLEANUP_SCAN_MIN}）')
+    if len(rows) < CLEANUP_SCAN_MIN:
+        print(f'🔴 少于下限 —— 扫描器可能已失效（文件改名？调用方式变了？）')
+        print('=' * 70)
+        return 1
+    print('   ✅ 扫描器有效')
+
+    allow = _read_cleanup_allowlist()
+    if allow is None:
+        print(f'🔴 豁免清单不可读：{CLEANUP_ALLOWLIST} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+
+    bad = [r for r in rows if not r[2]]
+    print(f'\n② 未带结果校验 {len(bad)} 处：')
+    unlisted = []
+    for key, kind, _v, ln in bad:
+        reason = allow.get(key)
+        if reason is None:
+            unlisted.append((key, kind, ln))
+            print(f'   🔴 {key}  ({kind} @ L{ln}) —— **未登记豁免**')
+        else:
+            print(f'   ✅ {key} —— 已豁免')
+    if unlisted:
+        ok_all = False
+
+    # ③ 僵尸豁免
+    found = {r[0] for r in rows}
+    zombie = [k for k in allow if k not in found]
+    print(f'\n③ 僵尸豁免检查（登记了但扫描不到 {len(zombie)} 条）')
+    for k in zombie:
+        print(f'   🔴 {k} —— 代码里已无此调用，应删除')
+    if zombie:
+        ok_all = False
+
+    # ④ 理由充分性
+    print('\n④ 豁免理由检查')
+    for k in sorted(allow):
+        r = allow[k]
+        if len(r) < 10:
+            print(f'   🔴 {k} 理由过短（{len(r)} 字符）：{r!r}')
+            ok_all = False
+    if not any(len(v) < 10 for v in allow.values()):
+        print(f'   ✅ {len(allow)} 条豁免理由均充分')
+
+    print()
+    print(f'{"✅ 全部清理调用均已校验或已登记豁免" if ok_all else "🔴 存在未校验的清理调用"}')
+    print('=' * 70)
+    return 0 if ok_all else 1
+
+
 def cmd_check_selftest_reset():
     """🔑 G412：**自测临时目录清理自断言**（防 shutil.rmtree 静默失败）。
 
@@ -1989,6 +2210,12 @@ def cmd_check_gitlink():
             os.remove(gl)
         except OSError:
             pass
+        # 🔑 第一百二十轮：**清理后自断言**（G413 要求）
+        #    🔴 os.remove 失败会抛 OSError，但上面 `except OSError: pass` 把它吞了
+        #       —— 失败与成功**完全无法区分**（118 轮同病）。这里补查一次。
+        if os.path.lexists(gl):
+            print(f'\n🔴 自测清理后 {gl} **仍存在** —— 清理静默失败')
+            ok_all = False
 
     print()
     print('=' * 70)
@@ -2591,6 +2818,8 @@ def main():
                    help='G411 自测临时目录必须真被 gitignore')
     ap.add_argument('--check-selftest-reset', action='store_true',
                    help='G412：自测临时目录清理自断言（防 rmtree 静默失败）')
+    ap.add_argument('--assert-cleanup-verified', action='store_true',
+                   help='G413：全部清理类调用必须带结果校验或登记豁免')
     ap.add_argument('--check-gitlink', action='store_true',
                     help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
@@ -2653,6 +2882,9 @@ def main():
 
     if a.check_selftest_reset:
         return cmd_check_selftest_reset()
+
+    if a.assert_cleanup_verified:
+        return cmd_assert_cleanup_verified()
     if a.check_gitlink:
         os.chdir(ROOT)
         return cmd_check_gitlink()

@@ -788,6 +788,10 @@ GATES = [
     #    "**清理真的发生了**" —— rmtree(ignore_errors=True) 失败时不报错也不删。
     ("G412", "**自测临时目录清理自断言**（防 shutil.rmtree 静默失败）",
      ["{py}", "{s}/push_api.py", "--check-selftest-reset"], "hard", []),
+    # 🔑 第一百二十轮：G412 只守一个函数，本条把它推广成"一类写法"——
+    #    扫全部 os.remove / shutil.rmtree / os.unlink，要求带结果校验或登记豁免。
+    ("G413", "**清理类调用必须带结果校验**（或登记豁免）",
+     ["{py}", "{s}/push_api.py", "--assert-cleanup-verified"], "hard", []),
 ]
 
 # 🔑 第一百零五轮：**必须并存的层**（在线 ↔ 离线）
