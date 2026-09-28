@@ -1,0 +1,28 @@
+# 第一百二十七轮声明清单
+# 🔑 优先引**代码标识符**（不随措辞变化）；文档锚点只引**不含引号**的稳定短串
+grep:scripts/claim_verify.py::def cmd_assert_audit_artifact
+grep:scripts/claim_verify.py::cmd_assert_audit_artifact
+grep:scripts/claim_verify.py::assert-audit-artifact
+grep:scripts/claim_verify.py::assert_audit_artifact
+grep:scripts/claim_verify.py::CAPABILITY_ARTIFACT_KEYS
+grep:scripts/claim_verify.py::GATE_RC_DOMAIN
+grep:scripts/claim_verify.py::generated_at_ns
+grep:scripts/claim_verify.py::拒绝给结论
+grep:scripts/run_all_gates.py::G419
+grep:scripts/run_all_gates.py::assert-audit-artifact
+cmd:claim_verify.py --assert-audit-artifact
+gate:G419
+# 🔑 判据⑧ 独立真值：另起子进程跑 --all，快照须在跑**之前**取
+grep:scripts/claim_verify.py::subprocess.run
+# 🔑 判据⑥ ok 须与 results 自洽（防同一文件两个真相）
+grep:scripts/claim_verify.py::ok 不自洽
+# 🔑 G406 第三次真实生效：126 轮新增的常量未登记，本轮补登记
+grep:scripts/push_api.py::ROUND_GAP_ALLOWLIST
+grep:scripts/push_api.py::轮次断号豁免清单路径
+# 🔑 文档锚点（只引不含引号的稳定短串）
+grep:references/游戏引擎复刻.md::真值参照物
+grep:README.md::第一百二十七轮：G419
+# 🔑 G405 跨文件缺陷修复（登记表在 push_api.py，名字可能定义在别处）
+grep:scripts/push_api.py::def _module_level_defs
+grep:scripts/push_api.py::_module_level_defs
+grep:scripts/push_api.py::已跨 scripts/*.py 查找

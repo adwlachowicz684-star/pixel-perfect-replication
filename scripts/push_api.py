@@ -29,6 +29,10 @@ import glob
 import hashlib
 import json
 import os
+# 🔑 第一百二十九轮：**顶层导入**（沿用第一百一十九轮的治本做法）。
+#    🔴 在函数内 import 已导致四次 NameError（84/111/118/119 轮），
+#       新函数每写一个就得记得补一行 —— 把它放在顶层，这类错误不可能再发生。
+import re
 import shutil
 # 🔑 第一百一十九轮**根治**：本文件原**没有顶层** import subprocess，
 #    只在各函数内 import —— 已导致**四次** NameError（84 轮 ROOT、111 轮 glob、
@@ -72,6 +76,10 @@ DEPENDENT_NAMES = {
     'LEGACY_FILES_DIR': ('const', '异常文件完整清单落盘目录'),
     # 🔑 第一百二十轮：G406 报出「未登记」—— 新增常量时忘了登记（第二次真实生效）
     'CLEANUP_ALLOWLIST': ('const', '清理类调用豁免表路径'),
+    # 🔑 第一百二十七轮：G406 报出「未登记」—— 126 轮新增时忘了登记
+    #    （G406 **第三次**在真实工作流中生效：115 轮 TRUST_ROOT_FILE、
+    #      120 轮 CLEANUP_ALLOWLIST、本轮 ROUND_GAP_ALLOWLIST）
+    'ROUND_GAP_ALLOWLIST': ('const', '轮次断号豁免清单路径（G418 依赖）'),
     # ── 登记项本身：改名会让 G403/G404 静默失效 ──
     'MIRROR_WRITE_FN': ('const', '镜像写入函数名登记项'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
@@ -866,20 +874,28 @@ def cmd_assert_dependent_names():
         print(f'   ✅ meta    {len(globals().get("SELF_REGISTERED_META") or ())} '
               f'个元登记项闭合')
 
+    # 🔑 第一百二十七轮：存在性**跨文件**查找（登记表在本文件，名字可能在别处）
+    mconsts, mfns = _module_level_defs()
     for name, (kind, desc) in sorted(tbl.items()):
         g = globals().get(name)
         if kind == 'const':
-            ok = g is not None and g != ''
+            here = g is not None and g != ''
+            ok = here or (name in mconsts)
+            where = '本文件' if here else (mconsts.get(name) or '—')
         else:
-            ok = callable(g)
+            here = callable(g)
+            ok = here or (name in mfns)
+            where = '本文件' if here else (mfns.get(name) or '—')
         n_ref = refs.get(name, 0)
         if not ok:
-            bad.append(f'{kind} {name}（{desc}）**不存在或为空**')
+            bad.append(f'{kind} {name}（{desc}）**不存在或为空**'
+                       f'（已跨 scripts/*.py 查找）')
         elif n_ref == 0:
             bad.append(f'{name}（{desc}）**无任何引用** —— '
                        f'改名后门禁会静默失效')
         else:
-            print(f'   ✅ {kind:5s} {name:22s} 引用 {n_ref} 处 · {desc}')
+            print(f'   ✅ {kind:5s} {name:22s} 引用 {n_ref:2d} 处 · '
+                  f'@{where} · {desc}')
     if bad:
         print()
         for b in bad:
@@ -890,6 +906,34 @@ def cmd_assert_dependent_names():
     print(f'✅ {len(tbl)} 个被依赖的名字**全部闭合**（存在且真被引用）')
     print('=' * 70)
     return 0
+
+def _module_level_defs():
+    """🔑 扫 `scripts/*.py` 的**模块级**定义，返回 (常量名→文件, 函数名→文件)。
+
+    🔴 第一百二十七轮**实测发现**：`DEPENDENT_NAMES` 登记表在 `push_api.py`，
+       而 G405 的"存在性"判据只用 `globals().get(name)` —— **只看本文件**。
+       🔑 于是登记一个**定义在别处**的名字（如 `claim_verify.py::ROUND_GAP_ALLOWLIST`）
+          会被误报"不存在或为空"，而它其实是**真被依赖**的。
+    🔑 跨文件扩展**不是削弱判据**：名字在哪都不存在 → 仍然报错；
+       只是把"存在性"的查找范围从单文件扩到 `scripts/`（与 G406 同范围）。
+    """
+    import ast
+    consts, fns = {}, {}
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        base = os.path.basename(f)
+        try:
+            tree = ast.parse(open(f, encoding='utf-8').read())
+        except (SyntaxError, ValueError):
+            continue
+        for n in tree.body:
+            if isinstance(n, ast.Assign):
+                for t in n.targets:
+                    if isinstance(t, ast.Name):
+                        consts.setdefault(t.id, base)
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                fns.setdefault(n.name, base)
+    return consts, fns
+
 
 def _scan_path_consts():
     """🔑 扫 scripts/*.py 的**模块级路径常量**（os.path.join(ROOT/HERE, ...)）。
@@ -2762,6 +2806,73 @@ def cmd_assert_legacy_dump():
     return 1
 
 
+def _claims_max_index():
+    """🔑 ledger/ 里**磁盘上**已有的最大清单编号（不要求在 git 索引里）。"""
+    d = os.path.join(ROOT, 'ledger')
+    if not os.path.isdir(d):
+        return 0
+    mx = 0
+    for f_ in os.listdir(d):
+        m = re.match(r'claims_(\d+)\.txt$', f_)
+        if m:
+            mx = max(mx, int(m.group(1)))
+    return mx
+
+
+def cmd_assert_round_claims():
+    """🔑 G421：**推送前必须已有本轮声明清单，且已纳入 git 索引**。
+
+    🔴 第一百二十九轮真实事故（本条的存在理由）：
+        第一百二十七轮的推送在 **08:07:59** 完成，
+        而 `ledger/claims_127.txt` 在 **08:17:47** 才写入 → **漏传**。
+        🔑 关键：**G390（防漏传）当时是绿的** ——
+           文件在推送那一刻还**不存在**，无从检查。
+        🔑 判据：**"没检查出问题"与"没问题"是两回事** ——
+           G390 守的是"已存在但没 add"，守不住"还没写就推了"。
+
+    🔑 取 N = max(文档最大轮次, ledger 里最大清单编号)：
+       - 文档已写 129 轮但清单没写 → N=129 → 缺文件 → 🔴
+       - 清单写了 129 但文档还没提 → N=129 → 只查它有没有进索引 → 🔴（防忘 add）
+       🔑 两个方向都有意义，缺任一个都会漏掉一类事故。
+
+    🔑 轮次探测不到时 **拒绝给结论**（与 G389 / G408 同源，不猜）。
+    """
+    print('=' * 70)
+    print('🔑 G421 推送前本轮清单检查（防"还没写就推了"）')
+    print('=' * 70)
+    docs = _doc_max_round()
+    cmax = _claims_max_index()
+    n = max(docs, cmax)
+    if n <= 0:
+        print('🔴 无法确定当前轮次（文档未提及轮次，且 ledger 无清单）'
+              ' —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    rel = f'ledger/claims_{n}.txt'
+    p = os.path.join(ROOT, 'ledger', f'claims_{n}.txt')
+    if not os.path.isfile(p):
+        print(f'🔴 缺 {rel} —— **本轮清单尚未写**')
+        print(f'   （文档最大轮次 {docs} · ledger 最大清单编号 {cmax}）')
+        print('   🔑 推送后补写 = 漏传：本轮做过什么将无法复核（127 轮真实事故）')
+        print('=' * 70)
+        return 1
+    # 🔑 git 不可用 ≠ 文件没进索引（与 G390 同源：读不到要拒绝，不能当"没有"）
+    if os.system('git rev-parse --is-inside-work-tree >/dev/null 2>&1') != 0:
+        print('🔴 git 不可用 —— **无法确定**清单是否已纳入索引，拒绝给结论')
+        print('=' * 70)
+        return 1
+    idx = list_files()
+    if rel not in idx:
+        print(f'🔴 {rel} **不在 git 索引里** —— 推送会漏传')
+        print('   🔑 处理办法：git add -A（推送前 add，不是推送后）')
+        print('=' * 70)
+        return 1
+    print(f'✅ 第 {n} 轮清单已写且已纳入索引'
+          f'（文档最大轮次 {docs} · ledger 最大清单编号 {cmax}）')
+    print('=' * 70)
+    return 0
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -2779,6 +2890,8 @@ def main():
                     help='G390：只检查是否会**静默漏传**（忘了 git add）')
     ap.add_argument('--allow-untracked', action='store_true',
                     help='明确接受漏传（不推荐）')
+    ap.add_argument('--assert-round-claims', action='store_true',
+                    help='G421：推送前必须已有**本轮声明清单**且已纳入索引')
     ap.add_argument('--verify-push', action='store_true',
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
@@ -2897,6 +3010,10 @@ def main():
         os.chdir(ROOT)
         return cmd_verify_push(report=a.report)
 
+    if a.assert_round_claims:
+        os.chdir(ROOT)
+        return cmd_assert_round_claims()
+
     if a.check_leak:
         # 🔑 G390：只做**漏传检查**，不统计不推送
         os.chdir(ROOT)
@@ -2914,7 +3031,13 @@ def main():
 
     os.chdir(ROOT)
 
-    os.chdir(ROOT)
+    # 🔑 第一百二十九轮：**G421 本轮清单必须在推送前写**。
+    #    🔴 真实事故：127 轮推送 08:07:59 完成，claims_127.txt 08:17:47 才写
+    #       → 漏传；而 G390 当时是**绿的**（那一刻文件还不存在）。
+    #    🔑 判据：G390 守"已存在但没 add"，本条守"还没写就推了" —— 互补。
+    if cmd_assert_round_claims() != 0:
+        print('\n🔴 拒绝推送 —— 清单漏传会让"本轮做过什么"无法复核')
+        return 1
 
     # 🔑 第九十七轮：**未纳入版本管理的文件检查**。
     #    🔴 第九十六轮诚实结论⑤：`push_api.py` 依赖 `git ls-files`，

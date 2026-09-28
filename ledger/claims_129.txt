@@ -1,0 +1,27 @@
+# 第一百二十九轮声明清单
+# 🔑 优先引**代码标识符**（不随措辞变化）；文档锚点只引**不含引号**的稳定短串
+grep:scripts/push_api.py::def cmd_assert_round_claims
+grep:scripts/push_api.py::cmd_assert_round_claims
+grep:scripts/push_api.py::assert-round-claims
+grep:scripts/push_api.py::assert_round_claims
+grep:scripts/push_api.py::def _claims_max_index
+grep:scripts/push_api.py::_claims_max_index
+grep:scripts/push_api.py::_doc_max_round
+grep:scripts/push_api.py::本轮清单尚未写
+grep:scripts/push_api.py::不在 git 索引里
+grep:scripts/push_api.py::拒绝给结论
+grep:scripts/push_api.py::拒绝推送
+grep:scripts/run_all_gates.py::G421
+grep:scripts/run_all_gates.py::assert-round-claims
+cmd:push_api.py --assert-round-claims
+gate:G421
+# 🔑 根因：推送在前、写清单在后（127 轮真实漏传）
+grep:references/游戏引擎复刻.md::c9bcbf8f728d
+grep:references/游戏引擎复刻.md::08:17:47
+grep:README.md::第一百二十九轮：G421
+# 🔑 判据：N = max(文档最大轮次, ledger 最大清单编号)，两个方向都要覆盖
+grep:references/游戏引擎复刻.md::max(文档最大轮次
+# 🔑 已集成进推送主流程（在 G390 之前），缺清单即拒绝推送
+grep:scripts/push_api.py::cmd_assert_round_claims() != 0
+# 🔑 顶层 import re（沿用 119 轮治本做法，防 NameError 再次发生）
+grep:scripts/push_api.py::import re

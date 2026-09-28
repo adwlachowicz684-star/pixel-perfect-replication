@@ -1186,8 +1186,11 @@ def cmd_assert_audit_artifact():
     #       🔑 若先跑后读，读到的永远是刚写的新值 → 判据恒真 → 静默失效。
     print('\n⑧ 独立真值（另起子进程跑 `--all`）')
     try:
+        # 🔑 第一百二十八轮：带 `--no-artifact` —— **不重写产物**。
+        #    🔴 否则 G419 自己把产物改回真值，"假产物"下次就查不到了。
         pp = subprocess.run(
-            [sys.executable, os.path.abspath(__file__), '--all'],
+            [sys.executable, os.path.abspath(__file__), '--all',
+             '--no-artifact'],
             capture_output=True, text=True, timeout=300)
     except Exception as e:
         print(f'🔴 无法运行 `--all`：{type(e).__name__}: {e} —— 拒绝给结论')
@@ -1215,12 +1218,220 @@ def cmd_assert_audit_artifact():
             if not same:
                 bad.append(f'{k} 产物 {sv!r} ≠ 真值 {tv!r}')
 
+    # ⑨ 🔑 取真值**不得重写产物**（检查者不得同时是修正者）
+    print('\n⑨ 取真值**未重写产物**（🔑 检查者不得修正被检查对象）')
+    try:
+        with open(ap2, encoding='utf-8') as f:
+            after = json.load(f)
+    except Exception as e:
+        print(f'🔴 取真值后产物不可读 —— 拒绝给结论'
+              f'（{type(e).__name__}: {e}）')
+        print('=' * 70)
+        return 1
+    ns_after = after.get('generated_at_ns')
+    if ns_after != ns:
+        print(f'🔴 产物被重写：ns {ns} → {ns_after}')
+        print('   🔑 G419 一旦重写产物，"假产物"在下次回归时会被**自动抹平**，'
+              '本门禁将永远绿。')
+        bad.append('产物被重写')
+    else:
+        print(f'   ✅ ns 未变（{ns}）—— 产物**未被重写**')
+
     print()
     if bad:
         print('🔴 守卫失效：%s' % bad)
         print('=' * 70)
         return 1
-    print('✅ 守卫成立：`audit-all` 产物与独立真值**逐条一致**')
+    print('✅ 守卫成立：`audit-all` 产物与独立真值**逐条一致**'
+          '，且取真值过程**未重写产物**')
+    print('=' * 70)
+    return 0
+
+
+# 🔑 第一百二十八轮：G420 的登记项（**不得硬编码在扫描器里** ——
+#    改名会让检查静默失效，与第一百一十一轮同源）
+NO_ARTIFACT_FLAG = '--no-artifact'
+NO_ART_ARTIFACT_FN = 'cmd_all'
+NO_ART_TRUTH_FN = 'cmd_assert_audit_artifact'
+
+
+def _find_func(tree, name):
+    """按函数名取 AST 节点（找不到返回 None）。"""
+    for n in ast.walk(tree):
+        if isinstance(n, ast.FunctionDef) and n.name == name:
+            return n
+    return None
+
+
+def cmd_assert_no_rewrite():
+    """🔑 G420：**取真值不得重写产物** —— 检查者不得同时是修正者。
+
+    🔴 第一百二十七轮诚实结论②：G419 取"独立真值"时跑 `--all`，
+       而 `--all` **必然重写产物** ——
+       🔑 于是"假产物"只能存活到**下一次回归**：
+          篡改 → G419 报一次 rc=1 → 产物被重写成真值 → 下次**永远绿**。
+       🔑 **"曾经不一致"这个事实被抹掉，只剩一个 rc**，
+          而 rc 无法回答"刚才是不是不一致"
+          （与 122 轮基线污染被自动抹平**同源**）。
+       🔑 判据：**检查者不得同时是修正者** ——
+          否则它修正的不是错误，是"错误存在过的证据"。
+
+    判据：
+      ① 登记项非空
+      ② `--no-artifact` 已在 argparse 与真值调用处**同时**登记
+      ③ `cmd_all` **真的**有跳过写入的分支（防开关存在但不生效）
+      ④ G419 的子进程命令**真的**带该开关（防判据③真而调用没带）
+      🔑 ⑤ **行为层**：临时篡改产物 → 真跑 G419 →
+           断言 rc=1 且 **ns 未变** 且 **产物仍保留篡改值**
+           （🔑 与实现解耦：即便内部重构，只要重写产物就会被抓）
+    """
+    print('=' * 70)
+    print('G420 · 🔑 **取真值不得重写产物**（检查者不得是修正者）')
+    print('=' * 70)
+    bad = []
+    me = os.path.abspath(__file__)
+
+    # ①
+    if not NO_ARTIFACT_FLAG or not NO_ART_ARTIFACT_FN or not NO_ART_TRUTH_FN:
+        print('\n🔴 G420 登记项为空 —— 拒绝给结论')
+        return 1
+    print('① 登记项：flag=`%s` · 产物函数=`%s` · 真值函数=`%s`'
+          % (NO_ARTIFACT_FLAG, NO_ART_ARTIFACT_FN, NO_ART_TRUTH_FN))
+
+    try:
+        src = open(me, encoding='utf-8').read()
+        tree = ast.parse(src)
+    except Exception as e:
+        print('\n🔴 无法解析本文件 —— 拒绝给结论（%s: %s）'
+              % (type(e).__name__, e))
+        return 1
+
+    # ② argparse + 真值调用处都要有
+    n_flag = sum(1 for n in ast.walk(tree)
+                 if isinstance(n, ast.Constant)
+                 and n.value == NO_ARTIFACT_FLAG)
+    # 🔑 第一百二十八轮破坏③：**只数次数防不住"该有的地方没有"**。
+    #    🔴 删掉 argparse 那行后，字面量仍剩「登记项定义 + G419 调用」两处，
+    #       `n_flag >= 2` 照样通过 —— 而命令行**根本没有这个参数**。
+    #    🔑 与 93 轮「只数次数防不住改值」、91 轮「比率为 0 时断言退化」
+    #       **同一个病**：数"有几个"不等于验"是什么/在哪"。
+    #    ✅ 改为**位置判定**：必须真被 `add_argument` 登记。
+    reg_in_ap = any(
+        isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == 'add_argument'
+        and n.args
+        and isinstance(n.args[0], ast.Constant)
+        and n.args[0].value == NO_ARTIFACT_FLAG
+        for n in ast.walk(tree))
+    print('\n② `%s` 字面量 %d 处 · argparse 已登记: %s'
+          % (NO_ARTIFACT_FLAG, n_flag, '✅' if reg_in_ap else '🔴'))
+    if not reg_in_ap:
+        print('🔴 未在 argparse 中登记 —— 命令行**根本没有这个参数**，'
+              '开关是假的')
+        bad.append('flag 未登记')
+
+    # ③ cmd_all 真的引用开关
+    fa = _find_func(tree, NO_ART_ARTIFACT_FN)
+    if fa is None:
+        print('\n🔴 找不到函数 `%s` —— 拒绝给结论' % NO_ART_ARTIFACT_FN)
+        return 1
+    # 🔑 第一百二十八轮坑：`getattr(a, 'no_artifact', False)` 里的
+    #    `no_artifact` 是 **ast.Constant（字符串）**，不是 Name / Attribute ——
+    #    🔴 只按名字统计会**永远为 0**，检查静默失效。
+    #    🔑 与 114 轮 `globals().get('X')` 扫不到**同源**（第三次出现）：
+    #       「按名字访问」与「按字符串访问」是两种引用形态，只统计其一时，
+    #       另一类就表现为"不存在"。
+    uses_a = any(
+        (isinstance(n, ast.Attribute) and n.attr == 'no_artifact')
+        or (isinstance(n, ast.Name) and n.id == 'no_artifact')
+        or (isinstance(n, ast.Constant) and n.value == 'no_artifact')
+        for n in ast.walk(fa))
+    print('③ `%s` 引用 no_artifact: %s'
+          % (NO_ART_ARTIFACT_FN, '✅' if uses_a else '🔴'))
+    if not uses_a:
+        print('🔴 产物函数**没有**跳过写入的分支 —— 开关形同虚设')
+        bad.append('写入未跳过')
+
+    # ④ G419 子进程真带开关
+    ft = _find_func(tree, NO_ART_TRUTH_FN)
+    if ft is None:
+        print('\n🔴 找不到函数 `%s` —— 拒绝给结论' % NO_ART_TRUTH_FN)
+        return 1
+    uses_t = any(isinstance(n, ast.Constant)
+                 and n.value == NO_ARTIFACT_FLAG
+                 for n in ast.walk(ft))
+    print('④ `%s` 子进程带开关: %s'
+          % (NO_ART_TRUTH_FN, '✅' if uses_t else '🔴'))
+    if not uses_t:
+        print('🔴 真值函数**没带**开关 —— 取真值会重写产物')
+        bad.append('调用未带开关')
+
+    # 🔑 ⑤ 行为层：篡改 → 跑 G419 → 产物必须**原样保留**
+    print('\n⑤ 行为层验证（临时篡改 → 真跑 G419 → 产物须**不被抹平**）')
+    rel = CAPABILITY_ARTIFACT.get('audit-all')
+    keys = CAPABILITY_ARTIFACT_KEYS.get('audit-all')
+    if not rel or not keys:
+        print('🔴 产物/键未登记 —— 拒绝给结论')
+        return 1
+    ap2 = os.path.join(ROOT, rel)
+    try:
+        orig_txt = open(ap2, encoding='utf-8').read()
+        orig = json.loads(orig_txt)
+    except Exception as e:
+        print('🔴 产物不可读 —— 拒绝给结论（%s: %s）'
+              % (type(e).__name__, e))
+        return 1
+    k0 = keys[1] if len(keys) > 1 else keys[0]
+    tampered = dict(orig)
+    tampered['results'] = dict(orig.get('results') or {})
+    tampered['results'][k0] = 1
+    tampered_ns = orig.get('generated_at_ns')
+    try:
+        with open(ap2, 'w', encoding='utf-8') as f:
+            json.dump(tampered, f, ensure_ascii=False, indent=2)
+        print('   已篡改 `%s` = 1（ns 保持 %s）' % (k0, tampered_ns))
+        try:
+            pp = subprocess.run(
+                [sys.executable, me, '--assert-audit-artifact'],
+                capture_output=True, text=True, timeout=300)
+            rc = pp.returncode
+        except Exception as e:
+            print('🔴 无法运行 G419：%s: %s' % (type(e).__name__, e))
+            return 1
+        after = json.loads(open(ap2, encoding='utf-8').read())
+        ns_after = after.get('generated_at_ns')
+        val_after = (after.get('results') or {}).get(k0)
+        print('   G419 rc=%d · ns 后=%s · `%s` 后=%r'
+              % (rc, ns_after, k0, val_after))
+        if rc == 0:
+            print('🔴 G419 **放行**了假产物 —— 守望失效')
+            bad.append('假产物被放行')
+        if ns_after != tampered_ns:
+            print('🔴 产物被**重写**：ns %s → %s' % (tampered_ns, ns_after))
+            bad.append('产物被重写')
+        if val_after != 1:
+            print('🔴 篡改值被**抹平**：%s = %r（应为 1）' % (k0, val_after))
+            bad.append('篡改被抹平')
+        if rc != 0 and ns_after == tampered_ns and val_after == 1:
+            print('   ✅ 假产物**持续可见** —— 不会被下一次回归自动抹平')
+    finally:
+        # 🔑 无论成败都要还原 —— 🔴 否则残留的假产物会污染后续
+        with open(ap2, 'w', encoding='utf-8') as f:
+            f.write(orig_txt)
+        now = json.loads(open(ap2, encoding='utf-8').read())
+        same = (now == orig)
+        print('   %s 已还原产物（%s）' % ('✅' if same else '🔴',
+                                    '与原文一致' if same else '**不一致**'))
+        if not same:
+            bad.append('产物未还原')
+
+    print()
+    if bad:
+        print('🔴 守卫失效：%s' % bad)
+        print('=' * 70)
+        return 1
+    print('✅ 守卫成立：取真值**不重写产物**，假产物不会被自动抹平')
     print('=' * 70)
     return 0
 
@@ -1269,9 +1480,20 @@ def cmd_all(a):
     # 🔑 第八十七轮：**写出文件系统产物**（真正的外部副作用）。
     #    🔑 即使三段**都失败**，产物也照写 ——
     #       🔴 否则"跑不通"与"没跑"又变成同一回事（与"空表即通过"同源）。
+    # 🔑 第一百二十八轮：**检查者不得同时是修正者**。
+    #    G419 取独立真值时要跑 `--all`，而 `--all` 会重写产物 ——
+    #    🔴 于是"假产物"在下一次回归时被**自动抹平**：
+    #       篡改 → G419 报一次 → 产物被重写成真值 → 下次回归**永远绿**。
+    #       🔑 "曾经不一致"这个事实只剩一个 rc，而 rc 无法回答
+    #          "刚才是不是不一致"（与 122 轮基线污染被抹平同源）。
+    #    ✅ 故增设 `--no-artifact`：跑但不写产物。
+    no_art = bool(getattr(a, 'no_artifact', False))
     art = CAPABILITY_ARTIFACT.get('audit-all')
     ns = time.time_ns()
-    if art:
+    if no_art:
+        print('\n🔑 `--no-artifact`：**跳过产物写入**'
+              '（检查者不得修正被检查对象）')
+    elif art:
         ap2 = os.path.join(ROOT, art)
         os.makedirs(os.path.dirname(ap2), exist_ok=True)
         rec = {'generated_at_ns': ns,
@@ -1280,7 +1502,7 @@ def cmd_all(a):
         with open(ap2, 'w', encoding='utf-8') as f:
             json.dump(rec, f, ensure_ascii=False, indent=2)
         print(f'\n🔑 文件系统产物已写入: `{art}` （generated_at_ns={ns}）')
-    else:
+    elif not art:
         print('\n🔴 `CAPABILITY_ARTIFACT` 未登记 —— 无法证明外部副作用')
 
     print()
@@ -1509,12 +1731,19 @@ def main():
                     help='扫描轮次的文档（可重复，默认全部 md）')
     ap.add_argument('--all', action='store_true',
                     help='G385：一次进程跑完 G382+G383+G384')
+    ap.add_argument('--no-artifact', action='store_true',
+                    help='G420：跑 `--all` 但**不写产物** —— '
+                         '供 G419 取独立真值时使用'
+                         '（🔑 检查者不得同时是修正者）')
     ap.add_argument('--assert-since-active', action='store_true',
                     help='G418：逐轮要求须真的在门禁运行中生效'
                          '（防断号检查因 require_since=None 而形同虚设）')
     ap.add_argument('--assert-audit-artifact', action='store_true',
                     help='G419：`audit-all` 产物须与**独立真值**一致'
                          '（防自报 rc 无人核对）')
+    ap.add_argument('--assert-no-rewrite', action='store_true',
+                    help='G420：取真值**不得重写产物**'
+                         '（检查者不得同时是修正者，防假产物被自动抹平）')
     ap.add_argument('--audit-all', action='store_true',
                     help='G385：独立校验 --all 三段是否都跑了')
     ap.add_argument('--probe-capability', metavar='NAME', default=None,
@@ -1542,6 +1771,8 @@ def main():
         return cmd_assert_since_active()
     if a.assert_audit_artifact:
         return cmd_assert_audit_artifact()
+    if getattr(a, 'assert_no_rewrite', False):
+        return cmd_assert_no_rewrite()
     if a.audit_all:
         return cmd_audit_all(a)
     if a.probe_capability is not None:

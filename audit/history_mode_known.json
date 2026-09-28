@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-28T06:53:06+0800",
+  "generated_at": "2026-09-29T00:32:42+0800",
   "baseline_modes": {
-    "100644": 303
+    "100644": 310
   },
   "baseline_fp_history": [
     {
@@ -35,10 +35,42 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-28T06:53:06+0800"
+    },
+    {
+      "seq": 3,
+      "seq_in_round": 1,
+      "round": 127,
+      "from_fp": "d0ca1aabde91f648a7c268609d9b1231d1fe5870",
+      "to_fp": "ad9e13baca5a95822924a7af2ed0d786c3d27ab5",
+      "from_modes": {
+        "100644": 303
+      },
+      "to_modes": {
+        "100644": 306
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-28T08:12:22+0800"
+    },
+    {
+      "seq": 4,
+      "seq_in_round": 1,
+      "round": 129,
+      "from_fp": "ad9e13baca5a95822924a7af2ed0d786c3d27ab5",
+      "to_fp": "7b0842db3b74643f93995dd14e7721f668b50f81",
+      "from_modes": {
+        "100644": 306
+      },
+      "to_modes": {
+        "100644": 310
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-29T00:32:43+0800"
     }
   ],
-  "baseline_fp": "d0ca1aabde91f648a7c268609d9b1231d1fe5870",
-  "checked_commits": 44,
+  "baseline_fp": "7b0842db3b74643f93995dd14e7721f668b50f81",
+  "checked_commits": 48,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -62,7 +94,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 303
+        "100644": 310
       }
     },
     {
@@ -87,7 +119,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 303
+        "100644": 310
       }
     },
     {
@@ -112,7 +144,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 303
+        "100644": 310
       }
     },
     {
@@ -137,7 +169,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 303
+        "100644": 310
       }
     },
     {
@@ -162,7 +194,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 303
+        "100644": 310
       }
     }
   ],
