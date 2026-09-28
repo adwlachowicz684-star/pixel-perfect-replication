@@ -25,3 +25,7 @@ grep:references/游戏引擎复刻.md::max(文档最大轮次
 grep:scripts/push_api.py::cmd_assert_round_claims() != 0
 # 🔑 顶层 import re（沿用 119 轮治本做法，防 NameError 再次发生）
 grep:scripts/push_api.py::import re
+# 🔑 同轮第二事故：回归日志属产物，不得入库
+grep:.gitignore::*.log
+grep:references/游戏引擎复刻.md::已入库并被推送
+grep:references/游戏引擎复刻.md::reg129.log

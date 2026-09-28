@@ -27,6 +27,7 @@ python3 scripts/push_api.py --dry-run        # 只统计，不推送
 import base64
 import glob
 import hashlib
+import io
 import json
 import os
 # 🔑 第一百二十九轮：**顶层导入**（沿用第一百一十九轮的治本做法）。
@@ -156,6 +157,24 @@ HDR = {'Authorization': f'Bearer {TOK}',
        'Accept': 'application/vnd.github+json',
        'X-GitHub-Api-Version': '2022-11-28',
        'Content-Type': 'application/json'}
+
+
+def req_err_desc(d):
+    """🔑 **统一**描述 `req()` 的失败形态（第一百三十轮）。
+
+    🔴 `req()` 有两种失败返回：
+       - `HTTPError` → `{'__err': code, '__body': b}`；
+       - 其它异常（断网 / DNS / 超时）→ `{'__err': 'NET:...'}`，**没有 `__body`**。
+    🔑 直接写 `d['__body']` 在断网时抛 `KeyError` → **崩溃而非拒绝**。
+       🔴 崩溃的 rc 也是 1，与"正确拒绝"**在退出码上无法区分**
+          （104 轮「只捕 HTTPError 导致 URLError 崩溃」同源，本轮在**调用方**复发）。
+    🔑 判据：**调用方必须能区分"拒绝了"与"代码坏了"** —— 前者有结论，后者没有。
+    """
+    if not isinstance(d, dict):
+        return str(d)[:150]
+    if '__err' not in d:
+        return str(d)[:150]
+    return f"{d['__err']} {str(d.get('__body', ''))[:150]}"
 
 
 def req(method, url, data=None):
@@ -337,7 +356,7 @@ def mk_blob(path):
             {'content': base64.b64encode(raw).decode(),
              'encoding': 'base64'})
     if '__err' in d:
-        return (path, None, f"HTTP {d['__err']} {d['__body'][:150]}")
+        return (path, None, f"HTTP {req_err_desc(d)}")
     return (path, d['sha'], None)
 
 
@@ -1296,7 +1315,7 @@ def cmd_verify_push(report=False):
 
     d = req('GET', f'{API}/git/trees/main?recursive=1')
     if '__err' in d:
-        print(f"🔴 无法读取远端 tree: HTTP {d['__err']} {d['__body'][:150]}")
+        print(f"🔴 无法读取远端 tree: HTTP {req_err_desc(d)}")
         return 1
     if d.get('truncated'):
         print('🔴 远端 tree **被截断**（文件过多） —— 无法完整比对')
@@ -2873,6 +2892,176 @@ def cmd_assert_round_claims():
     return 0
 
 
+# 🔑 第一百三十轮：**轮次末尾必跑的三项**（第一百二十九轮诚实结论①）
+#    🔴 129 轮：G421 只在"推送那一刻"有效 —— 推完又写新文件**仍无人发现**；
+#       claims_127.txt 的漏传是靠**人工**核对远端 tree 才暴露的，不是门禁。
+#    🔑 所以轮次末尾必须再问一次："本地有的，远端都有吗？"
+#    🔑 mode='report' 的原因（如实写明，不掩饰）：
+#       G391 是**全量四层比对 + 本地未提交修改**，回归跑完必然有产物变脏
+#       （106 轮已知），若严格跑则**永远红**，等于把它从流程里挤出去。
+#       故第三项用报告模式——**必跑但不阻断**，异常仍会打印出来。
+ROUND_END_STEPS = (
+    ('--assert-round-claims', 'G421', 'strict',
+     '推送前本轮清单必须已写且已入索引'),
+    ('--assert-index-pushed', 'G422', 'strict',
+     '本地索引 ⊆ 远端 tree（轮次末尾再验一次）'),
+    ('--verify-push', 'G391', 'report',
+     '推送完整性回读（缺失/多余/内容/权限四层，报告模式）'),
+)
+# 🔑 这三项缺一不可（G423 断言）：删任一个都会重新打开 127 轮那个洞。
+ROUND_END_REQUIRED_GIDS = ('G421', 'G422', 'G391')
+
+
+def cmd_assert_index_pushed():
+    """🔑 G422：**本地索引 ⊆ 远端 tree**（轻量：只比路径，一次 API）。
+
+    🔴 第一百二十九轮诚实结论①：G421 只在"推送那一刻"有效，
+       推完又写的文件**没有任何门禁再看一眼**（127 轮真实漏传事故）。
+    🔑 判据：**"推送前检查通过" ≠ "推完就没新增"** ——
+       必须在**轮次末尾**再问一次"本地有的远端都有吗"。
+
+    🔑 与 G391 的分工（两者互补，不可互相替代）：
+       - G391 **四层全比**（缺失 / 多余 / 内容 sha / mode）+ 本地未提交修改，
+         🔴 因此只在**推送刚结束**时严格跑（其后跑回归会写产物 → 必然不等）；
+       - G422 **只比路径**且**只看缺失方向**，一次 API、秒级，
+         ✅ 所以能放进**自动回归**，每轮都被跑一次。
+       🔑 远端"多余"在此**只警告不阻断** —— 那是残留，不是漏传（G391 才管）。
+
+    🔑 远端不可达 / git 不可用 → **拒绝给结论**（与 G390 / G421 同源，不猜）。
+    """
+    print('=' * 70)
+    print('🔑 G422 本地索引 ⊆ 远端 tree（防"推完又写"无人发现）')
+    print('=' * 70)
+    loc = local_index_entries()
+    if not loc:
+        print('🔴 **无法确定**本地受管文件（git 不可用） —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    print(f'\n🔑 本地受管文件 {len(loc)} 个')
+    d = req('GET', f'{API}/git/trees/main?recursive=1')
+    if '__err' in d:
+        print(f"🔴 无法读取远端 tree: HTTP {req_err_desc(d)}"
+              f" —— 拒绝给结论")
+        print('=' * 70)
+        return 1
+    if d.get('truncated'):
+        print('🔴 远端 tree **被截断** —— 无法完整比对，拒绝给结论')
+        print('=' * 70)
+        return 1
+    rem = set(t['path'] for t in d['tree'] if t.get('type') == 'blob')
+    print(f'🔑 远端 blob     {len(rem)} 个')
+    missing = sorted(set(loc) - rem)
+    extra = sorted(rem - set(loc))
+    if missing:
+        print(f'\n🔴 **本地有而远端没有** {len(missing)} 个 —— 漏传：')
+        for p_ in missing[:10]:
+            print(f'   - {p_}')
+        print('   🔑 处理办法：git add -A && git commit && 重新推送')
+        print('   🔑 这是 G421 守不住的方向：G421 只查本轮**清单**一类文件，'
+              '本条查**全部**文件')
+        print('=' * 70)
+        return 1
+    if extra:
+        print(f'\n⚠️ 远端残留（远端有、本地无）{len(extra)} 个 —— '
+              f'**不阻断**，由 G391 管：')
+        for p_ in extra[:10]:
+            print(f'   - {p_}')
+    print('\n✅ 本地索引全部已推送'
+          f'（{len(loc)} 个文件，远端残留 {len(extra)} 个不阻断）')
+    print('=' * 70)
+    return 0
+
+
+def cmd_round_end():
+    """🔑 轮次末尾必跑：G421 + G422 + G391(报告)。
+
+    🔑 存在理由：第一百二十九轮诚实结论① ——
+       "根治要'轮次末尾再回读一次远端'，而 G391 是人工门禁，没人跑"。
+    🔑 本入口把"回读远端"从**人工自觉**变成**一条命令**。
+    """
+    print('=' * 70)
+    print('🔑 轮次末尾必跑：三项回读远端检查')
+    print('=' * 70)
+    rc = 0
+    for flag, gid, mode, why in ROUND_END_STEPS:
+        print(f'\n### {gid}  {flag}  [{mode}]  —— {why}')
+        cmd = [sys.executable, os.path.abspath(__file__), flag]
+        if mode == 'report':
+            cmd.append('--report')
+        r = subprocess.run(cmd, cwd=ROOT)
+        if r.returncode != 0:
+            rc = 1
+    print('\n' + '=' * 70)
+    if rc == 0:
+        print('✅ 轮次末尾三项全部通过 —— 本轮产物与清单均已抵达远端')
+    else:
+        print('🔴 轮次末尾检查未全通过 —— 上面标红的项必须先处理再收工')
+    print('=' * 70)
+    return rc
+
+
+def cmd_assert_round_end():
+    """🔑 G423：**轮次末尾入口必须真含这三项**（防流程退化成"没人跑"）。
+
+    🔴 129 轮诚实结论①的另一个面：光有命令也**没人会记得跑**。
+       若 `ROUND_END_STEPS` 被人删掉一项（尤其 G391），
+       表面"入口还在"，实际又退回"靠人工自觉"。
+    🔑 三条判据：
+       ① `ROUND_END_STEPS` 非空；
+       ② 每项 flag **真被 argparse 登记**（AST 取 add_argument 首参，
+          🔴 不数次数 —— 93 轮"数几个 ≠ 验是什么"同样适用）；
+       ③ `ROUND_END_REQUIRED_GIDS` 里的编号**全都在**步骤里，
+          且每个编号在 `run_all_gates.py` 里**真有门禁**。
+    """
+    print('=' * 70)
+    print('🔑 G423 轮次末尾必跑入口须真含三项（防退化成没人跑）')
+    print('=' * 70)
+    ok = True
+    if not ROUND_END_STEPS:
+        print('🔴 ROUND_END_STEPS 为空 —— 轮次末尾无人回读远端')
+        print('=' * 70)
+        return 1
+    # ② 真被 argparse 登记
+    import ast as _ast
+    tree = _ast.parse(io.open(os.path.abspath(__file__),
+                              encoding='utf-8').read())
+    flags = set()
+    for n in _ast.walk(tree):
+        if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Attribute) \
+                and n.func.attr == 'add_argument' and n.args \
+                and isinstance(n.args[0], _ast.Constant):
+            flags.add(n.args[0].value)
+    for flag, gid, _m, _w in ROUND_END_STEPS:
+        if flag not in flags:
+            print(f'🔴 {gid} 的 {flag} **未在 argparse 中登记** —— 入口会报错')
+            ok = False
+    # ③ 必需编号齐全 + 在门禁表里真存在
+    gids = [g for _f, g, _m, _w in ROUND_END_STEPS]
+    for g in ROUND_END_REQUIRED_GIDS:
+        if g not in gids:
+            print(f'🔴 轮次末尾步骤**缺 {g}** —— 该方向又没人守了')
+            ok = False
+    rg = os.path.join(HERE, 'run_all_gates.py')
+    try:
+        rtxt = io.open(rg, encoding='utf-8').read()
+    except Exception as e:
+        print(f'🔴 无法读取门禁表 {rg}: {e} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    for g in ROUND_END_STEPS:
+        if f'("{g[1]}"' not in rtxt:
+            print(f'🔴 {g[1]} 在 `run_all_gates.py` 中**无门禁登记**'
+                  f' —— 轮次末尾跑的项必须本身也是门禁')
+            ok = False
+    if not ok:
+        print('=' * 70)
+        return 1
+    print(f'✅ 轮次末尾 {len(ROUND_END_STEPS)} 项齐全：'
+          + ' · '.join(f'{g}({f})' for f, g, _m, _w in ROUND_END_STEPS))
+    print('=' * 70)
+    return 0
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -2892,6 +3081,12 @@ def main():
                     help='明确接受漏传（不推荐）')
     ap.add_argument('--assert-round-claims', action='store_true',
                     help='G421：推送前必须已有**本轮声明清单**且已纳入索引')
+    ap.add_argument('--assert-index-pushed', action='store_true',
+                    help='G422：本地索引 ⊆ 远端 tree（防推完又写无人发现）')
+    ap.add_argument('--round-end', action='store_true',
+                    help='轮次末尾必跑：G421+G422+G391 三项回读远端')
+    ap.add_argument('--assert-round-end', action='store_true',
+                    help='G423：轮次末尾入口必须真含这三项')
     ap.add_argument('--verify-push', action='store_true',
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
@@ -3013,6 +3208,18 @@ def main():
     if a.assert_round_claims:
         os.chdir(ROOT)
         return cmd_assert_round_claims()
+
+    if a.assert_index_pushed:
+        os.chdir(ROOT)
+        return cmd_assert_index_pushed()
+
+    if a.round_end:
+        os.chdir(ROOT)
+        return cmd_round_end()
+
+    if a.assert_round_end:
+        os.chdir(ROOT)
+        return cmd_assert_round_end()
 
     if a.check_leak:
         # 🔑 G390：只做**漏传检查**，不统计不推送

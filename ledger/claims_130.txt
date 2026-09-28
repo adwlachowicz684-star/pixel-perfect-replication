@@ -1,0 +1,28 @@
+# 第一百三十轮声明清单
+# 🔑 只引**代码标识符**与**文档正文行**短串；标题行/注释行不算证据（129 轮踩过两次）
+grep:scripts/push_api.py::def cmd_assert_index_pushed
+grep:scripts/push_api.py::cmd_assert_index_pushed
+grep:scripts/push_api.py::assert-index-pushed
+grep:scripts/push_api.py::本地有而远端没有
+grep:scripts/push_api.py::ROUND_END_STEPS
+grep:scripts/push_api.py::ROUND_END_REQUIRED_GIDS
+grep:scripts/push_api.py::def cmd_round_end
+grep:scripts/push_api.py::def cmd_assert_round_end
+grep:scripts/push_api.py::round-end
+grep:scripts/push_api.py::assert-round-end
+grep:scripts/push_api.py::def req_err_desc
+grep:scripts/push_api.py::req_err_desc
+grep:scripts/push_api.py::import io
+grep:scripts/run_all_gates.py::G422
+grep:scripts/run_all_gates.py::G423
+cmd:push_api.py --assert-index-pushed
+cmd:push_api.py --assert-round-end
+gate:G422
+gate:G423
+# 🔑 对照实验：同一状态 G421 rc=0 / G422 rc=1
+grep:references/游戏引擎复刻.md::_tmp_probe_130.txt
+# 🔑 真实缺陷：断网时 req() 返回无 __body → KeyError 崩溃
+grep:references/游戏引擎复刻.md::KeyError: '__body'
+# 🔑 第五次 NameError，push_api.py 顶层导入治本
+grep:references/游戏引擎复刻.md::`io`
+grep:README.md::第一百三十轮：G422
