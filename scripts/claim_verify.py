@@ -1081,6 +1081,150 @@ def cmd_assert_since_active():
     return 0
 
 
+def cmd_assert_audit_artifact():
+    """🔑 G419：**`audit-all` 产物的独立守望者**。
+
+    🔴 第一百二十六轮诚实结论②：`--audit-all` 的产物
+       `ledger/_audit_all_last.json` **没有任何门禁守**。
+       它**自报** G382/G383/G384 三段的 rc，而 G387 探测能力时
+       正是拿这份产物当"真值参照物"去比对 `cmd_all` 的实际结果 ——
+       🔑 于是产物若被改成"全 0"，能力探测会拿一份**假真值**去背书，
+          而全仓库没有第二个东西把产物与真实结果对照过。
+    🔑 与 G417（参照物的分母不得自报自用）**完全同构** ——
+       只是这里自报的是 **rc** 而不是分母。
+
+    判据：
+      ① 登记项非空（未登记 → 拒绝给结论，不得静默当"没问题"）
+      ② 产物存在且可读（读不到 ≠ 没有问题）
+      ③ 结果键**只准在 results 里**（防同一文件两个真相，与 G416 同源）
+      ④ 三段键齐全 · ⑤ 值 ∈ GATE_RC_DOMAIN（复用单一常量）
+      ⑥ `ok` 字段须与 results **自洽**
+      ⑦ generated_at_ns 为正
+      ⑧ 🔑 与**独立真值**一致（另起子进程跑 `--all`，解析其真实 rc）
+    """
+    print('=' * 70)
+    print('G419 · 🔑 **`audit-all` 产物守望者**（防自报 rc 无人核对）')
+    print('=' * 70)
+    bad = []
+
+    rel = CAPABILITY_ARTIFACT.get('audit-all')
+    keys = CAPABILITY_ARTIFACT_KEYS.get('audit-all')
+    # ①②
+    if not rel:
+        print('\n🔴 `CAPABILITY_ARTIFACT` 未登记 audit-all —— 拒绝给结论')
+        return 1
+    if not keys:
+        print('\n🔴 `CAPABILITY_ARTIFACT_KEYS` 未登记 —— 拒绝给结论')
+        return 1
+    ap2 = os.path.join(ROOT, rel)
+    if not os.path.exists(ap2):
+        print(f'\n🔴 产物不存在 `{rel}` —— 拒绝给结论（不得当"没问题"）')
+        print('=' * 70)
+        return 1
+    try:
+        with open(ap2, encoding='utf-8') as f:
+            snap = json.load(f)
+    except Exception as e:
+        print(f'\n🔴 产物不可读 —— 拒绝给结论（{type(e).__name__}: {e}）')
+        print('=' * 70)
+        return 1
+    print(f'\n① 产物 `{rel}` 已读取（🔑 快照在跑真值**之前**取）')
+
+    # ③ 顶层不得有裸的结果键
+    top = [k for k in keys if k in snap]
+    if top:
+        print(f'\n🔴 结果键出现在**顶层**: {top} —— 同一文件两个真相')
+        print('   🔑 产物只准在 `results` 里写结果；顶层若也有一份，'
+              '读顶层的新代码会读到与探针不同的值。')
+        bad.append('顶层裸键')
+    else:
+        print('③ 结果键**只**在 results 里 ✅')
+
+    res = snap.get('results')
+    if not isinstance(res, dict):
+        print('\n🔴 产物缺少 `results` 对象 —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+
+    # ④⑤
+    print('\n④⑤ 三段键齐全且值在 rc 合法域内：')
+    for k in keys:
+        v = res.get(k)
+        okk = isinstance(v, int) and not isinstance(v, bool) \
+            and v in GATE_RC_DOMAIN
+        print('   %s %s = %r %s' % ('✅' if okk else '🔴', k, v,
+                                    '' if okk else f'（须 ∈ {GATE_RC_DOMAIN}）'))
+        if not okk:
+            bad.append(f'{k} 值非法')
+
+    # ⑥ ok 自洽
+    okv = snap.get('ok')
+    exp_ok = all(res.get(k) == 0 for k in keys) if all(
+        isinstance(res.get(k), int) for k in keys) else None
+    if exp_ok is not None:
+        if bool(okv) != exp_ok:
+            print(f'\n🔴 `ok`={okv!r} 与 results 自相矛盾（应为 {exp_ok}）'
+                  ' —— 同一文件两个真相')
+            bad.append('ok 不自洽')
+        else:
+            print(f'⑥ `ok`={okv!r} 与 results 自洽 ✅')
+    else:
+        print('\n🔴 三段值不齐，无法核对 `ok` —— 拒绝给结论')
+        bad.append('ok 无法核对')
+
+    # ⑦ 纳秒戳
+    ns = snap.get('generated_at_ns')
+    if not isinstance(ns, int) or isinstance(ns, bool) or ns <= 0:
+        print(f'\n🔴 `generated_at_ns`={ns!r} 不是正整数 —— '
+              '产物时间戳不可信')
+        bad.append('ns 非法')
+    else:
+        print(f'⑦ `generated_at_ns`={ns} ✅')
+
+    # ⑧ 🔑 独立真值：另起子进程跑 `--all`
+    #    🔴 第八十七轮坑：快照**必须**在跑之前取（子进程会重写产物）。
+    #       🔑 若先跑后读，读到的永远是刚写的新值 → 判据恒真 → 静默失效。
+    print('\n⑧ 独立真值（另起子进程跑 `--all`）')
+    try:
+        pp = subprocess.run(
+            [sys.executable, os.path.abspath(__file__), '--all'],
+            capture_output=True, text=True, timeout=300)
+    except Exception as e:
+        print(f'🔴 无法运行 `--all`：{type(e).__name__}: {e} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    truth = {}
+    for ln in (pp.stdout or '').splitlines():
+        for k in keys:
+            if k in ln and 'rc=' in ln:
+                m = re.search(r'rc=(\d+)', ln)
+                if m:
+                    truth[k] = int(m.group(1))
+                    break
+    miss_t = [k for k in keys if k not in truth]
+    if miss_t:
+        print(f'🔴 子进程输出里**解析不到**真值: {miss_t} —— 拒绝给结论')
+        print('   🔑 判据与实现耦合时，重构会让本条**静默失效**。')
+        bad.append('真值缺失')
+    else:
+        for k in keys:
+            sv, tv = res.get(k), truth[k]
+            same = (sv == tv)
+            print('   %s %s 产物=%r · 真值=%r' % ('✅' if same else '🔴',
+                                                  k, sv, tv))
+            if not same:
+                bad.append(f'{k} 产物 {sv!r} ≠ 真值 {tv!r}')
+
+    print()
+    if bad:
+        print('🔴 守卫失效：%s' % bad)
+        print('=' * 70)
+        return 1
+    print('✅ 守卫成立：`audit-all` 产物与独立真值**逐条一致**')
+    print('=' * 70)
+    return 0
+
+
 def cmd_all(a):
     """G385 · 🔑 **一次进程跑完声明核实三件事**。
 
@@ -1368,6 +1512,9 @@ def main():
     ap.add_argument('--assert-since-active', action='store_true',
                     help='G418：逐轮要求须真的在门禁运行中生效'
                          '（防断号检查因 require_since=None 而形同虚设）')
+    ap.add_argument('--assert-audit-artifact', action='store_true',
+                    help='G419：`audit-all` 产物须与**独立真值**一致'
+                         '（防自报 rc 无人核对）')
     ap.add_argument('--audit-all', action='store_true',
                     help='G385：独立校验 --all 三段是否都跑了')
     ap.add_argument('--probe-capability', metavar='NAME', default=None,
@@ -1393,6 +1540,8 @@ def main():
         return cmd_all(a)
     if a.assert_since_active:
         return cmd_assert_since_active()
+    if a.assert_audit_artifact:
+        return cmd_assert_audit_artifact()
     if a.audit_all:
         return cmd_audit_all(a)
     if a.probe_capability is not None:
