@@ -1,0 +1,24 @@
+# 第一百三十一轮声明清单
+# 🔑 只引**代码标识符**与**文档正文行**短串；标题行/注释行不算证据（129 轮踩过两次）
+grep:scripts/push_api.py::def _run_round_end_steps
+grep:scripts/push_api.py::_run_round_end_steps
+grep:scripts/push_api.py::ROUND_END_FN
+grep:scripts/push_api.py::def cmd_assert_round_end_wired
+grep:scripts/push_api.py::cmd_assert_round_end_wired
+grep:scripts/push_api.py::assert-round-end-wired
+grep:scripts/push_api.py::轮次末尾回读未通过
+grep:scripts/push_api.py::轮次末尾必须是时序上的最后一步
+grep:scripts/push_api.py::本次推送**不算完成**
+grep:scripts/run_all_gates.py::G424
+cmd:push_api.py --assert-round-end-wired
+cmd:push_api.py --assert-round-end
+cmd:push_api.py --assert-dependent-names
+gate:G424
+gate:G423
+# 🔑 对照实验：同一状态（推送流程无轮次末尾调用）G423 rc=0 / G424 rc=1
+grep:references/游戏引擎复刻.md::G423 rc=0 / G424 rc=1
+# 🔑 真实缺陷：判据④曾恒真（常量值恰是另一个登记项的键）
+grep:references/游戏引擎复刻.md::判据④是恒真的
+# 🔑 复用唯一实现，不抄一份（100 轮教训）
+grep:references/游戏引擎复刻.md::轮次末尾三项回读的唯一实现
+grep:README.md::第一百三十一轮：G424

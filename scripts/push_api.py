@@ -63,6 +63,12 @@ BASELINE_FP_HISTORY_MAX = 20
 #       改函数名会让 G403 **静默失效**（与 93 轮常量改名同源）。
 #    🔑 登记后由 G404 断言该函数**真实存在**，改名即暴露。
 MIRROR_WRITE_FN = '_write_mirror'
+# 🔑 第一百三十一轮：**轮次末尾回读函数名**登记项。
+#    🔴 110 轮诚实结论③（镜像写入函数名硬编码）的同构问题：
+#       若 G424 扫描器里写死 `_run_round_end_steps`，改函数名会让 G424
+#       **静默失效** —— 表面"推送流程里有调用"，实际扫的是旧名字。
+#    🔑 登记后由 G424 断言该函数**真定义 + 真被调用 + 真在表里**。
+ROUND_END_FN = '_run_round_end_steps'
 
 # 🔑 第一百一十二轮：**被依赖的名字**统一登记。
 #    🔴 111 轮诚实结论②：只登记了 MIRROR_WRITE_FN 一个 ——
@@ -83,6 +89,9 @@ DEPENDENT_NAMES = {
     'ROUND_GAP_ALLOWLIST': ('const', '轮次断号豁免清单路径（G418 依赖）'),
     # ── 登记项本身：改名会让 G403/G404 静默失效 ──
     'MIRROR_WRITE_FN': ('const', '镜像写入函数名登记项'),
+    # 🔑 第一百三十一轮：G424 依赖它定位"推送主流程末尾的回读调用"
+    'ROUND_END_FN': ('const', '轮次末尾回读函数名登记项'),
+    '_run_round_end_steps': ('fn', '轮次末尾三项回读的唯一实现'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
     # ── 被依赖的函数 ──
     '_write_mirror': ('fn', '写镜像'),
@@ -2972,18 +2981,23 @@ def cmd_assert_index_pushed():
     return 0
 
 
-def cmd_round_end():
-    """🔑 轮次末尾必跑：G421 + G422 + G391(报告)。
+def _run_round_end_steps(skip_gids=()):
+    """🔑 轮次末尾三项回读的**唯一实现**（cmd_round_end 与推送主流程共用）。
 
-    🔑 存在理由：第一百二十九轮诚实结论① ——
-       "根治要'轮次末尾再回读一次远端'，而 G391 是人工门禁，没人跑"。
-    🔑 本入口把"回读远端"从**人工自觉**变成**一条命令**。
+    🔴 第一百轮教训：自测/复用若**复刻一份**判断逻辑，
+       把真实实现改坏时自测仍然绿（"测了自己抄的那份"）。
+    🔑 所以 G424 断言的是**推送主流程调用本函数**，而不是"看起来跑了三项"。
     """
     print('=' * 70)
     print('🔑 轮次末尾必跑：三项回读远端检查')
     print('=' * 70)
     rc = 0
+    ran = 0
     for flag, gid, mode, why in ROUND_END_STEPS:
+        if gid in set(skip_gids):
+            print(f'\n### {gid}  {flag}  [跳过]  —— {why}')
+            continue
+        ran += 1
         print(f'\n### {gid}  {flag}  [{mode}]  —— {why}')
         cmd = [sys.executable, os.path.abspath(__file__), flag]
         if mode == 'report':
@@ -2993,11 +3007,23 @@ def cmd_round_end():
             rc = 1
     print('\n' + '=' * 70)
     if rc == 0:
-        print('✅ 轮次末尾三项全部通过 —— 本轮产物与清单均已抵达远端')
+        print(f'✅ 轮次末尾 {ran} 项全部通过 —— 本轮产物与清单均已抵达远端')
     else:
         print('🔴 轮次末尾检查未全通过 —— 上面标红的项必须先处理再收工')
     print('=' * 70)
     return rc
+
+
+def cmd_round_end():
+    """🔑 轮次末尾必跑：G421 + G422 + G391(报告)。
+
+    🔑 存在理由：第一百二十九轮诚实结论① ——
+       "根治要'轮次末尾再回读一次远端'，而 G391 是人工门禁，没人跑"。
+    🔑 本入口把"回读远端"从**人工自觉**变成**一条命令**。
+    🔑 第一百三十一轮：实现抽到 `_run_round_end_steps`，
+       使**推送主流程**与**手动入口**共用同一份，不复刻。
+    """
+    return _run_round_end_steps()
 
 
 def cmd_assert_round_end():
@@ -3062,6 +3088,112 @@ def cmd_assert_round_end():
     return 0
 
 
+def cmd_assert_round_end_wired():
+    """🔑 G424：**轮次末尾回读必须接在推送主流程末尾**（不跑就推不完）。
+
+    🔴 第一百三十轮诚实结论①：
+       "`--round-end` 仍然要靠人**记得跑** —— G423 只保证入口没被拆，
+        保证不了有人执行它。"
+    🔑 判据：**"入口存在" ≠ "每轮真跑"**。
+       把 `_run_round_end_steps()` 接进 `main()` 的推送路径末尾，
+       推送就不可能"跳过这一步还报成功"。
+
+    🔑 四条判据：
+       ① `ROUND_END_STEPS` 非空且三个必需编号齐全（复用 G423 的口径）；
+       ② `ROUND_END_FN` **真定义**（改名即暴露，防 G424 自身静默失效）；
+       ③ 在 `main()` 内**真被调用**，且调用行 **晚于**严格 `cmd_verify_push`
+          的行 —— 🔑 **"末尾"必须是时序上的末尾**，不是注释里写着末尾；
+       ④ `ROUND_END_FN` 已登记进 `DEPENDENT_NAMES`（与 112 轮同构）。
+
+    🔴 与 G423 的分工（互补，不可互相替代）：
+       - G423 守"**入口里有哪些项**"（防删项）；
+       - G424 守"**推送流程真的调用了它**"（防没人跑）。
+       🔑 只有 G423：入口齐全但没人跑 → 129 轮那个洞原样还在。
+       🔑 只有 G424：调用是真调用了，但 ROUND_END_STEPS 被删成一项也看不出。
+    """
+    print('=' * 70)
+    print('🔑 G424 轮次末尾回读必须接在推送主流程末尾（不跑就推不完）')
+    print('=' * 70)
+    ok = True
+    # ①
+    if not ROUND_END_STEPS:
+        print('🔴 ROUND_END_STEPS 为空 —— 接了也白接（没有项可跑）')
+        ok = False
+    gids = [g for _f, g, _m, _w in ROUND_END_STEPS]
+    for g in ROUND_END_REQUIRED_GIDS:
+        if g not in gids:
+            print(f'🔴 轮次末尾步骤**缺 {g}** —— 推送流程跑了也漏一个方向')
+            ok = False
+    # ④ 🔑 两条**都要**：只验一条会退化成恒真。
+    #    🔴 实测（本轮）：`ROUND_END_FN` 的值是 '_run_round_end_steps'，
+    #       而该名字**也**作为 fn 登记在表内 → 单看"值在不在表里"
+    #       **永远为真**，删掉常量登记项也照样绿（判据恒真）。
+    #    🔑 所以：a) 常量**名**在表里；b) 常量**值**（函数）在表里。
+    if 'ROUND_END_FN' not in DEPENDENT_NAMES:
+        print('🔴 ROUND_END_FN **未登记进 DEPENDENT_NAMES**'
+              ' —— 登记项被删无人知晓（与 112 轮同构）')
+        ok = False
+    if ROUND_END_FN not in DEPENDENT_NAMES:
+        print(f'🔴 {ROUND_END_FN}() **未登记为被依赖函数**'
+              f' —— 改名会让本门禁静默失效')
+        ok = False
+    # ②③ AST 扫描 main()
+    import ast as _ast
+    try:
+        src = io.open(os.path.abspath(__file__), encoding='utf-8').read()
+        tree = _ast.parse(src)
+    except Exception as e:
+        print(f'🔴 无法解析 {os.path.basename(__file__)}: {e} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    fns = {n.name: n for n in tree.body if isinstance(n, _ast.FunctionDef)}
+    if ROUND_END_FN not in fns:
+        print(f'🔴 {ROUND_END_FN}() **未定义** —— G424 会永远扫不到它')
+        ok = False
+    mainfn = fns.get('main')
+    if mainfn is None:
+        print('🔴 找不到 main() —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    end_lineno = None
+    strict_lineno = None
+    for n in _ast.walk(mainfn):
+        if not isinstance(n, _ast.Call):
+            continue
+        nm = getattr(n.func, 'id', None)
+        if nm == ROUND_END_FN and end_lineno is None:
+            end_lineno = n.lineno
+        # 🔑 严格模式的 G391：`cmd_verify_push(report=False)`
+        if nm == 'cmd_verify_push':
+            for kw in n.keywords:
+                if kw.arg == 'report' and isinstance(kw.value, _ast.Constant)                         and kw.value.value is False:
+                    strict_lineno = n.lineno
+    if end_lineno is None:
+        print(f'🔴 main() 中**没有调用** {ROUND_END_FN}()'
+              f' —— 轮次末尾回读仍然"靠人记得跑"')
+        ok = False
+    if strict_lineno is None:
+        print('🔴 main() 中**没有严格模式**的 cmd_verify_push(report=False)'
+              ' —— 推送后回读的严格层不在流程里')
+        ok = False
+    if end_lineno is not None and strict_lineno is not None:
+        if end_lineno <= strict_lineno:
+            print(f'🔴 {ROUND_END_FN}() 在第 {end_lineno} 行，'
+                  f'而严格 G391 在第 {strict_lineno} 行'
+                  f' —— 回读**不在末尾**（轮次末尾必须是时序上的最后一步）')
+            ok = False
+        else:
+            print(f'🔑 调用顺序正确：严格 G391 第 {strict_lineno} 行'
+                  f' → 轮次末尾回读第 {end_lineno} 行')
+    if not ok:
+        print('=' * 70)
+        return 1
+    print(f'✅ 轮次末尾 {len(ROUND_END_STEPS)} 项已接进推送主流程末尾：'
+          + ' · '.join(gids))
+    print('=' * 70)
+    return 0
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -3087,6 +3219,9 @@ def main():
                     help='轮次末尾必跑：G421+G422+G391 三项回读远端')
     ap.add_argument('--assert-round-end', action='store_true',
                     help='G423：轮次末尾入口必须真含这三项')
+    ap.add_argument('--assert-round-end-wired', action='store_true',
+                    help='G424：轮次末尾回读必须接在**推送主流程末尾**'
+                         '（防"入口在但没人跑"）')
     ap.add_argument('--verify-push', action='store_true',
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
@@ -3220,6 +3355,10 @@ def main():
     if a.assert_round_end:
         os.chdir(ROOT)
         return cmd_assert_round_end()
+
+    if a.assert_round_end_wired:
+        os.chdir(ROOT)
+        return cmd_assert_round_end_wired()
 
     if a.check_leak:
         # 🔑 G390：只做**漏传检查**，不统计不推送
@@ -3379,6 +3518,16 @@ def main():
         return vr
     print(f'   {len(files)} 个文件 · '
           f'https://github.com/{OWNER}/{REPO}/commit/{c["sha"][:12]}')
+
+    # 🔑 第一百三十一轮：**轮次末尾回读接进推送主流程**。
+    #    🔴 第一百三十轮诚实结论①：G423 只保证"入口没被拆"，
+    #       保证不了"有人执行它" —— 129 轮 claims_127.txt 漏传正是如此。
+    #    🔑 判据：**"能跑" ≠ "会跑"**；把这一步放在 `return 0` 之前，
+    #       推送就不可能"没跑完这三项还报成功"。
+    er = _run_round_end_steps()
+    if er != 0:
+        print('\n🔴 轮次末尾回读未通过 —— 本次推送**不算完成**')
+        return er
     return 0
 
 
