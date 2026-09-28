@@ -1,0 +1,29 @@
+# 第一百三十二轮声明清单
+# 🔑 只引**代码标识符**与**文档正文行**短串；标题行/注释行不算证据（129 轮踩过三次）
+grep:scripts/push_api.py::ROUND_END_STEPS_BAD_FN
+grep:scripts/push_api.py::_round_end_steps_bad
+grep:scripts/push_api.py::def _round_end_steps_bad
+grep:scripts/push_api.py::def cmd_assert_round_end_single
+grep:scripts/push_api.py::cmd_assert_round_end_single
+grep:scripts/push_api.py::assert-round-end-single
+grep:scripts/push_api.py::步骤齐全判据须唯一实现
+grep:scripts/push_api.py::判据又被抄了一份
+grep:scripts/push_api.py::判据是恒真的桩
+grep:scripts/push_api.py::轮次末尾步骤**缺
+grep:scripts/run_all_gates.py::G425
+cmd:push_api.py --assert-round-end-single
+cmd:push_api.py --assert-round-end
+cmd:push_api.py --assert-round-end-wired
+cmd:push_api.py --assert-dependent-names
+cmd:push_api.py --assert-path-consts
+cmd:push_api.py --assert-meta-names
+gate:G425
+gate:G424
+gate:G423
+# 🔑 对照实验：同一状态（判据内联回 G423）G423 rc=0 / G424 rc=0 / G425 rc=1
+grep:references/游戏引擎复刻.md::--assert-round-end-single rc = 1
+# 🔑 危害：两条门禁会给出互相矛盾的结论
+grep:references/游戏引擎复刻.md::它们看的是同一个事实
+# 🔑 破坏⑥：静态判据全通过但 helper 是恒返回空的桩
+grep:references/游戏引擎复刻.md::只有**真跑一次改坏的输入**才暴露
+grep:README.md::第一百三十二轮：G425

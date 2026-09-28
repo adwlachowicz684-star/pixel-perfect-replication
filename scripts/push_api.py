@@ -69,6 +69,13 @@ MIRROR_WRITE_FN = '_write_mirror'
 #       **静默失效** —— 表面"推送流程里有调用"，实际扫的是旧名字。
 #    🔑 登记后由 G424 断言该函数**真定义 + 真被调用 + 真在表里**。
 ROUND_END_FN = '_run_round_end_steps'
+# 🔑 第一百三十二轮：**"轮次末尾步骤齐全"判据的唯一实现**登记项。
+#    🔴 第一百三十一轮诚实结论②：G423 判据①与 G424 判据①是
+#       **同一口径的两处实现** —— 改一处、漏一处，两条门禁会给出
+#       **互相矛盾的结论**，而没有任何东西发现"它们已经不一致"。
+#    🔑 登记后由 G425 断言：该函数真定义、被两条门禁**共同**调用、
+#       且是**唯一**遍历 ROUND_END_REQUIRED_GIDS 的函数。
+ROUND_END_STEPS_BAD_FN = '_round_end_steps_bad'
 
 # 🔑 第一百一十二轮：**被依赖的名字**统一登记。
 #    🔴 111 轮诚实结论②：只登记了 MIRROR_WRITE_FN 一个 ——
@@ -92,6 +99,12 @@ DEPENDENT_NAMES = {
     # 🔑 第一百三十一轮：G424 依赖它定位"推送主流程末尾的回读调用"
     'ROUND_END_FN': ('const', '轮次末尾回读函数名登记项'),
     '_run_round_end_steps': ('fn', '轮次末尾三项回读的唯一实现'),
+    # 🔑 第一百三十二轮：G423/G424 共用判据的**唯一实现**
+    #    （G406 会在新增常量忘记登记时报错，本条按规程登记）
+    'ROUND_END_STEPS_BAD_FN': (
+        'const', '轮次末尾步骤齐全判据的函数名登记项'),
+    '_round_end_steps_bad': (
+        'fn', 'G423/G424 共用的"步骤齐全"判据唯一实现'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
     # ── 被依赖的函数 ──
     '_write_mirror': ('fn', '写镜像'),
@@ -3026,6 +3039,27 @@ def cmd_round_end():
     return _run_round_end_steps()
 
 
+def _round_end_steps_bad():
+    """🔑 **"轮次末尾步骤齐全"判据的唯一实现**（G423 与 G424 共用）。
+
+    🔴 第一百三十一轮诚实结论②：
+       G423 判据①（ROUND_END_STEPS 非空 + 三个必需编号齐全）与
+       G424 判据①是**同一口径的两处实现**。
+    🔑 危害不是"代码重复"，而是**改一处漏一处**时：
+       两条门禁会给出**互相矛盾的结论**，而没有任何东西发现它们已不一致
+       （与 93 轮"两处 rc 合法域"、106 轮"两处都写台账"同源）。
+    🔑 返回**问题清单**（空列表 = 通过），由调用方决定怎么报。
+    """
+    bad = []
+    if not ROUND_END_STEPS:
+        bad.append('ROUND_END_STEPS 为空 —— 轮次末尾无人回读远端')
+    gids = [g for _f, g, _m, _w in ROUND_END_STEPS]
+    for g in ROUND_END_REQUIRED_GIDS:
+        if g not in gids:
+            bad.append(f'轮次末尾步骤**缺 {g}** —— 该方向又没人守了')
+    return bad
+
+
 def cmd_assert_round_end():
     """🔑 G423：**轮次末尾入口必须真含这三项**（防流程退化成"没人跑"）。
 
@@ -3038,15 +3072,18 @@ def cmd_assert_round_end():
           🔴 不数次数 —— 93 轮"数几个 ≠ 验是什么"同样适用）；
        ③ `ROUND_END_REQUIRED_GIDS` 里的编号**全都在**步骤里，
           且每个编号在 `run_all_gates.py` 里**真有门禁**。
+
+    🔑 第一百三十二轮：判据①③抽到 `_round_end_steps_bad()`（唯一实现），
+       与 G424 **共用同一份** —— 防"改一处漏一处"导致两条门禁结论矛盾。
     """
     print('=' * 70)
     print('🔑 G423 轮次末尾必跑入口须真含三项（防退化成没人跑）')
     print('=' * 70)
     ok = True
-    if not ROUND_END_STEPS:
-        print('🔴 ROUND_END_STEPS 为空 —— 轮次末尾无人回读远端')
-        print('=' * 70)
-        return 1
+    # ①③ 共用实现
+    for b in _round_end_steps_bad():
+        print(f'🔴 {b}')
+        ok = False
     # ② 真被 argparse 登记
     import ast as _ast
     tree = _ast.parse(io.open(os.path.abspath(__file__),
@@ -3061,12 +3098,8 @@ def cmd_assert_round_end():
         if flag not in flags:
             print(f'🔴 {gid} 的 {flag} **未在 argparse 中登记** —— 入口会报错')
             ok = False
-    # ③ 必需编号齐全 + 在门禁表里真存在
+    # ③（前半已由共用实现覆盖）在门禁表里真存在
     gids = [g for _f, g, _m, _w in ROUND_END_STEPS]
-    for g in ROUND_END_REQUIRED_GIDS:
-        if g not in gids:
-            print(f'🔴 轮次末尾步骤**缺 {g}** —— 该方向又没人守了')
-            ok = False
     rg = os.path.join(HERE, 'run_all_gates.py')
     try:
         rtxt = io.open(rg, encoding='utf-8').read()
@@ -3099,7 +3132,9 @@ def cmd_assert_round_end_wired():
        推送就不可能"跳过这一步还报成功"。
 
     🔑 四条判据：
-       ① `ROUND_END_STEPS` 非空且三个必需编号齐全（复用 G423 的口径）；
+       ① `ROUND_END_STEPS` 非空且三个必需编号齐全
+          （🔑 第一百三十二轮：改为调用 `_round_end_steps_bad()`，
+           与 G423 **共用同一实现**，不再是"同一口径的第二份"）；
        ② `ROUND_END_FN` **真定义**（改名即暴露，防 G424 自身静默失效）；
        ③ 在 `main()` 内**真被调用**，且调用行 **晚于**严格 `cmd_verify_push`
           的行 —— 🔑 **"末尾"必须是时序上的末尾**，不是注释里写着末尾；
@@ -3115,15 +3150,11 @@ def cmd_assert_round_end_wired():
     print('🔑 G424 轮次末尾回读必须接在推送主流程末尾（不跑就推不完）')
     print('=' * 70)
     ok = True
-    # ①
-    if not ROUND_END_STEPS:
-        print('🔴 ROUND_END_STEPS 为空 —— 接了也白接（没有项可跑）')
+    # ① 共用实现（与 G423 同一份，防两条门禁结论矛盾）
+    for b in _round_end_steps_bad():
+        print(f'🔴 {b} —— 接了也白接（跑了也漏一个方向）')
         ok = False
     gids = [g for _f, g, _m, _w in ROUND_END_STEPS]
-    for g in ROUND_END_REQUIRED_GIDS:
-        if g not in gids:
-            print(f'🔴 轮次末尾步骤**缺 {g}** —— 推送流程跑了也漏一个方向')
-            ok = False
     # ④ 🔑 两条**都要**：只验一条会退化成恒真。
     #    🔴 实测（本轮）：`ROUND_END_FN` 的值是 '_run_round_end_steps'，
     #       而该名字**也**作为 fn 登记在表内 → 单看"值在不在表里"
@@ -3194,6 +3225,123 @@ def cmd_assert_round_end_wired():
     return 0
 
 
+def cmd_assert_round_end_single():
+    """🔑 G425：**"步骤齐全"判据必须只有一处实现，且被 G423/G424 共用**。
+
+    🔴 第一百三十一轮诚实结论②：
+       G423 判据①与 G424 判据①是**同一口径的两处实现** ——
+       改一处、漏一处时两条门禁会给出**互相矛盾的结论**，
+       而没有任何东西发现它们已经不一致。
+    🔑 判据：**"两条门禁都在" ≠ "它们看的是同一个事实"**。
+
+    🔑 五条判据：
+       ① `ROUND_END_STEPS_BAD_FN` **常量名**已登记（防登记项被删）；
+       ② 其**值**已登记为 fn（🔴 单看一条会退化成恒真 —— 131 轮实测：
+          常量值 '_run_round_end_steps' 本身也在表里，"值在不在表里"永真）；
+       ③ 该函数**真定义**；
+       ④ G423 / G424 **两个函数体内都真调用**它（只登记不算共用）；
+       ⑤ 全文件遍历 `ROUND_END_REQUIRED_GIDS` 的 for 循环**只有 1 处**
+          —— 防"共用之外又内联一份"（**存在但无关**的老病，83 轮）；
+       ⑥ **行为反证**：真跑一次被改坏的 `ROUND_END_STEPS`，
+          断言判据**会响**（防该函数被改成恒返回 `[]` 的桩，
+          与 100 轮"自测必须调用真实实现"同源）。
+    """
+    print('=' * 70)
+    print('🔑 G425 步骤齐全判据须唯一实现且被 G423/G424 共用')
+    print('=' * 70)
+    ok = True
+    fn = ROUND_END_STEPS_BAD_FN
+    # ①② 两条都要（131 轮实测：单看"值在表里"恒真）
+    if 'ROUND_END_STEPS_BAD_FN' not in DEPENDENT_NAMES:
+        print('🔴 ROUND_END_STEPS_BAD_FN **未登记进 DEPENDENT_NAMES**'
+              ' —— 登记项被删无人知晓')
+        ok = False
+    if fn not in DEPENDENT_NAMES:
+        print(f'🔴 {fn}() **未登记为被依赖函数** —— 改名会让本门禁静默失效')
+        ok = False
+    import ast as _ast
+    try:
+        src = io.open(os.path.abspath(__file__), encoding='utf-8').read()
+        tree = _ast.parse(src)
+    except Exception as e:
+        print(f'🔴 无法解析 {os.path.basename(__file__)}: {e} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    fns = {n.name: n for n in tree.body if isinstance(n, _ast.FunctionDef)}
+    # ③
+    if fn not in fns:
+        print(f'🔴 {fn}() **未定义** —— G423/G424 无从共用')
+        ok = False
+    # ④ 两个门禁函数体内真调用
+    for gate_fn, gid in (('cmd_assert_round_end', 'G423'),
+                         ('cmd_assert_round_end_wired', 'G424')):
+        g = fns.get(gate_fn)
+        if g is None:
+            print(f'🔴 找不到 {gate_fn}() —— 拒绝给结论')
+            ok = False
+            continue
+        called = any(isinstance(n, _ast.Call)
+                     and getattr(n.func, 'id', None) == fn
+                     for n in _ast.walk(g))
+        if not called:
+            print(f'🔴 {gid}（{gate_fn}）**没有调用** {fn}()'
+                  f' —— 又在自己的函数里内联了一份判据')
+            ok = False
+        else:
+            print(f'🔑 {gid} 调用 {fn}() ✅')
+    # ⑤ 遍历 ROUND_END_REQUIRED_GIDS 的 for 循环只能有 1 处
+    owners = []
+    for name, node in fns.items():
+        for n in _ast.walk(node):
+            if isinstance(n, _ast.For) \
+                    and isinstance(n.iter, _ast.Name) \
+                    and n.iter.id == 'ROUND_END_REQUIRED_GIDS':
+                owners.append(name)
+                break
+    owners = sorted(set(owners))
+    if len(owners) != 1 or owners[0] != fn:
+        print(f'🔴 遍历 ROUND_END_REQUIRED_GIDS 的函数有 {len(owners)} 处'
+              f' {owners}（应只有 {fn} 一处）—— 判据又被抄了一份')
+        ok = False
+    else:
+        print(f'🔑 判据唯一实现：{fn}()（其余 {len(fns)} 个函数均未内联）')
+    # ⑥ 行为反证：真跑一次改坏的输入
+    try:
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location('_pa_probe',
+                                            os.path.abspath(__file__))
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception as e:
+        print(f'🔴 无法导入本模块做行为反证: {e} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    for label, patched in (
+            ('步骤表清空', ()),
+            ('缺 G422/G391', (('--assert-round-claims', 'G421',
+                               'strict', 'w'),)),
+    ):
+        mod.ROUND_END_STEPS = patched
+        try:
+            got = mod._round_end_steps_bad()
+        except Exception as e:
+            print(f'🔴 {label} 时 {fn}() 抛异常: {e} —— 判据不可用')
+            ok = False
+            continue
+        if not got:
+            print(f'🔴 {label} 时 {fn}() **返回空**（应报错）'
+                  f' —— 判据是恒真的桩')
+            ok = False
+        else:
+            print(f'🔑 反证通过（{label}）：报出 {len(got)} 条')
+    if not ok:
+        print('=' * 70)
+        return 1
+    print('✅ 步骤齐全判据唯一实现，且 G423/G424 共用同一份')
+    print('=' * 70)
+    return 0
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -3222,6 +3370,8 @@ def main():
     ap.add_argument('--assert-round-end-wired', action='store_true',
                     help='G424：轮次末尾回读必须接在**推送主流程末尾**'
                          '（防"入口在但没人跑"）')
+    ap.add_argument('--assert-round-end-single', action='store_true',
+                    help='G425：步骤齐全判据须**唯一实现**且被 G423/G424 共用')
     ap.add_argument('--verify-push', action='store_true',
                     help='G391：**回读远端 tree** 并与本地逐条比对')
     ap.add_argument('--audit-history', action='store_true',
@@ -3359,6 +3509,10 @@ def main():
     if a.assert_round_end_wired:
         os.chdir(ROOT)
         return cmd_assert_round_end_wired()
+
+    if a.assert_round_end_single:
+        os.chdir(ROOT)
+        return cmd_assert_round_end_single()
 
     if a.check_leak:
         # 🔑 G390：只做**漏传检查**，不统计不推送
