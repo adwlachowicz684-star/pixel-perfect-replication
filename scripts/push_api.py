@@ -25,6 +25,12 @@ python3 scripts/push_api.py --dry-run        # 只统计，不推送
 - 🔑 **空仓库**第一次要先建一个初始 commit（blob API 对空仓库返回 409）。
 """
 import ast
+# 🔑 第一百三十五轮：**顶层**导入 `ast as _ast`。
+#    🔴 本文件里有 3 处函数内 `import ast as _ast`（1170/3101/3192 行附近），
+#       于是每个新函数都得"记得补一行"—— 119 轮已就 `subprocess` 治本过一次，
+#       但**没覆盖到 `_ast`**，本轮写 G426 时第 5 次踩到同一个 NameError。
+#    🔑 判据：重复出现的同类错误，应改到"让它不可能发生"，而不是每次补一处。
+import ast as _ast
 import base64
 import glob
 import hashlib
@@ -109,6 +115,9 @@ DEPENDENT_NAMES = {
     # 🔑 第一百三十四轮：G425 判据④ 的唯一实现（防"只引用不调用"）
     '_gate_calls_helper': ('fn', '判断门禁函数体是否真调用 helper'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
+    # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
+    #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
+    #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
     # ── 被依赖的函数 ──
     '_write_mirror': ('fn', '写镜像'),
     '_scan_write_pairing': ('fn', 'G403 用的函数级扫描器'),
@@ -141,7 +150,15 @@ PATH_CONST_ALLOW_MIN_REASON = 6
 #    🔑 这些名字同样是"被依赖的"：G405/G406 都靠它们工作。
 SELF_REGISTERED_META = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
                         'DEPENDENT_NAMES_REQUIRED', 'PATH_CONST_ALLOW',
-                        'PATH_CONST_ALLOW_MIN_REASON')
+                        'PATH_CONST_ALLOW_MIN_REASON',
+                        'CRITERIA_ROOTS_REQUIRED')
+# 🔑 第一百三十五轮：**判据存在性**的反向登记项（G426 依赖）。
+#    🔴 134 轮破坏实测⑦⑧：G425 的判据⑧（行为反证）被删、判据⑨（判据不能验自己）
+#       被改成恒真 —— **全部放行**，而 G425 其余判据照绿。
+#    🔑 处置：把这两条判据的**存在性**写进 ledger/trust_root.json::CRITERIA_ROOTS，
+#       并用本常量做**反向扫描**（代码 → 信任根），防"删掉一条信任根记录"。
+#       （与 G406 反向扫描 DEPENDENT_NAMES 同构）
+CRITERIA_ROOTS_REQUIRED = ('G425_c8_行为反证', 'G425_c9_判据不能验自己')
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -1308,6 +1325,132 @@ def cmd_assert_trust_root():
     print(f'✅ 信任根闭合：{len(want)} 项一致，且未退回登记项')
     print('=' * 70)
     return 0
+
+def cmd_assert_criteria_roots():
+    """🔑 G426：**判据存在性信任根闭合**。
+
+    🔴 第一百三十四轮破坏实测⑦⑧（本条要解决的那两条）：
+       - 把 G425 判据⑨ 改成 `used = True`（恒真）   → ✅ **放行** rc=0
+       - 删掉 G425 判据⑧ 整段（行为反证）           → ✅ **放行** rc=0
+       而 G425 其余判据照绿 —— 这两条判据**自身没有外部守护**。
+
+    🔑 处置（与 115 轮「停止递推 + 明示信任根」同构）：
+       把「这两条判据必须存在」写进 `ledger/trust_root.json::CRITERIA_ROOTS`
+       （**独立于代码**的文件），并断言代码里确实还有它们。
+       🔴 已知边界：同时改代码与本文件仍会绕过（109 轮同源），靠 git 审计兜底。
+
+    🔑 五条判据：
+       ① 信任根必须可读 —— 读不到**拒绝给结论**（读不到 ≠ 没有）
+       ② `CRITERIA_ROOTS_REQUIRED` 的每个键都必须在信任根里登记
+          （🔑 **反向扫描**：代码 → 信任根，防"悄悄删掉一条信任根记录"）
+       ③ 每条登记的判据：`defined_in` 存在 · `in_fn` 真存在（AST）
+       ④ 每个 `require` 标记串都出现在**该函数行范围内**
+          （🔴 AST 求行范围**并排除自身** —— 93 轮"检查器扫到自己"）
+       ⑤ `why` ≥ 20 字符（🔴 否则信任根退化成无理由白名单）
+          · `round` ≤ 文档最大轮次（G389 同款，防"来自未来的批准"）
+    """
+    print('🔑 **判据存在性信任根闭合**（G426）')
+    print('=' * 70)
+    tr = _trust_root()
+    if tr is None:
+        print('🔴 信任根不可读 —— 拒绝给结论（不静默当"没有判据"）')
+        print('=' * 70)
+        return 1
+    req = globals().get('CRITERIA_ROOTS_REQUIRED')
+    if not req:
+        print('🔴 CRITERIA_ROOTS_REQUIRED **未登记或为空** —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    crit = tr.get('CRITERIA_ROOTS')
+    if not isinstance(crit, dict) or not [k for k in crit if k != '_why']:
+        print('🔴 信任根未登记 CRITERIA_ROOTS —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    bad = []
+    # ② 反向扫描：代码常量 → 信任根
+    missing = [k for k in req if k not in crit]
+    if missing:
+        bad.append(f'CRITERIA_ROOTS_REQUIRED 中的 {missing} **未在信任根登记**'
+                   f' —— 🔴 删掉信任根记录会让对应判据失去守护')
+    mx = None
+    try:
+        mx = _doc_max_round()
+    except Exception:
+        mx = None
+    src_cache = {}
+    checked = 0
+    for k in sorted(k for k in crit if k != '_why'):
+        spec = crit[k]
+        if not isinstance(spec, dict):
+            bad.append(f'判据 {k} 的登记不是 dict —— 拒绝给结论')
+            continue
+        di = (spec.get('defined_in') or '').strip()
+        fn_name = (spec.get('in_fn') or '').strip()
+        why = (spec.get('why') or '').strip()
+        rnd = spec.get('round')
+        if len(why) < 20:
+            bad.append(f'判据 {k} 的 why 过短（{len(why)}<20）—— 🔴 必须写明"为什么它算根"')
+        if not isinstance(rnd, int) or rnd <= 0:
+            bad.append(f'判据 {k} 未登记批准轮次 round —— 拒绝给结论')
+        elif mx is not None and rnd > mx:
+            bad.append(f'判据 {k} 的批准轮次 {rnd} **大于文档最大轮次 {mx}**'
+                       f' —— 🔴 来自未来的批准')
+        if not di:
+            bad.append(f'判据 {k} 未登记 defined_in —— 拒绝给结论')
+            continue
+        fp = os.path.join(ROOT, di)
+        if not os.path.exists(fp):
+            bad.append(f'判据 {k} 的 defined_in 指向不存在的文件：{di}')
+            continue
+        if fp not in src_cache:
+            src_cache[fp] = open(fp, encoding='utf-8').read()
+        text = src_cache[fp]
+        try:
+            tree = _ast.parse(text)
+        except SyntaxError:
+            bad.append(f'判据 {k}：{di} 语法错误 —— 拒绝给结论')
+            continue
+        # ③ + ④ AST 求函数行范围
+        node = None
+        for n in _ast.walk(tree):
+            if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef)) \
+                    and n.name == fn_name:
+                node = n
+                break
+        if node is None:
+            bad.append(f'判据 {k}：{di} 中**找不到函数** {fn_name} —— 拒绝给结论')
+            continue
+        lo = node.lineno
+        hi = getattr(node, 'end_lineno', None) or node.lineno
+        body = '\n'.join(text.splitlines()[lo - 1:hi])
+        marks = spec.get('require')
+        if not isinstance(marks, list) or not marks:
+            bad.append(f'判据 {k} 未登记 require 标记串 —— 拒绝给结论')
+            continue
+        gone = [m for m in marks if m not in body]
+        if gone:
+            bad.append(f'判据 {k} 的标记串 {gone} **在 {fn_name}() 内找不到**'
+                       f' —— 🔴 判据可能已被删除或改成恒真')
+        else:
+            checked += 1
+            print(f'   ✅ 判据 {k} 在 {fn_name}():{lo}-{hi} 内'
+                  f' 标记 {len(marks)} 个均在 · 批准于第 {rnd} 轮')
+    print(f'   信任根 {TRUST_ROOT_FILE}')
+    print(f'   已登记判据 {len([k for k in crit if k != "_why"])} 条'
+          f' · 反向必需 {len(req)} 条 · 校验通过 {checked} 条'
+          f' · 文档最大轮次 {mx}')
+    if bad:
+        print()
+        for b in bad:
+            print(f'🔴 {b}')
+        print('=' * 70)
+        return 1
+    print()
+    print(f'✅ 判据存在性闭合：{checked} 条判据均仍在代码中'
+          f'（134 轮破坏⑦⑧ 的放行方向已被封住）')
+    print('=' * 70)
+    return 0
+
 
 def cmd_verify_push(report=False):
     """🔑 G391：**回读远端 tree** 并与本地逐条比对。
@@ -3560,6 +3703,8 @@ def main():
                     help='G397：文件级遗留断言（odd_count / odd_paths_sha）')
     ap.add_argument('--assert-trust-root', action='store_true',
                     help='G408：信任根闭合（代码元登记项 == 信任根文件）')
+    ap.add_argument('--assert-criteria-roots', action='store_true',
+                    help='G426：判据存在性信任根闭合（G425 判据⑧/⑨ 必须仍在代码中）')
     ap.add_argument('--assert-meta-names', action='store_true',
                     help='G407：元登记项（登记表本身）必须闭合')
     ap.add_argument('--assert-path-consts', action='store_true',
@@ -3620,6 +3765,8 @@ def main():
 
     if a.assert_trust_root:
         return cmd_assert_trust_root()
+    if a.assert_criteria_roots:
+        return cmd_assert_criteria_roots()
     if a.assert_meta_names:
         return cmd_assert_meta_names()
     if a.assert_path_consts:

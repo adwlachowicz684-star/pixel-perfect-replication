@@ -1,0 +1,29 @@
+# 第一百三十五轮完成声明（G381/G382/G383 校验）
+# 指引来源：第一百三十四轮末尾 —— 把判据⑧/⑨ 的**存在性**写进 ledger/trust_root.json
+grep:scripts/push_api.py::CRITERIA_ROOTS_REQUIRED
+grep:scripts/push_api.py::def cmd_assert_criteria_roots
+grep:scripts/push_api.py::--assert-criteria-roots
+grep:scripts/push_api.py::import ast as _ast
+grep:scripts/push_api.py::_ast.walk(_self)
+grep:scripts/push_api.py::判据④ 处
+grep:scripts/push_api.py::getattr(mod, '_gate_calls_helper', None)
+grep:scripts/push_api.py::反证失败
+grep:scripts/push_api.py::_doc_max_round()
+grep:scripts/push_api.py::CRITERIA_ROOTS
+grep:ledger/trust_root.json::CRITERIA_ROOTS
+grep:ledger/trust_root.json::G425_c8_行为反证
+grep:ledger/trust_root.json::G425_c9_判据不能验自己
+grep:ledger/trust_root.json::CRITERIA_ROOTS_REQUIRED
+grep:scripts/run_all_gates.py::G426
+grep:scripts/run_all_gates.py::--assert-criteria-roots
+grep:scripts/run_all_gates.py::G425
+grep:references/游戏引擎复刻.md::第一百三十五轮
+grep:references/游戏引擎复刻.md::标记串必须在该函数内唯一
+grep:references/游戏引擎复刻.md::原子写入
+grep:README.md::第一百三十五轮
+cmd:push_api.py --assert-criteria-roots
+cmd:push_api.py --assert-round-end-single
+cmd:push_api.py --assert-trust-root
+gate:G426
+gate:G425
+gate:G408

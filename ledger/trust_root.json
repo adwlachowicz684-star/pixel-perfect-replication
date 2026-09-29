@@ -6,7 +6,8 @@
     "DEPENDENT_NAMES_MIN",
     "DEPENDENT_NAMES_REQUIRED",
     "PATH_CONST_ALLOW",
-    "PATH_CONST_ALLOW_MIN_REASON"
+    "PATH_CONST_ALLOW_MIN_REASON",
+    "CRITERIA_ROOTS_REQUIRED"
   ],
   "VALUE_ROOTS": {
     "GATE_RC_DOMAIN": {
@@ -44,5 +45,29 @@
     ],
     "🔑_为什么是人工判断": "与第一百一十五轮『停止递推』同一结论：识别根这件事本身无法自动化。本文件的作用是把**人工判断的结果**固定下来并持续断言，而不是自动生成判断。",
     "报告入口": "scripts/_scan_cross_ref_consts.py —— 输出跨文件引用候选供人工参考，🔴 它**不是**门禁（会漏掉真根，见上）"
+  },
+  "CRITERIA_ROOTS": {
+    "_why": "🔑 第一百三十五轮：G425 的**判据⑧/⑨ 自身没有外部守护** —— 134 轮破坏实测⑦⑧：把判据⑨改成恒真、或删掉判据⑧整段，**全部放行**（rc=0），而 G425 其余判据照绿。本表把这两条判据的**存在性**写进信任根（与 115 轮『停止递推 + 明示信任根』同构），使『删掉判据/改成恒真』在 G426 处暴露。🔴 已知边界：同时改代码与本文件仍会绕过（109 轮同源），靠 git 审计兜底。",
+    "G425_c8_行为反证": {
+      "defined_in": "scripts/push_api.py",
+      "in_fn": "cmd_assert_round_end_single",
+      "require": [
+        "getattr(mod, '_gate_calls_helper', None)",
+        "反证失败"
+      ],
+      "why": "判据⑧：**真跑** _gate_calls_helper 对四种合成 AST 反证（只引用不调用/直接调用/取用后调用/取的是别的常量）。🔴 132 轮破坏⑥实测：把它改成恒返回 True 的桩后，①②③④⑤ 静态判据**全部照常通过** —— 只有行为反证能发现。",
+      "round": 135
+    },
+    "G425_c9_判据不能验自己": {
+      "defined_in": "scripts/push_api.py",
+      "in_fn": "cmd_assert_round_end_single",
+      "require": [
+        "_self = fns.get('cmd_assert_round_end_single')",
+        "_ast.walk(_self)",
+        "判据④ 处"
+      ],
+      "why": "判据⑨：要求判据④ 处确有 _gate_calls_helper(g, fn) 这个**特定调用**。🔴 134 轮实测两次才做对：第一版用同一个 helper 验『自己有没有用它』，结果⑧里的 getattr 也被认作调用 → **恒真**。删掉它则判据④ 可随意写成恒真桩。 🔴 135 轮：第一版用 ['_n.args','判据④ 处']，破坏②（判据⑨改恒真）**仍放行** —— `_n.args` 在该函数内出现 3 次，删掉⑨块后还剩 2 处。🔑 判据：**标记串必须在该函数内唯一**，否则删除判据后它仍在别处命中。",
+      "round": 135
+    }
   }
 }
