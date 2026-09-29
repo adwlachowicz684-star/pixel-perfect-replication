@@ -1,0 +1,29 @@
+# 第一百三十四轮声明清单
+# 🔑 只引**代码标识符**与**文档正文行**短串；标题行/注释行不算证据（129 轮踩过三次）
+grep:scripts/push_api.py::_gate_calls_helper
+grep:scripts/push_api.py::_used_direct
+grep:scripts/push_api.py::_gate_calls_helper(g, fn)
+grep:scripts/push_api.py::只引用不调用，等于没共用
+grep:scripts/push_api.py::反证失败（
+grep:scripts/push_api.py::判据是恒真的桩或已失效
+grep:scripts/push_api.py::判据④ 确由 _gate_calls_helper(g, fn) 判定
+grep:scripts/push_api.py::判断门禁函数体是否真调用 helper
+grep:scripts/push_api.py::没有调用
+grep:scripts/push_api.py::_n.func.id == '_gate_calls_helper'
+grep:scripts/run_all_gates.py::G425
+cmd:push_api.py --assert-round-end-single
+cmd:push_api.py --assert-round-end
+cmd:push_api.py --assert-round-end-wired
+cmd:push_api.py --assert-dependent-names
+cmd:push_api.py --assert-path-consts
+cmd:push_api.py --assert-meta-names
+gate:G425
+gate:G424
+gate:G423
+# 🔑 对照实验：同一状态（G424 只引用不调用）修复前 rc=0 / 修复后 rc=1
+grep:README.md::修复前 rc=0 放行 / 修复后 rc=1 拦下
+grep:references/游戏引擎复刻.md::判据不能验自己
+grep:references/游戏引擎复刻.md::用同一个 helper 去验
+grep:references/游戏引擎复刻.md::拦下（**修复前曾放行**）
+grep:references/游戏引擎复刻.md::信任边界
+grep:README.md::第一百三十四轮：G425 判据④

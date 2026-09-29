@@ -24,6 +24,7 @@ python3 scripts/push_api.py --dry-run        # 只统计，不推送
 - 🔑 commit 的 parent 设为**远程当前 main** —— 历史连续，不是孤立的 commit。
 - 🔑 **空仓库**第一次要先建一个初始 commit（blob API 对空仓库返回 409）。
 """
+import ast
 import base64
 import glob
 import hashlib
@@ -105,6 +106,8 @@ DEPENDENT_NAMES = {
         'const', '轮次末尾步骤齐全判据的函数名登记项'),
     '_round_end_steps_bad': (
         'fn', 'G423/G424 共用的"步骤齐全"判据唯一实现'),
+    # 🔑 第一百三十四轮：G425 判据④ 的唯一实现（防"只引用不调用"）
+    '_gate_calls_helper': ('fn', '判断门禁函数体是否真调用 helper'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
     # ── 被依赖的函数 ──
     '_write_mirror': ('fn', '写镜像'),
@@ -3242,6 +3245,41 @@ def cmd_assert_round_end_wired():
     return 0
 
 
+def _gate_calls_helper(node, fn):
+    """🔑 判断一个门禁函数体内是否**真调用**了 helper（不只是引用）。
+
+    🔴 第一百三十三轮诚实结论①：判据④为兼容
+       `globals().get(ROUND_END_STEPS_BAD_FN)` 写法而放宽成"**引用**"
+       —— 于是"拿到 helper 却**从不调用**"也算共用，判据形同虚设。
+    🔑 判据：**该名字必须出现在 `Call` 的 `func` 位置**。
+
+    🔑 兼容两种共用形态：
+       a) 直接调用：`_round_end_steps_bad()`；
+       b) 取用后调用：`_b = globals().get(ROUND_END_STEPS_BAD_FN)` → `_b()`。
+          🔑 b) 要求 `get` 的实参**确为该常量名或其值**——
+             只认"取的是 helper 的那个变量"，不是任何 `globals().get()`。
+    """
+    bound = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call):
+            f = n.value.func
+            if isinstance(f, ast.Attribute) and f.attr in ('get', 'getattr'):
+                for a in n.value.args:
+                    hit = ((isinstance(a, ast.Name)
+                            and a.id == 'ROUND_END_STEPS_BAD_FN')
+                           or (isinstance(a, ast.Constant)
+                               and a.value == fn))
+                    if hit:
+                        for t in n.targets:
+                            if isinstance(t, ast.Name):
+                                bound.add(t.id)
+    for n in ast.walk(node):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
+            if n.func.id == fn or n.func.id in bound:
+                return True
+    return False
+
+
 def cmd_assert_round_end_single():
     """🔑 G425：**"步骤齐全"判据必须只有一处实现，且被 G423/G424 共用**。
 
@@ -3268,7 +3306,11 @@ def cmd_assert_round_end_single():
              新判据按 **Name 引用**统计，任何写法都覆盖；
        ⑥ **行为反证**：真跑一次被改坏的 `ROUND_END_STEPS`，
           断言判据**会响**（防该函数被改成恒返回 `[]` 的桩，
-          与 100 轮"自测必须调用真实实现"同源）。
+          与 100 轮"自测必须调用真实实现"同源）；
+       ⑦ helper 缺失时必须是**拒绝**而非**崩溃**（rc 相同，靠输出区分）；
+       ⑧ 🔑 第一百三十四轮：**判据④ 本身也须被反证** ——
+          真跑 `_gate_calls_helper` 对四种合成 AST 判断，
+          防它被改成恒真的桩（132 轮破坏⑥同源）。
     """
     print('=' * 70)
     print('🔑 G425 步骤齐全判据须唯一实现且被 G423/G424 共用')
@@ -3304,14 +3346,13 @@ def cmd_assert_round_end_single():
             print(f'🔴 找不到 {gate_fn}() —— 拒绝给结论')
             ok = False
             continue
-        # 🔑 两种共用形态都算：直接调用，或经常量名取用后调用
-        used = any(isinstance(n, _ast.Name)
-                   and isinstance(n.ctx, _ast.Load)
-                   and n.id in (fn, 'ROUND_END_STEPS_BAD_FN')
-                   for n in _ast.walk(g))
+        # 🔑 第一百三十四轮：**必须真调用**，只引用不算。
+        #    🔴 实测（本轮）：只写 `_x = _bad_fn` 而不调用，
+        #       旧判据照样报"共用 ✅" —— 判据形同虚设。
+        used = _gate_calls_helper(g, fn)
         if not used:
-            print(f'🔴 {gid}（{gate_fn}）**没有用到** {fn}'
-                  f' —— 又在自己的函数里内联了一份判据')
+            print(f'🔴 {gid}（{gate_fn}）**没有调用** {fn}()'
+                  f' —— 只引用不调用，等于没共用（判据形同虚设）')
             ok = False
         else:
             print(f'🔑 {gid} 共用 {fn}() ✅')
@@ -3403,6 +3444,69 @@ def cmd_assert_round_end_single():
         finally:
             if real is not None:
                 setattr(mod, fn, real)
+    # ⑧ 🔑 行为反证：**真跑** `_gate_calls_helper` 对合成 AST 的判断。
+    #    🔴 只做静态判据不够：若有人把它改成恒返回 True 的**桩**，
+    #       判据④ 会永远"通过"而没人发现 —— 与 100 轮"自测必须调用
+    #       真实实现"、132 轮破坏⑥（改成桩后静态判据全部照常通过）同源。
+    #    🔑 所以这里**调用真实实现**，不复刻一份逻辑。
+    _h = getattr(mod, '_gate_calls_helper', None)
+    if _h is None:
+        print('🔴 _gate_calls_helper() **不存在**'
+              ' —— 判据④ 无从判定（拒绝给结论）')
+        ok = False
+    else:
+        import ast as _ast2
+        for label, src, want in (
+                ('只引用不调用',
+                 'def g():\n    _r = _round_end_steps_bad\n    return _r\n',
+                 False),
+                ('直接调用',
+                 'def g():\n    return _round_end_steps_bad()\n', True),
+                ('取用后调用',
+                 'def g():\n    _b = globals().get(ROUND_END_STEPS_BAD_FN)'
+                 '\n    return _b()\n', True),
+                ('取的是别的常量',
+                 'def g():\n    _b = globals().get(OTHER_CONST)'
+                 '\n    return _b()\n', False),
+        ):
+            node = _ast2.parse(src).body[0]
+            got = _h(node, fn)
+            if got != want:
+                print(f'🔴 反证失败（{label}）：判据返回 {got}'
+                      f'（应为 {want}）—— 判据是恒真的桩或已失效')
+                ok = False
+            else:
+                print(f'🔑 反证通过（{label}）：{got} ✅')
+    # ⑨ 🔑 判据④ 本身必须真用 `_gate_calls_helper`。
+    #    🔴 实测（本轮）：把它改成 `used = True` 的恒真桩后，
+    #       ⑧ **依然全绿** —— ⑧ 验的是"helper 判得准不准"，
+    #       验不了"判据④ 到底用没用它"。
+    #    🔑 复用同一个 helper：它接受任意 (函数节点, 名字) 对。
+    #    🔴 实测（本轮，两次才做对）：第一版用
+    #       `_gate_calls_helper(_self, '_gate_calls_helper')`，
+    #       结果判据④ 改成 `used = True` 后**仍然放行** ——
+    #       因为 ⑧ 里 `_h = getattr(mod, '_gate_calls_helper')` 也被
+    #       认作"调用"，⑨ 于是恒定为真。**判据不能验自己。**
+    #    🔑 所以 ⑨ 要求：判据④ 那个**特定的调用**
+    #       `_gate_calls_helper(g, fn)` 真存在于本函数体内。
+    _self = fns.get('cmd_assert_round_end_single')
+    _used_direct = False
+    if _self is not None:
+        for _n in _ast.walk(_self):
+            if (isinstance(_n, _ast.Call)
+                    and isinstance(_n.func, _ast.Name)
+                    and _n.func.id == '_gate_calls_helper'
+                    and len(_n.args) == 2
+                    and all(isinstance(_a, _ast.Name) for _a in _n.args)
+                    and [ _a.id for _a in _n.args ] == ['g', 'fn']):
+                _used_direct = True
+                break
+    if _self is None or not _used_direct:
+        print('🔴 判据④ 处**没有** `_gate_calls_helper(g, fn)` 这个调用'
+              ' —— 它可能被写成了恒真的桩（拒绝给结论）')
+        ok = False
+    else:
+        print('🔑 判据④ 确由 _gate_calls_helper(g, fn) 判定 ✅')
     if not ok:
         print('=' * 70)
         return 1

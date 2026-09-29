@@ -4,7 +4,9 @@ grep:scripts/push_api.py::ROUND_END_STEPS_BAD_FN
 grep:scripts/push_api.py::_round_end_steps_bad
 grep:scripts/push_api.py::globals().get(ROUND_END_STEPS_BAD_FN)
 grep:scripts/push_api.py::isinstance(n.ctx, _ast.Load)
-grep:scripts/push_api.py::n.id in (fn, 'ROUND_END_STEPS_BAD_FN')
+# 🔴 第一百三十四轮据实更新：判据④ 改为唯一实现 `_gate_calls_helper(g, fn)`，
+#    原引文 `n.id in (fn, 'ROUND_END_STEPS_BAD_FN')` 已随重构消失（改动留痕于 git）
+grep:scripts/push_api.py::_gate_calls_helper(g, fn)
 grep:scripts/push_api.py::引用 ROUND_END_REQUIRED_GIDS 的函数有
 grep:scripts/push_api.py::判据又被抄了一份
 grep:scripts/push_api.py::拒绝给结论（不是崩溃）

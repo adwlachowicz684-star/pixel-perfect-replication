@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-29T18:22:03+0800",
+  "generated_at": "2026-09-30T05:50:35+0800",
   "baseline_modes": {
-    "100644": 312
+    "100644": 313
   },
   "baseline_fp_history": [
     {
@@ -99,10 +99,26 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-09-29T18:22:04+0800"
+    },
+    {
+      "seq": 7,
+      "seq_in_round": 1,
+      "round": 134,
+      "from_fp": "46078684a866df6590889fbaf13f218c3684b4c7",
+      "to_fp": "c5dee243d62a0c3ef2c416733b04c99d9b0eb1db",
+      "from_modes": {
+        "100644": 312
+      },
+      "to_modes": {
+        "100644": 313
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-09-30T05:50:36+0800"
     }
   ],
-  "baseline_fp": "46078684a866df6590889fbaf13f218c3684b4c7",
-  "checked_commits": 53,
+  "baseline_fp": "c5dee243d62a0c3ef2c416733b04c99d9b0eb1db",
+  "checked_commits": 55,
   "known_legacy": [
     {
       "sha": "444515de4b42",
@@ -126,7 +142,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 312
+        "100644": 313
       }
     },
     {
@@ -151,7 +167,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 312
+        "100644": 313
       }
     },
     {
@@ -176,7 +192,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 312
+        "100644": 313
       }
     },
     {
@@ -201,7 +217,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 312
+        "100644": 313
       }
     },
     {
@@ -226,7 +242,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 312
+        "100644": 313
       }
     }
   ],
