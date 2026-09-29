@@ -3081,7 +3081,17 @@ def cmd_assert_round_end():
     print('=' * 70)
     ok = True
     # ①③ 共用实现
-    for b in _round_end_steps_bad():
+    #    🔑 第一百三十三轮：用 `globals().get` 取，缺失时**拒绝给结论**。
+    #       🔴 直接写死调用时，helper 改名会抛 NameError ——
+    #          **崩溃的 rc 也是 1**，与"正确阻断"在退出码上无法区分
+    #          （104 轮 `req()` 同病，本轮为第 6 次同类）。
+    _bad_fn = globals().get(ROUND_END_STEPS_BAD_FN)
+    if _bad_fn is None:
+        print(f'🔴 {ROUND_END_STEPS_BAD_FN}() **不存在**'
+              f' —— 拒绝给结论（不是崩溃）')
+        print('=' * 70)
+        return 1
+    for b in _bad_fn():
         print(f'🔴 {b}')
         ok = False
     # ② 真被 argparse 登记
@@ -3151,7 +3161,14 @@ def cmd_assert_round_end_wired():
     print('=' * 70)
     ok = True
     # ① 共用实现（与 G423 同一份，防两条门禁结论矛盾）
-    for b in _round_end_steps_bad():
+    #    🔑 同 G423：缺失即拒绝给结论，不崩溃。
+    _bad_fn = globals().get(ROUND_END_STEPS_BAD_FN)
+    if _bad_fn is None:
+        print(f'🔴 {ROUND_END_STEPS_BAD_FN}() **不存在**'
+              f' —— 拒绝给结论（不是崩溃）')
+        print('=' * 70)
+        return 1
+    for b in _bad_fn():
         print(f'🔴 {b} —— 接了也白接（跑了也漏一个方向）')
         ok = False
     gids = [g for _f, g, _m, _w in ROUND_END_STEPS]
@@ -3239,9 +3256,16 @@ def cmd_assert_round_end_single():
        ② 其**值**已登记为 fn（🔴 单看一条会退化成恒真 —— 131 轮实测：
           常量值 '_run_round_end_steps' 本身也在表里，"值在不在表里"永真）；
        ③ 该函数**真定义**；
-       ④ G423 / G424 **两个函数体内都真调用**它（只登记不算共用）；
-       ⑤ 全文件遍历 `ROUND_END_REQUIRED_GIDS` 的 for 循环**只有 1 处**
-          —— 防"共用之外又内联一份"（**存在但无关**的老病，83 轮）；
+       ④ G423 / G424 **两个函数体内都真用到**它（只登记不算共用）。
+          🔑 第一百三十三轮：兼容两种形态 —— 直接调用 `fn()`，
+             或经常量名 `globals().get(ROUND_END_STEPS_BAD_FN)` 取用
+             （后者是「缺失即拒绝给结论」所必需的写法）；
+       ⑤ 🔑 **引用** `ROUND_END_REQUIRED_GIDS` 的函数**只有 helper 一个**
+          —— 防"共用之外又内联一份"（**存在但无关**的老病，83 轮）。
+          🔴 第一百三十三轮改：**不看写法**。旧判据只认
+             `for x in ROUND_END_REQUIRED_GIDS` 这一种 for 形式，
+             改用 `set(A) - set(B)` 或推导式就绕过（132 轮诚实结论①）；
+             新判据按 **Name 引用**统计，任何写法都覆盖；
        ⑥ **行为反证**：真跑一次被改坏的 `ROUND_END_STEPS`，
           断言判据**会响**（防该函数被改成恒返回 `[]` 的桩，
           与 100 轮"自测必须调用真实实现"同源）。
@@ -3280,31 +3304,37 @@ def cmd_assert_round_end_single():
             print(f'🔴 找不到 {gate_fn}() —— 拒绝给结论')
             ok = False
             continue
-        called = any(isinstance(n, _ast.Call)
-                     and getattr(n.func, 'id', None) == fn
-                     for n in _ast.walk(g))
-        if not called:
-            print(f'🔴 {gid}（{gate_fn}）**没有调用** {fn}()'
+        # 🔑 两种共用形态都算：直接调用，或经常量名取用后调用
+        used = any(isinstance(n, _ast.Name)
+                   and isinstance(n.ctx, _ast.Load)
+                   and n.id in (fn, 'ROUND_END_STEPS_BAD_FN')
+                   for n in _ast.walk(g))
+        if not used:
+            print(f'🔴 {gid}（{gate_fn}）**没有用到** {fn}'
                   f' —— 又在自己的函数里内联了一份判据')
             ok = False
         else:
-            print(f'🔑 {gid} 调用 {fn}() ✅')
-    # ⑤ 遍历 ROUND_END_REQUIRED_GIDS 的 for 循环只能有 1 处
+            print(f'🔑 {gid} 共用 {fn}() ✅')
+    # ⑤ 🔑 第一百三十三轮：**按 Name 引用统计，不认写法**。
+    #    🔴 旧判据只匹配 `for x in ROUND_END_REQUIRED_GIDS`，
+    #       换成 `set(A) - set(B)`、`[... for g in A ...]` 就绕过。
     owners = []
     for name, node in fns.items():
+        if name == 'cmd_assert_round_end_single':
+            continue   # 本门禁自身只在字符串里提到它，不算引用
         for n in _ast.walk(node):
-            if isinstance(n, _ast.For) \
-                    and isinstance(n.iter, _ast.Name) \
-                    and n.iter.id == 'ROUND_END_REQUIRED_GIDS':
+            if isinstance(n, _ast.Name) \
+                    and n.id == 'ROUND_END_REQUIRED_GIDS' \
+                    and isinstance(n.ctx, _ast.Load):
                 owners.append(name)
                 break
     owners = sorted(set(owners))
     if len(owners) != 1 or owners[0] != fn:
-        print(f'🔴 遍历 ROUND_END_REQUIRED_GIDS 的函数有 {len(owners)} 处'
+        print(f'🔴 引用 ROUND_END_REQUIRED_GIDS 的函数有 {len(owners)} 处'
               f' {owners}（应只有 {fn} 一处）—— 判据又被抄了一份')
         ok = False
     else:
-        print(f'🔑 判据唯一实现：{fn}()（其余 {len(fns)} 个函数均未内联）')
+        print(f'🔑 判据唯一实现：{fn}()（其余 {len(fns)} 个函数均未引用）')
     # ⑥ 行为反证：真跑一次改坏的输入
     try:
         import importlib.util as _ilu
@@ -3334,6 +3364,45 @@ def cmd_assert_round_end_single():
             ok = False
         else:
             print(f'🔑 反证通过（{label}）：报出 {len(got)} 条')
+    # ⑦ 🔑 行为反证：helper **改名/不存在**时必须是"拒绝"而不是"崩溃"。
+    #    🔴 第一百三十二轮诚实结论③：helper 改名会让 G423/G424 抛
+    #       NameError —— **崩溃的 rc 也是 1**，与"正确阻断"在退出码上
+    #       **无法区分**（104 轮 `req()` 同病，本类问题第 6 次）。
+    #    🔑 判据：rc==1 且输出含"拒绝给结论"且**不含** Traceback。
+    import io as _io2
+    import contextlib as _cb
+    for gid, cmd_name in (('G423', 'cmd_assert_round_end'),
+                          ('G424', 'cmd_assert_round_end_wired')):
+        real = getattr(mod, fn, None)
+        try:
+            if hasattr(mod, fn):
+                delattr(mod, fn)      # 模拟改名：helper 从此不存在
+            buf = _io2.StringIO()
+            try:
+                with _cb.redirect_stdout(buf):
+                    rc = getattr(mod, cmd_name)()
+            except Exception as e:
+                print(f'\U0001f534 {gid} 在 {fn}() 缺失时**抛异常**: '
+                      f'{type(e).__name__}: {e}'
+                      f' —— 崩溃与拒绝在 rc 上无法区分')
+                ok = False
+                continue
+            out = buf.getvalue()
+            if rc != 1:
+                print(f'\U0001f534 {gid} 在 {fn}() 缺失时 rc={rc}（应为 1）')
+                ok = False
+            elif 'Traceback' in out:
+                print(f'\U0001f534 {gid} 输出含 Traceback —— 是**崩溃**不是拒绝')
+                ok = False
+            elif '拒绝给结论' not in out:
+                print(f'\U0001f534 {gid} 未输出"拒绝给结论" —— 无法与崩溃区分')
+                ok = False
+            else:
+                print(f'\U0001f511 反证通过（{gid}）：helper 缺失时'
+                      f' **拒绝给结论**而非崩溃')
+        finally:
+            if real is not None:
+                setattr(mod, fn, real)
     if not ok:
         print('=' * 70)
         return 1
