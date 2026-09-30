@@ -136,6 +136,15 @@ DEPENDENT_NAMES = {
     'DOC_ROUND_MIN_FILES': ('const', '文档轮次扫描 md 文件数下限（G433 依赖）'),
     'DOC_CLAIMS_SINCE': ('const', '文档↔清单对账起始轮（G433 依赖，143 轮新增）'),
     '_doc_claims_closure_bad': ('fn', 'G433 判据②③④⑤ 的唯一实现'),
+    # 🔑 第一百四十四轮：G434（文档轮次识别**不认写法**）依赖的常量/函数。
+    #    🔴 按 115/120/127/139/142/143 轮同一条规程：新增必须同步登记，
+    #       否则 G406 会报"未登记"（它已在真实工作流中生效三次）。
+    'DOC_ROUND_CN_RE': ('const', '文档轮次中文数字正则（G434 依赖）'),
+    'DOC_ROUND_AR_RE': ('const', '文档轮次阿拉伯数字正则（G434 依赖）'),
+    'DOC_ROUND_AR_MAX': ('const', '阿拉伯轮次上限（防噪音把 max 顶飞）'),
+    '_round_hits': ('fn', '轮次解析唯一实现（不认写法：中文 ↔ 阿拉伯）'),
+    'ROUND_PARSE_FN': ('const', '轮次解析函数名登记项（G434 依赖，防一致改名静默失效）'),
+    'NOTATION_SAMPLES': ('const', '写法反证样本（G434 判据③ 依赖，防清空后恒通过）'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -4794,6 +4803,60 @@ DOC_CLAIMS_SINCE = 75
 DOC_ROUND_SKIP_PARTS = ('/work/', '/.git/')
 
 
+# 🔑 第一百四十四轮：G434 —— 文档轮次识别**不认写法**。
+#    🔴 143 轮诚实结论（本轮指引）：`_doc_round_set()` 只认中文数字 ——
+#       把「第一百一十轮」改成「第110轮」就让它从文档证据源里**消失**
+#       （143 轮破坏⑦ 正是靠这个触发）。
+#       🔑 反过来：G433 判据④ 会对"文档其实记了、只是换了写法"**误报**。
+DOC_ROUND_CN_RE = u'第([零一二三四五六七八九十百]+)轮'
+DOC_ROUND_AR_RE = u'第\\s?([0-9]{1,3})\\s?轮'
+# 🔑 阿拉伯上限：防止文中出现的大数字（时间戳 / 行号等）被误当成轮次。
+DOC_ROUND_AR_MAX = 999
+# 🔑 解析函数的**名字登记项**（111 轮 MIRROR_WRITE_FN 同款）：
+#    🔴 若把名字硬编码在 G434 判据里，**一致改名**会让判据⑤ 假阳性；
+#    ✅ 改成"常量值"后，一致改名只需改这一处，判据仍成立。
+ROUND_PARSE_FN = '_round_hits'
+# 🔑 反证样本下限：判据③ 靠遍历它，**被清空就恒通过**（106 轮"缺失≠没有违规"）。
+NOTATION_SAMPLES_MIN = 10
+# 🔑 写法反证样本：**两种写法必须解析出同一轮次**（含 100/101/110/115 等易错值）。
+NOTATION_SAMPLES = (
+    (u'第十轮', 10), (u'第10轮', 10),
+    (u'第十一轮', 11), (u'第11轮', 11),
+    (u'第二十轮', 20), (u'第20轮', 20),
+    (u'第二十一轮', 21), (u'第21轮', 21),
+    (u'第一百轮', 100), (u'第100轮', 100),
+    (u'第一百零一轮', 101), (u'第101轮', 101),
+    (u'第一百一十轮', 110), (u'第110轮', 110),
+    (u'第一百一十五轮', 115), (u'第115轮', 115),
+    (u'第一百二十轮', 120), (u'第120轮', 120),
+    (u'第一百四十三轮', 143), (u'第143轮', 143),
+)
+
+
+def _round_hits(text):
+    """🔑 从一段文本解析出所有声称的轮次（**不认写法**：中文 ↔ 阿拉伯）。
+
+    🔑 这是 `_doc_round_set()` 的**唯一解析实现** —— G434 判据③ 直接调它做
+       行为反证（94 轮"自测必须调用真实实现"同源：**不抄一份**）。
+    🔑 中文部分**复用** `_cn_round`（G432 也在用的唯一中文解析），不另写一套。
+    """
+    out = set()
+    if not text:
+        return out
+    for m in re.finditer(DOC_ROUND_CN_RE, text):
+        n_ = _cn_round(m.group(0))
+        if n_:
+            out.add(n_)
+    for m in re.finditer(DOC_ROUND_AR_RE, text):
+        try:
+            n_ = int(m.group(1))
+        except Exception:
+            continue
+        if 0 < n_ <= DOC_ROUND_AR_MAX:
+            out.add(n_)
+    return out
+
+
 def _doc_round_set():
     """🔑 文档里声称的轮次集合。返回 (dict{轮次:set(文件)}|None, md 文件数)。
 
@@ -4812,10 +4875,8 @@ def _doc_round_set():
                 t = fh.read()
         except Exception:
             continue
-        for m in re.finditer(u'第([零一二三四五六七八九十百]+)轮', t):
-            n_ = _cn_round(m.group(0))
-            if n_:
-                hits.setdefault(n_, set()).add(os.path.relpath(f, ROOT))
+        for n_ in _round_hits(t):
+            hits.setdefault(n_, set()).add(os.path.relpath(f, ROOT))
     if n_md < DOC_ROUND_MIN_FILES or not hits:
         return None, n_md
     return hits, n_md
@@ -4962,6 +5023,101 @@ def cmd_assert_doc_round_closure():
         return 1
     print(u'✅ 两个证据源一致：文档最大轮次 == 清单最大轮次 == %d，'
           u'且自第 %d 轮起无未登记缺口' % (max(claims), DOC_CLAIMS_SINCE))
+    print('=' * 70)
+    return 0
+
+
+def cmd_assert_doc_round_notation():
+    """🔑 G434：文档轮次识别**不认写法**（中文数字 ↔ 阿拉伯数字）。
+
+    🔴 143 轮诚实结论（本轮指引）：`_doc_round_set()` 只认中文数字 ——
+       「第一百一十轮」改成「第110轮」就让它从文档证据源里消失。
+       🔑 两个方向的危害：
+         - 换写法 → G433 判据④ **误报**（文档其实记了）
+         - 想让一轮"消失"，只要换个写法即可（143 轮明说未设反制）
+
+    🔑 五条判据：
+       ① 两个正则都在（缺一 → 换写法即失效）
+       ② `_round_hits` 存在（不存在 → **拒绝给结论**）
+       ③ 🔑 行为反证：两种写法解析出**同一轮次**（含 100/101/110/115 等易错值）
+       ④ 互不覆盖：中文正则不匹配阿拉伯写法，反之亦然（证明两者都必要）
+       ⑤ `_doc_round_set` 必须真调用 `_round_hits`（防绕过共用实现另写一套）
+    """
+    print('=' * 70)
+    print(u'🔑 G434 文档轮次识别不认写法（中文数字 ↔ 阿拉伯数字）')
+    print('=' * 70)
+    bad = []
+
+    # ── 判据①：两个正则都在 ──
+    for nm in ('DOC_ROUND_CN_RE', 'DOC_ROUND_AR_RE', 'DOC_ROUND_AR_MAX',
+               'ROUND_PARSE_FN', 'NOTATION_SAMPLES', 'NOTATION_SAMPLES_MIN'):
+        if nm not in globals():
+            bad.append(u'%s 不存在 —— 判据静默失效' % nm)
+    # 🔑 样本下限：被清空 → 判据③ 的循环不跑 → **恒通过**（106 轮同型）
+    if len(NOTATION_SAMPLES) < NOTATION_SAMPLES_MIN:
+        bad.append(u'NOTATION_SAMPLES 只有 %d 条（下限 %d）'
+                   u' —— 判据③ 会**恒通过**' % (len(NOTATION_SAMPLES),
+                                            NOTATION_SAMPLES_MIN))
+    parse_fn = globals().get('ROUND_PARSE_FN')
+    if not parse_fn:
+        bad.append(u'ROUND_PARSE_FN 为空 —— 判据②/⑤ 静默失效')
+    cn_re = globals().get('DOC_ROUND_CN_RE')
+    ar_re = globals().get('DOC_ROUND_AR_RE')
+    ar_max = globals().get('DOC_ROUND_AR_MAX')
+    if not isinstance(ar_max, int) or ar_max <= 0:
+        bad.append(u'DOC_ROUND_AR_MAX = %r 非正整数 —— 阿拉伯轮次上限失效'
+                   % (ar_max,))
+
+    # ── 判据②：解析函数存在 ──
+    fn = globals().get(parse_fn) if parse_fn else None
+    if fn is None:
+        bad.append(u'%s 不存在 —— **拒绝给结论**' % parse_fn)
+
+    if fn is not None and cn_re and ar_re:
+        # ── 判据③：行为反证（不认写法）──
+        for txt, want in NOTATION_SAMPLES:
+            got = fn(txt)
+            if got != set([want]):
+                bad.append(u'写法反证失败：_round_hits(%r) = %r，期望 {%d}'
+                           % (txt, sorted(got), want))
+        print(u'🔑 写法反证 %d 例已跑（中文 ↔ 阿拉伯）' % len(NOTATION_SAMPLES))
+
+        # ── 判据④：互不覆盖（证明两个正则**都必要**）──
+        if re.search(cn_re, u'第110轮'):
+            bad.append(u'中文正则竟匹配阿拉伯写法 —— 判据④ 恒真（两正则重合）')
+        if re.search(ar_re, u'第一百一十轮'):
+            bad.append(u'阿拉伯正则竟匹配中文写法 —— 判据④ 恒真（两正则重合）')
+
+    # ── 判据⑤：_doc_round_set 必须真调用 _round_hits ──
+    dsf = globals().get('_doc_round_set')
+    if dsf is None:
+        bad.append(u'_doc_round_set 不存在 —— 判据⑤ 无法验证')
+    else:
+        calls = []
+        try:
+            import ast as _ast
+            import inspect as _inspect
+            _tree = _ast.parse(_inspect.getsource(dsf))
+            calls = [n.func.id for n in _ast.walk(_tree)
+                     if isinstance(n, _ast.Call)
+                     and isinstance(n.func, _ast.Name)]
+        except Exception as e:
+            bad.append(u'解析 _doc_round_set 源码失败：%r —— **拒绝给结论**' % (e,))
+        if calls and parse_fn not in calls:
+            bad.append(u'_doc_round_set 未调用 %s —— 共用实现被绕过' % parse_fn)
+        elif not calls:
+            bad.append(u'_doc_round_set 未解析出任何调用 —— **拒绝给结论**')
+
+    print()
+    if bad:
+        for b in bad:
+            print(u'🔴 %s' % b)
+        print('=' * 70)
+        print(u'🔴 守卫失效（G434）')
+        print('=' * 70)
+        return 1
+    print(u'✅ 两种写法解析一致（%d 例），且 _doc_round_set 共用唯一实现'
+          % len(NOTATION_SAMPLES))
     print('=' * 70)
     return 0
 
@@ -5435,6 +5591,9 @@ def main():
     ap.add_argument('--assert-doc-round-closure', action='store_true',
                     help='G433：文档轮次与清单轮次必须互相印证'
                          '（G432 的本地集合只有 claims 一个来源）')
+    ap.add_argument('--assert-doc-round-notation', action='store_true',
+                    help='G434：文档轮次识别不认写法'
+                         '（中文数字 ↔ 阿拉伯数字）')
     ap.add_argument('--assert-push-exclusive-alive', action='store_true',
                     help='G430：推送互斥守卫的**名字锚点 + 行为反证**'
                          '（139 轮：一致改名 / 实现换成 return [] 都照绿）')
@@ -5586,6 +5745,9 @@ def main():
     if a.assert_doc_round_closure:
         print()
         return cmd_assert_doc_round_closure()
+    if a.assert_doc_round_notation:
+        print()
+        return cmd_assert_doc_round_notation()
     if a.assert_remote_rounds:
         os.chdir(ROOT)
         return cmd_assert_remote_rounds()

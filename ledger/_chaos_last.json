@@ -1,10 +1,10 @@
 {
-  "generated_at_ns": 1790732138116784052,
+  "generated_at_ns": 1790809361526386931,
   "anchor_denom": 101,
   "results": {
     "participated": 101,
-    "intercepted": 101,
-    "strong": 99
+    "intercepted": 100,
+    "strong": 98
   },
-  "ok": 101
+  "ok": 100
 }
