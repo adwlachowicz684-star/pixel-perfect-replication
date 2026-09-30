@@ -158,7 +158,10 @@ SELF_REGISTERED_META = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
 #    🔑 处置：把这两条判据的**存在性**写进 ledger/trust_root.json::CRITERIA_ROOTS，
 #       并用本常量做**反向扫描**（代码 → 信任根），防"删掉一条信任根记录"。
 #       （与 G406 反向扫描 DEPENDENT_NAMES 同构）
-CRITERIA_ROOTS_REQUIRED = ('G425_c8_行为反证', 'G425_c9_判据不能验自己')
+CRITERIA_ROOTS_REQUIRED = ('G425_c8_行为反证', 'G425_c9_判据不能验自己',
+                           # 🔑 第一百三十六轮推广：G412/G413 的判据同样"可被改成桩"
+                           'G412_c2_真跑真实实现', 'G412_c4_反证静默失败',
+                           'G413_c1_扫描下限', 'G413_c5_豁免不可读须拒绝')
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -1326,6 +1329,85 @@ def cmd_assert_trust_root():
     print('=' * 70)
     return 0
 
+def _dynamic_call_name(node):
+    """从 `globals()['f']` / `getattr(m, 'f', ...)` 里取出函数名；否则 None。"""
+    if isinstance(node, ast.Subscript):
+        sl = node.slice
+        if isinstance(sl, ast.Constant) and isinstance(sl.value, str):
+            return sl.value
+        return None
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+            and node.func.id == 'getattr' and len(node.args) >= 2:
+        a1 = node.args[1]
+        if isinstance(a1, ast.Constant) and isinstance(a1.value, str):
+            return a1.value
+    return None
+
+
+def _criteria_ast_missing(fn_node, specs):
+    """🔑 G426 判据⑥：**AST 结构判据** —— 不认写法（第一百三十六轮补①）。
+
+    🔴 第一百三十五轮诚实结论①：`require` 是**文本匹配** ——
+       改写法但保留语义会**误报**；在别处复制一段相同文本可**蒙混**。
+    🔑 本函数改为按 **AST 节点结构**判定：不管你写成 `x = f()` 还是
+       `x = getattr(mod, 'f')()` 之外的等价写法，只要**结构在**就算在。
+
+    | type | 含义 |
+    |---|---|
+    | `call` | 函数体内必须**调用**该名字（`Call(func=Name(name))`） |
+    | `call_attr` | 必须调用 `obj.attr(...)` |
+    | `assign_attr` | 必须**赋值**给 `obj.attr`（如 monkeypatch `shutil.rmtree = ...`）；可再加 `value` 约束 RHS 形状（`lambda`/`name`） |
+
+    🔑 `call` **不认写法**：除 `Name` 外还识别两种**动态取用**形态 ——
+       `globals()['f']()` 与 `getattr(mod, 'f')()`。
+       🔴 否则"改写法但保留语义"会**误报**，这就是判据⑥ 要解决的 135 轮①。
+    """
+    calls = set()
+    call_attrs = set()
+    assign_attrs = set()
+    assign_shapes = set()
+    for n in ast.walk(fn_node):
+        if isinstance(n, ast.Call):
+            f = n.func
+            if isinstance(f, ast.Name):
+                calls.add(f.id)
+            elif isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):
+                call_attrs.add((f.value.id, f.attr))
+            else:
+                # 🔑 动态取用：`globals()['f']()` / `getattr(mod, 'f')()`
+                got = _dynamic_call_name(f)
+                if got:
+                    calls.add(got)
+        if isinstance(n, ast.Assign):
+            for t in n.targets:
+                if isinstance(t, ast.Attribute) and isinstance(t.value, ast.Name):
+                    v = n.value
+                    shape = 'lambda' if isinstance(v, ast.Lambda) \
+                        else ('name' if isinstance(v, ast.Name) else 'other')
+                    assign_attrs.add((t.value.id, t.attr))
+                    assign_shapes.add((t.value.id, t.attr, shape))
+    miss = []
+    for s in specs:
+        if not isinstance(s, dict):
+            miss.append(s)
+            continue
+        t = s.get('type')
+        if t == 'call':
+            hit = s.get('name') in calls
+        elif t == 'call_attr':
+            hit = (s.get('obj'), s.get('attr')) in call_attrs
+        elif t == 'assign_attr':
+            hit = (s.get('obj'), s.get('attr')) in assign_attrs
+            vs = s.get('value')
+            if hit and vs:
+                hit = (s.get('obj'), s.get('attr'), vs) in assign_shapes
+        else:
+            hit = False
+        if not hit:
+            miss.append(s)
+    return miss
+
+
 def cmd_assert_criteria_roots():
     """🔑 G426：**判据存在性信任根闭合**。
 
@@ -1348,6 +1430,10 @@ def cmd_assert_criteria_roots():
           （🔴 AST 求行范围**并排除自身** —— 93 轮"检查器扫到自己"）
        ⑤ `why` ≥ 20 字符（🔴 否则信任根退化成无理由白名单）
           · `round` ≤ 文档最大轮次（G389 同款，防"来自未来的批准"）
+       ⑥ `require_ast`：**AST 结构判据**（第一百三十六轮新增）
+          🔴 135 轮①：纯文本匹配改写法会误报、复制文本可蒙混。
+      ⑦ 每个标记串在该函数内**必须唯一**（第一百三十六轮新增）
+          🔴 135 轮发现一：`_n.args` 出现 3 次时，删掉判据**仍放行**。
     """
     print('🔑 **判据存在性信任根闭合**（G426）')
     print('=' * 70)
@@ -1424,17 +1510,48 @@ def cmd_assert_criteria_roots():
         hi = getattr(node, 'end_lineno', None) or node.lineno
         body = '\n'.join(text.splitlines()[lo - 1:hi])
         marks = spec.get('require')
-        if not isinstance(marks, list) or not marks:
-            bad.append(f'判据 {k} 未登记 require 标记串 —— 拒绝给结论')
+        ast_spec = spec.get('require_ast')
+        if marks is None and ast_spec is None:
+            bad.append(f'判据 {k} 既未登记 require 也未登记 require_ast'
+                       f' —— 拒绝给结论')
             continue
-        gone = [m for m in marks if m not in body]
-        if gone:
-            bad.append(f'判据 {k} 的标记串 {gone} **在 {fn_name}() 内找不到**'
-                       f' —— 🔴 判据可能已被删除或改成恒真')
-        else:
+        ok_mark = True
+        if marks is not None:
+            if not (isinstance(marks, list) and marks):
+                bad.append(f'判据 {k} 的 require 不是非空列表 —— 拒绝给结论')
+                ok_mark = False
+            else:
+                # 判据④ 存在性 + 判据⑦ **唯一性**
+                gone = [m for m in marks if m not in body]
+                dup = [m for m in marks if body.count(m) > 1]
+                if gone:
+                    bad.append(f'判据 {k} 的标记串 {gone} **在 {fn_name}() 内找不到**'
+                               f' —— 🔴 判据可能已被删除或改成恒真')
+                    ok_mark = False
+                if dup:
+                    cnt = {m: body.count(m) for m in dup}
+                    bad.append(f'判据 {k} 的标记串**不唯一** {cnt}'
+                               f' —— 🔴 "判据被删"与"标记仍在别处命中"'
+                               f'无法区分（135 轮发现一）')
+                    ok_mark = False
+        ok_ast = True
+        if ast_spec is not None:
+            if not (isinstance(ast_spec, list) and ast_spec):
+                bad.append(f'判据 {k} 的 require_ast 不是非空列表 —— 拒绝给结论')
+                ok_ast = False
+            else:
+                miss_ast = _criteria_ast_missing(node, ast_spec)
+                if miss_ast:
+                    bad.append(f'判据 {k} 的 AST 结构判据 {miss_ast}'
+                               f' **在 {fn_name}() 内不满足**'
+                               f' —— 🔴 判据可能已被删除')
+                    ok_ast = False
+        if ok_mark and ok_ast:
             checked += 1
+            extra = f' · AST {len(ast_spec)} 条' if ast_spec else ''
             print(f'   ✅ 判据 {k} 在 {fn_name}():{lo}-{hi} 内'
-                  f' 标记 {len(marks)} 个均在 · 批准于第 {rnd} 轮')
+                  f' 标记 {len(marks or [])} 个均唯一且在{extra}'
+                  f' · 批准于第 {rnd} 轮')
     print(f'   信任根 {TRUST_ROOT_FILE}')
     print(f'   已登记判据 {len([k for k in crit if k != "_why"])} 条'
           f' · 反向必需 {len(req)} 条 · 校验通过 {checked} 条'

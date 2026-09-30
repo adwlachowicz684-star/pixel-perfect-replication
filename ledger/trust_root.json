@@ -1,73 +1,136 @@
 {
-  "_why": "🔑 第一百一十五轮：SELF_REGISTERED_META 自己是'元元登记项'——它不在任何表里，改名同样无人发现。这条链可无限递推（113③→114①）。本文件是**明示的信任根**：停止递推，把它写死在这里，并断言代码值必须与本文件一致。 第一百一十六轮扩展：新增 VALUE_ROOTS —— **值型根**（跨文件被依赖的常量值）。 第一百一十七轮：按三条判据人工审了 22 个候选，登记其中 2 个（_ANCHOR_DENOM_MODE / LEGAL_GATES）；其余 19 个为各台账脚本的模板常量，判据②不满足（有实际台账数据作对照物）。",
-  "_rule": "🔴 修改本文件必须在本轮文档中写明理由。同时改代码与本文件会绕过 G408 —— 这是**已知边界**（与 109 轮'同时改两处'同源），靠 git 审计兜底。",
-  "SELF_REGISTERED_META": [
-    "DEPENDENT_NAMES",
-    "DEPENDENT_NAMES_MIN",
-    "DEPENDENT_NAMES_REQUIRED",
-    "PATH_CONST_ALLOW",
-    "PATH_CONST_ALLOW_MIN_REASON",
-    "CRITERIA_ROOTS_REQUIRED"
-  ],
-  "VALUE_ROOTS": {
-    "GATE_RC_DOMAIN": {
-      "value": [
-        0,
-        1
-      ],
-      "why": "门禁 rc 的合法值域。第八十八/九十二/九十三轮反复出现：rc=2（参数错误）被当成真值收下；audit-all 的三段 rc 也必须与它同域。改名或改值会让 G388 与跨进程真值校验一起静默失效。",
-      "defined_in": "scripts/claim_verify.py"
-    },
-    "_ANCHOR_DENOM_MODE": {
-      "value": "chaosable",
-      "why": "锚点分母口径。🔴 **第九十二轮实测过**：改回 'all_scripts' → 分母 101→128 → 锚点 90→187 → **误杀真实结果 101**（rc=1 却不是真问题）。两个合法值都不会报错，只会让下界**静默变松或变紧**。判据①改它让下界断言静默失效；判据②'该用哪个口径'是设计决定，无外部对照物；判据③跨 gate_chaos 内部与锚点判定两层。",
-      "defined_in": "scripts/gate_chaos.py",
-      "allowed_values": [
-        "chaosable",
-        "all_scripts"
-      ],
-      "🔴_实测后果": "第九十二轮：all_scripts 口径下真值 101 被判'低于下界 187 —— 疑似写假值'"
-    },
-    "LEGAL_GATES": {
-      "value": [
-        "G21"
-      ],
-      "why": "对 ownership==self（自有项目）**不适用**的门禁豁免集合。🔴 改它会让 G21 （许可证据充分·仅第三方内容）静默变成必跑，或让别的门禁被静默跳过——**不报错**，只是在汇总里少/多一行 ⏭。判据①/②/③ 均满足：无外部对照物（'哪些门禁对自有项目不适用'是人工决定），跨门禁表与执行两层。",
-      "defined_in": "scripts/run_all_gates.py"
-    }
+ "_why": "🔑 第一百一十五轮：SELF_REGISTERED_META 自己是'元元登记项'——它不在任何表里，改名同样无人发现。这条链可无限递推（113③→114①）。本文件是**明示的信任根**：停止递推，把它写死在这里，并断言代码值必须与本文件一致。 第一百一十六轮扩展：新增 VALUE_ROOTS —— **值型根**（跨文件被依赖的常量值）。 第一百一十七轮：按三条判据人工审了 22 个候选，登记其中 2 个（_ANCHOR_DENOM_MODE / LEGAL_GATES）；其余 19 个为各台账脚本的模板常量，判据②不满足（有实际台账数据作对照物）。",
+ "_rule": "🔴 修改本文件必须在本轮文档中写明理由。同时改代码与本文件会绕过 G408 —— 这是**已知边界**（与 109 轮'同时改两处'同源），靠 git 审计兜底。",
+ "SELF_REGISTERED_META": [
+  "DEPENDENT_NAMES",
+  "DEPENDENT_NAMES_MIN",
+  "DEPENDENT_NAMES_REQUIRED",
+  "PATH_CONST_ALLOW",
+  "PATH_CONST_ALLOW_MIN_REASON",
+  "CRITERIA_ROOTS_REQUIRED"
+ ],
+ "VALUE_ROOTS": {
+  "GATE_RC_DOMAIN": {
+   "value": [
+    0,
+    1
+   ],
+   "why": "门禁 rc 的合法值域。第八十八/九十二/九十三轮反复出现：rc=2（参数错误）被当成真值收下；audit-all 的三段 rc 也必须与它同域。改名或改值会让 G388 与跨进程真值校验一起静默失效。",
+   "defined_in": "scripts/claim_verify.py"
   },
-  "_root_criteria": {
-    "🔴_自动标准已实测失效": "第一百一十六轮：试过用『跨文件被引用次数 >= 1』自动识别根，扫出 216 个常量，但**真正的根 GATE_RC_DOMAIN 恰好是 0 次**（它只在定义文件内被引用，另一个文件里是字符串）。🔑 结论：『跨文件引用』与『是不是根』不相关——根的特征是『被某条门禁断言其值』，而不是『被几个文件引用』。",
-    "三条人工判据": [
-      "① **改变它会让某条门禁静默失效**（不是报错，是静默）—— 这是根的定义性特征",
-      "② **没有外部对照物** —— 若有别处可比对（如 git 索引、远端 API），就不必进信任根",
-      "③ **跨层** —— 它连接了『登记项』与『被登记项』两层，改它会让两层一起错"
-    ],
-    "🔑_为什么是人工判断": "与第一百一十五轮『停止递推』同一结论：识别根这件事本身无法自动化。本文件的作用是把**人工判断的结果**固定下来并持续断言，而不是自动生成判断。",
-    "报告入口": "scripts/_scan_cross_ref_consts.py —— 输出跨文件引用候选供人工参考，🔴 它**不是**门禁（会漏掉真根，见上）"
+  "_ANCHOR_DENOM_MODE": {
+   "value": "chaosable",
+   "why": "锚点分母口径。🔴 **第九十二轮实测过**：改回 'all_scripts' → 分母 101→128 → 锚点 90→187 → **误杀真实结果 101**（rc=1 却不是真问题）。两个合法值都不会报错，只会让下界**静默变松或变紧**。判据①改它让下界断言静默失效；判据②'该用哪个口径'是设计决定，无外部对照物；判据③跨 gate_chaos 内部与锚点判定两层。",
+   "defined_in": "scripts/gate_chaos.py",
+   "allowed_values": [
+    "chaosable",
+    "all_scripts"
+   ],
+   "🔴_实测后果": "第九十二轮：all_scripts 口径下真值 101 被判'低于下界 187 —— 疑似写假值'"
   },
-  "CRITERIA_ROOTS": {
-    "_why": "🔑 第一百三十五轮：G425 的**判据⑧/⑨ 自身没有外部守护** —— 134 轮破坏实测⑦⑧：把判据⑨改成恒真、或删掉判据⑧整段，**全部放行**（rc=0），而 G425 其余判据照绿。本表把这两条判据的**存在性**写进信任根（与 115 轮『停止递推 + 明示信任根』同构），使『删掉判据/改成恒真』在 G426 处暴露。🔴 已知边界：同时改代码与本文件仍会绕过（109 轮同源），靠 git 审计兜底。",
-    "G425_c8_行为反证": {
-      "defined_in": "scripts/push_api.py",
-      "in_fn": "cmd_assert_round_end_single",
-      "require": [
-        "getattr(mod, '_gate_calls_helper', None)",
-        "反证失败"
-      ],
-      "why": "判据⑧：**真跑** _gate_calls_helper 对四种合成 AST 反证（只引用不调用/直接调用/取用后调用/取的是别的常量）。🔴 132 轮破坏⑥实测：把它改成恒返回 True 的桩后，①②③④⑤ 静态判据**全部照常通过** —— 只有行为反证能发现。",
-      "round": 135
-    },
-    "G425_c9_判据不能验自己": {
-      "defined_in": "scripts/push_api.py",
-      "in_fn": "cmd_assert_round_end_single",
-      "require": [
-        "_self = fns.get('cmd_assert_round_end_single')",
-        "_ast.walk(_self)",
-        "判据④ 处"
-      ],
-      "why": "判据⑨：要求判据④ 处确有 _gate_calls_helper(g, fn) 这个**特定调用**。🔴 134 轮实测两次才做对：第一版用同一个 helper 验『自己有没有用它』，结果⑧里的 getattr 也被认作调用 → **恒真**。删掉它则判据④ 可随意写成恒真桩。 🔴 135 轮：第一版用 ['_n.args','判据④ 处']，破坏②（判据⑨改恒真）**仍放行** —— `_n.args` 在该函数内出现 3 次，删掉⑨块后还剩 2 处。🔑 判据：**标记串必须在该函数内唯一**，否则删除判据后它仍在别处命中。",
-      "round": 135
-    }
+  "LEGAL_GATES": {
+   "value": [
+    "G21"
+   ],
+   "why": "对 ownership==self（自有项目）**不适用**的门禁豁免集合。🔴 改它会让 G21 （许可证据充分·仅第三方内容）静默变成必跑，或让别的门禁被静默跳过——**不报错**，只是在汇总里少/多一行 ⏭。判据①/②/③ 均满足：无外部对照物（'哪些门禁对自有项目不适用'是人工决定），跨门禁表与执行两层。",
+   "defined_in": "scripts/run_all_gates.py"
   }
+ },
+ "_root_criteria": {
+  "🔴_自动标准已实测失效": "第一百一十六轮：试过用『跨文件被引用次数 >= 1』自动识别根，扫出 216 个常量，但**真正的根 GATE_RC_DOMAIN 恰好是 0 次**（它只在定义文件内被引用，另一个文件里是字符串）。🔑 结论：『跨文件引用』与『是不是根』不相关——根的特征是『被某条门禁断言其值』，而不是『被几个文件引用』。",
+  "三条人工判据": [
+   "① **改变它会让某条门禁静默失效**（不是报错，是静默）—— 这是根的定义性特征",
+   "② **没有外部对照物** —— 若有别处可比对（如 git 索引、远端 API），就不必进信任根",
+   "③ **跨层** —— 它连接了『登记项』与『被登记项』两层，改它会让两层一起错"
+  ],
+  "🔑_为什么是人工判断": "与第一百一十五轮『停止递推』同一结论：识别根这件事本身无法自动化。本文件的作用是把**人工判断的结果**固定下来并持续断言，而不是自动生成判断。",
+  "报告入口": "scripts/_scan_cross_ref_consts.py —— 输出跨文件引用候选供人工参考，🔴 它**不是**门禁（会漏掉真根，见上）"
+ },
+ "CRITERIA_ROOTS": {
+  "_why": "🔑 第一百三十五轮：G425 的**判据⑧/⑨ 自身没有外部守护** —— 134 轮破坏实测⑦⑧：把判据⑨改成恒真、或删掉判据⑧整段，**全部放行**（rc=0），而 G425 其余判据照绿。本表把这两条判据的**存在性**写进信任根（与 115 轮『停止递推 + 明示信任根』同构），使『删掉判据/改成恒真』在 G426 处暴露。🔴 已知边界：同时改代码与本文件仍会绕过（109 轮同源），靠 git 审计兜底。 第一百三十六轮扩展：① 新增**判据⑥ AST 结构判据**与**判据⑦ 标记串唯一性**（135 轮发现一：`_n.args` 出现 3 次时删掉判据仍放行）；② 把\"判据存在性\"从 G425 推广到 **G412/G413** —— 这两条门禁的判据同样\"可被整段删除或改成恒真桩而门禁照绿\"。",
+  "G425_c8_行为反证": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_assert_round_end_single",
+   "require": [
+    "getattr(mod, '_gate_calls_helper', None)",
+    "反证失败"
+   ],
+   "why": "判据⑧：**真跑** _gate_calls_helper 对四种合成 AST 反证（只引用不调用/直接调用/取用后调用/取的是别的常量）。🔴 132 轮破坏⑥实测：把它改成恒返回 True 的桩后，①②③④⑤ 静态判据**全部照常通过** —— 只有行为反证能发现。",
+   "round": 135
+  },
+  "G425_c9_判据不能验自己": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_assert_round_end_single",
+   "require": [
+    "_self = fns.get('cmd_assert_round_end_single')",
+    "_ast.walk(_self)",
+    "判据④ 处"
+   ],
+   "why": "判据⑨：要求判据④ 处确有 _gate_calls_helper(g, fn) 这个**特定调用**。🔴 134 轮实测两次才做对：第一版用同一个 helper 验『自己有没有用它』，结果⑧里的 getattr 也被认作调用 → **恒真**。删掉它则判据④ 可随意写成恒真桩。 🔴 135 轮：第一版用 ['_n.args','判据④ 处']，破坏②（判据⑨改恒真）**仍放行** —— `_n.args` 在该函数内出现 3 次，删掉⑨块后还剩 2 处。🔑 判据：**标记串必须在该函数内唯一**，否则删除判据后它仍在别处命中。",
+   "round": 135
+  },
+  "G412_c2_真跑真实实现": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_check_selftest_reset",
+   "require": [
+    "got = _selftest_reset()"
+   ],
+   "require_ast": [
+    {
+     "type": "call",
+     "name": "_selftest_reset"
+    }
+   ],
+   "why": "G412 判据②：**必须调用真实实现** `_selftest_reset()`，不得复刻一份。🔴 第一百轮实测：自测抄一份实现时，把真实实现改坏自测仍报通过 —— 自证循环。删掉它（改为抄一份）后 G412 自己不会发现。",
+   "round": 136
+  },
+  "G412_c4_反证静默失败": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_check_selftest_reset",
+   "require": [
+    "got_bad = _selftest_reset()",
+    "refused = (got_bad is None)"
+   ],
+   "require_ast": [
+    {
+     "type": "assign_attr",
+     "obj": "shutil",
+     "attr": "rmtree",
+     "value": "lambda"
+    }
+   ],
+   "why": "G412 判据④：**把 shutil.rmtree 换成 no-op，验证清理自断言确实会拒绝**。🔴 第一百三十二轮破坏⑥同构：helper 改成恒返回空的桩时静态判据全部照常通过，只有行为反证能发现。删掉它后 G412 仍是 rc=0。",
+   "round": 136
+  },
+  "G413_c1_扫描下限": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_assert_cleanup_verified",
+   "require": [
+    "少于下限"
+   ],
+   "require_ast": [
+    {
+     "type": "call",
+     "name": "_scan_cleanup_calls"
+    }
+   ],
+   "why": "G413 判据①：扫描到清理调用数不得**低于下限** —— 防扫描器静默失效（返回空集时\"没有违规\"与\"没扫到\"无法区分）。🔴 删掉它后，扫描器失效会表现成\"全部合规\"。",
+   "round": 136
+  },
+  "G413_c5_豁免不可读须拒绝": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_assert_cleanup_verified",
+   "require": [
+    "豁免清单不可读"
+   ],
+   "require_ast": [
+    {
+     "type": "call",
+     "name": "_read_cleanup_allowlist"
+    }
+   ],
+   "why": "G413 判据⑤：豁免清单**不可读时必须拒绝给结论**，不得当\"没有豁免\"。🔴 第一百零六轮实测：字段缺失被当成\"没有违规\"，判据静默跳过。改成 `or {}` 后 G413 不会发现。",
+   "round": 136
+  }
+ }
 }

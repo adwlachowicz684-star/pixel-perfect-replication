@@ -1,0 +1,25 @@
+# 第一百三十六轮完成声明（G381/G382/G383 校验）
+# 指引来源：第一百三十五轮末尾 —— 补③ 判据存在性推广到 G412/G413（+ 补① AST 结构判据）
+grep:scripts/push_api.py::_criteria_ast_missing
+grep:scripts/push_api.py::_dynamic_call_name
+grep:scripts/push_api.py::require_ast
+grep:scripts/push_api.py::不唯一
+grep:scripts/push_api.py::G412_c2_真跑真实实现
+grep:scripts/push_api.py::G412_c4_反证静默失败
+grep:scripts/push_api.py::G413_c1_扫描下限
+grep:scripts/push_api.py::G413_c5_豁免不可读须拒绝
+grep:scripts/push_api.py::assign_shapes
+grep:ledger/trust_root.json::G412_c2_真跑真实实现
+grep:ledger/trust_root.json::G412_c4_反证静默失败
+grep:ledger/trust_root.json::G413_c1_扫描下限
+grep:ledger/trust_root.json::G413_c5_豁免不可读须拒绝
+grep:references/游戏引擎复刻.md::第一百三十六轮
+grep:references/游戏引擎复刻.md::10/10
+grep:references/游戏引擎复刻.md::fsync
+grep:README.md::第一百三十六轮
+cmd:push_api.py --assert-criteria-roots
+cmd:push_api.py --check-selftest-reset
+cmd:push_api.py --assert-cleanup-verified
+gate:G426
+gate:G412
+gate:G413
