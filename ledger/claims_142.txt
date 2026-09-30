@@ -1,0 +1,18 @@
+# 第一百四十二轮完成声明（G381/G382/G383 校验）
+grep:scripts/push_api.py::cmd_assert_remote_rounds
+grep:scripts/push_api.py::_round_msg_bad
+grep:scripts/push_api.py::_round_msg_wired_bad
+grep:scripts/push_api.py::_cn_round
+grep:scripts/push_api.py::_remote_round_set
+grep:scripts/push_api.py::_load_remote_round_gaps
+grep:scripts/push_api.py::REMOTE_ROUNDS_SINCE
+grep:scripts/push_api.py::REMOTE_ROUND_GAP_ALLOWLIST
+grep:scripts/push_api.py::--assert-remote-rounds
+grep:scripts/push_api.py::G432
+grep:scripts/run_all_gates.py::G432
+grep:scripts/run_all_gates.py::G422', 'G432
+grep:ledger/remote_round_gap_allowlist.txt::远端轮次缺口豁免
+grep:README.md::第一百四十二轮
+grep:references/游戏引擎复刻.md::REMOTE_ROUNDS_SINCE = 142
+cmd:push_api.py --assert-remote-rounds
+gate:G432

@@ -126,6 +126,10 @@ DEPENDENT_NAMES = {
     'PUSH_LOCK_FILE': ('const', '推送互斥锁文件路径（G429 依赖，139 轮新增）'),
     'BLOB_NET_RETRY': ('const', 'blob 网络失败重试次数（G431 依赖，141 轮新增）'),
     'BLOB_RETRY_SLEEP': ('const', 'blob 重试退避基数秒（G431 依赖，141 轮新增）'),
+    # 🔑 第一百四十二轮：G432（远端轮次对账）依赖的两个常量。
+    #    按 115/120/127/139 轮同一条规程：新增常量**必须同步登记**。
+    'REMOTE_ROUNDS_SINCE': ('const', '远端轮次对账起始轮（G432 依赖，142 轮新增）'),
+    'REMOTE_ROUND_GAP_ALLOWLIST': ('const', '远端轮次缺口豁免清单路径（G432 依赖）'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -3236,6 +3240,11 @@ ROUND_END_STEPS = (
      '本地索引 ⊆ 远端 tree（轮次末尾再验一次）'),
     ('--verify-push', 'G391', 'report',
      '推送完整性回读（缺失/多余/内容/权限四层，报告模式）'),
+    # 🔑 第一百四十二轮：G421/G422 都查**文件**，查不到**轮次**。
+    #    🔴 141 轮实测：137~140 四轮从未独立抵达远端，
+    #       而 141 推送后文件全都在 → G422 照绿。文件齐 ≠ 轮次齐。
+    ('--assert-remote-rounds', 'G432', 'strict',
+     '远端轮次对账（本轮内容必须真的抵达远端）'),
 )
 # 🔑 这三项缺一不可（G423 断言）：删任一个都会重新打开 127 轮那个洞。
 ROUND_END_REQUIRED_GIDS = ('G421', 'G422', 'G391')
@@ -4491,6 +4500,276 @@ def cmd_assert_blob_retry():
     return 0
 
 
+# 🔑 第一百四十二轮：**远端轮次对账**（G432）。
+#    🔴 第一百四十一轮真实事故：137 / 138 / 139 三轮内容**始终没抵达远端**，
+#       而「远端 HEAD 停在第 136 轮」**没有任何门禁在看** ——
+#       三轮的回复都写成「卡在最后一步」，连续三轮无人发现。
+#    🔑 根因之一（本轮实测）：远端 59 个 commit 里 **43 个**消息是
+#       `同步（N 个文件）`，**不含轮次** → 远端历史**无法逐轮回溯**，
+#       「哪一轮的内容到了」在远端根本无从回答。
+#    ✅ 治本：推送消息**必须**含"第X轮"；在此之后远端才可逐轮对账。
+REMOTE_ROUNDS_SINCE = 142
+# 🔑 历史缺口**不追溯**（137~140 的内容已随 141 抵达，但无独立 commit）；
+#    自 REMOTE_ROUNDS_SINCE 起**逐轮**要求。
+REMOTE_ROUND_GAP_ALLOWLIST = os.path.join(
+    ROOT, 'ledger', 'remote_round_gap_allowlist.txt')
+
+
+def _cn_round(msg):
+    """🔑 从 commit 消息解析轮次；**解析不了返回 None**（不猜）。
+
+    🔴 第一百零八轮真实 bug：`partition('百')` 把"一百零七"解析成 **100**。
+       ✅ 现在复用 claim_verify 的逐字符累计实现（**不抄一份**）。
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from claim_verify import _cn2num
+    m = re.search(u'第([零一二三四五六七八九十百]+)轮', msg or '')
+    if not m:
+        return None
+    return _cn2num(m.group(1))
+
+
+def _round_msg_bad(msg):
+    """🔑 推送消息校验（G432 判据①的**唯一实现**）。
+
+    🔑 返回 [] = 通过；返回非空 = 阻断理由列表。
+    🔴 消息为空 / 不含轮次 → 阻断（否则远端历史无法逐轮回溯）。
+    """
+    bad = []
+    if msg is None or not str(msg).strip():
+        bad.append(u'推送消息为空 —— 必须含"第X轮"')
+        return bad
+    n_ = _cn_round(msg)
+    if n_ is None:
+        bad.append(u'推送消息不含"第X轮"：%r —— 远端历史将无法逐轮回溯'
+                   % str(msg)[:40])
+        return bad
+    if n_ <= 0:
+        bad.append(u'推送消息轮次解析为 %r（异常）' % n_)
+    return bad
+
+
+def _round_msg_wired_bad():
+    """🔑 G432 判据①：main() 里**真有**"消息不含轮次即退出"。
+
+    🔑 与 134 轮同款：**不认写法**（If 的 test 里引用 `_round_msg_bad` 即可），
+       但必须**同分支内真退出**（sys.exit / return）——
+       🔴 只打印警告等于没拦（74 轮"说了≠拦住了"）。
+    """
+    try:
+        with io.open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  'push_api.py'), encoding='utf-8') as f:
+            src_ = f.read()
+    except Exception as e:
+        return [u'读不到 push_api.py：%s' % e]
+    tree = _ast.parse(src_)
+    fn = None
+    for nd in tree.body:
+        if isinstance(nd, _ast.FunctionDef) and nd.name == 'main':
+            fn = nd
+            break
+    if fn is None:
+        return [u'找不到 main()']
+    # 🔑 调用可能写在**赋值**里（`x = _round_msg_bad(msg)`）再被 If 引用 ——
+    #    只查 If 的 test 会**认不出**（142 轮第一次实测就是这么漏的）。
+    assigned = set()
+    for nd in _ast.walk(fn):
+        if isinstance(nd, _ast.Assign) and isinstance(nd.value, _ast.Call):
+            f_ = nd.value.func
+            if isinstance(f_, _ast.Name) and f_.id == '_round_msg_bad':
+                for t in nd.targets:
+                    if isinstance(t, _ast.Name):
+                        assigned.add(t.id)
+    if not assigned:
+        return [u'main() 里没有 `_round_msg_bad(...)` 的调用 —— '
+                u'推送仍可不带轮次']
+    hit = False
+    for nd in _ast.walk(fn):
+        if not isinstance(nd, _ast.If):
+            continue
+        names = set(x.id for x in _ast.walk(nd.test)
+                    if isinstance(x, _ast.Name))
+        if not (names & assigned):
+            continue
+        exits = False
+        for s in nd.body:
+            if isinstance(s, (_ast.Return, _ast.Raise)):
+                exits = True
+            elif isinstance(s, _ast.Expr) and isinstance(s.value, _ast.Call):
+                try:
+                    if _ast.unparse(s.value.func).endswith('exit'):
+                        exits = True
+                except Exception:
+                    pass
+        if not exits:
+            return [u'main() 里 `_round_msg_bad` 的分支**没有退出** '
+                    u'—— 只是警告，拦不住']
+        hit = True
+    if not hit:
+        return [u'main() 里没有 `_round_msg_bad` 的校验分支 '
+                u'—— 推送仍可不带轮次']
+    return []
+
+
+def _remote_round_set():
+    """🔑 远端 commit 消息里的轮次集合。返回 (set|None, err)。
+
+    🔑 None = **读不到** —— 与"没有轮次"严格区分，调用方必须拒绝给结论。
+    """
+    d = req('GET', '%s/commits?per_page=100' % API)
+    if '__err' in d or not isinstance(d, list):
+        return None, u'无法读取远端 commit 列表：%s' % req_err_desc(d)
+    out = set()
+    for c in d:
+        n_ = _cn_round((c.get('commit') or {}).get('message', ''))
+        if n_:
+            out.add(n_)
+    return out, None
+
+
+def _local_round_set():
+    """🔑 本地已声明的轮次集合（ledger/claims_<N>.txt）。"""
+    out = set()
+    for f in glob.glob(os.path.join(ROOT, 'ledger', 'claims_*.txt')):
+        m = re.search(r'claims_(\d+)\.txt$', f)
+        if m:
+            out.add(int(m.group(1)))
+    return out
+
+
+def _load_remote_round_gaps():
+    """🔑 已登记的"远端没有该轮 commit"轮次。返回 None = **读不到**。"""
+    try:
+        with io.open(REMOTE_ROUND_GAP_ALLOWLIST, encoding='utf-8') as f:
+            out = {}
+            for ln in f:
+                ln = ln.strip()
+                if not ln or ln.startswith('#'):
+                    continue
+                k = ln.split(':', 1)[0].strip()
+                if k.isdigit():
+                    out[int(k)] = ln.split(':', 1)[1].strip() if ':' in ln else ''
+            return out
+    except Exception:
+        return None
+
+
+def cmd_assert_remote_rounds():
+    """🔑 G432：**远端轮次对账** —— 本轮内容必须真的到了远端，且可逐轮回溯。
+
+    🔴 第一百四十一轮实测：137/138/139 三轮从未抵达远端，
+       而"远端 HEAD 停在 136"这件事**没有任何门禁在看**；
+       🔑 更阴的是：141 推送后**文件全都在**（G422 变绿），
+       却仍看不出"137~140 四轮从未独立抵达" —— 文件齐 ≠ 轮次齐。
+
+    🔑 五条判据：
+      ① 推送消息必须含轮次（治本）+ 常量为正 + **行为反证**（真跑实现）
+      ② 远端 commit 列表可读（读不到 → **拒绝给结论**）
+      ③ 远端最大轮次 ≥ 本地最大轮次（直接抓"整轮未抵达"）
+      ④ 自 REMOTE_ROUNDS_SINCE 起**逐轮**对账（缺须登记，僵尸豁免要报）
+      ⑤ `_cn_round` 行为反证（防 108 轮"一百零七→100"复发）
+    """
+    print('=' * 70)
+    print(u'🔑 G432 远端轮次对账（本轮必须抵达远端 · 历史可逐轮回溯）')
+    print('=' * 70)
+    bad = []
+
+    # ── 判据①：推送消息必须含轮次 ──
+    if not isinstance(REMOTE_ROUNDS_SINCE, int) or REMOTE_ROUNDS_SINCE <= 0:
+        bad.append(u'REMOTE_ROUNDS_SINCE 非正整数 —— 对账基线失效')
+    bad.extend(_round_msg_wired_bad())
+    _rm = globals().get('_round_msg_bad')
+    if _rm is None:
+        bad.append(u'_round_msg_bad 不存在 —— 判据① 静默失效')
+    else:
+        for m_, want in ((u'第一百四十二轮：G432 远端轮次对账', 0),
+                         (u'第一百零七轮：G401 基准变更史闭合', 0),
+                         (u'同步（305 个文件）', 1),
+                         (None, 1), ('', 1)):
+            got = 1 if _rm(m_) else 0
+            if got != want:
+                bad.append(u'行为反证失败：_round_msg_bad(%r) 实测 %d，期望 %d'
+                           % (m_, got, want))
+
+    # ── 判据⑤：轮次解析（108 轮 bug 防复发）──
+    _cr = globals().get('_cn_round')
+    if _cr is None:
+        bad.append(u'_cn_round 不存在 —— 轮次解析静默失效')
+    else:
+        for m_, want in ((u'第一百零七轮：…', 107), (u'第一百四十一轮：…', 141),
+                         (u'第一百轮：…', 100), (u'同步（305 个文件）', None)):
+            got = _cr(m_)
+            if got != want:
+                bad.append(u'解析反证失败：_cn_round(%r) = %r，期望 %r'
+                           % (m_, got, want))
+
+    loc = _local_round_set()
+    if not loc:
+        bad.append(u'本地没有任何 claims_<N>.txt —— **拒绝给结论**')
+    print(u'\n🔑 本地已声明轮次 %d 个（最大 %s）'
+          % (len(loc), max(loc) if loc else u'—'))
+
+    # ── 判据②：远端可读 ──
+    rem, err = _remote_round_set()
+    if rem is None:
+        bad.append(u'远端 commit 列表读不到 —— **拒绝给结论**（%s）' % err)
+    else:
+        print(u'🔑 远端可解析轮次 %d 个（最大 %s）'
+              % (len(rem), max(rem) if rem else u'—'))
+
+    # ── 判据③：远端最大轮次 ≥ 本地最大轮次 ──
+    if rem is not None and loc:
+        if not rem:
+            bad.append(u'远端 commit 消息**全部**解析不出轮次 —— 拒绝给结论')
+        else:
+            lm, rm_ = max(loc), max(rem)
+            if rm_ < lm:
+                missing = sorted(x for x in loc if x > rm_)
+                bad.append(u'远端最新轮次 %d **落后于**本地 %d —— '
+                           u'本轮内容**未抵达远端**；未抵达轮次：%s'
+                           % (rm_, lm, missing[:12]))
+
+    # ── 判据④：自 REMOTE_ROUNDS_SINCE 起逐轮对账 ──
+    gaps = _load_remote_round_gaps()
+    if gaps is None:
+        bad.append(u'读不到 %s —— **拒绝给结论**（读不到 ≠ 没有豁免）'
+                   % os.path.basename(REMOTE_ROUND_GAP_ALLOWLIST))
+    elif rem is not None and loc:
+        need = sorted(x for x in loc if x >= REMOTE_ROUNDS_SINCE)
+        missing = [x for x in need if x not in rem]
+        unreg = [x for x in missing if x not in gaps]
+        if unreg:
+            bad.append(u'自第 %d 轮起 %d 个轮次**未抵达远端且未登记**：%s'
+                       u'（处置：重新推送，或登记豁免并写明理由）'
+                       % (REMOTE_ROUNDS_SINCE, len(unreg), unreg[:12]))
+        zombie = sorted(x for x in gaps if x in rem)
+        if zombie:
+            bad.append(u'僵尸豁免（登记了但远端其实有该轮）：%s' % zombie[:12])
+        early = sorted(x for x in gaps if x < REMOTE_ROUNDS_SINCE)
+        if early:
+            bad.append(u'豁免轮次早于基线 %d（应调基线而非登记）：%s'
+                       % (REMOTE_ROUNDS_SINCE, early[:12]))
+        print(u'🔑 对账基线：自第 %d 轮起逐轮要求（需核 %d 轮 · 缺 %d · '
+              u'已登记 %d）' % (REMOTE_ROUNDS_SINCE, len(need),
+                               len(missing), len(gaps)))
+
+    print()
+    if bad:
+        for b in bad:
+            print(u'🔴 %s' % b)
+        print('=' * 70)
+        print(u'🔴 守卫失效（G432）')
+        print('=' * 70)
+        return 1
+    print(u'✅ 远端轮次对账通过：远端最新轮次 %d ≥ 本地 %d，'
+          u'且自第 %d 轮起无未登记缺口' % (max(rem), max(loc),
+                                          REMOTE_ROUNDS_SINCE))
+    print(u'   🔑 历史（< %d 轮）缺口**不追溯**，已在文档如实记录'
+          % REMOTE_ROUNDS_SINCE)
+    print('=' * 70)
+    return 0
+
+
 def cmd_assert_push_exclusive_alive():
     """🔑 G430：推送互斥守卫**名字锚点 + 行为反证**。
 
@@ -4955,6 +5234,8 @@ def main():
                          '139 轮真实事故：三个推送进程同时存活）')
     ap.add_argument('--assert-blob-retry', action='store_true',
                     help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
+    ap.add_argument('--assert-remote-rounds', action='store_true',
+                    help='G432：远端轮次对账（本轮必须抵达远端 · 历史可逐轮回溯）')
     ap.add_argument('--assert-push-exclusive-alive', action='store_true',
                     help='G430：推送互斥守卫的**名字锚点 + 行为反证**'
                          '（139 轮：一致改名 / 实现换成 return [] 都照绿）')
@@ -5103,6 +5384,10 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_blob_retry()
 
+    if a.assert_remote_rounds:
+        os.chdir(ROOT)
+        return cmd_assert_remote_rounds()
+
     if a.assert_push_exclusive_alive:
         os.chdir(ROOT)
         return cmd_assert_push_exclusive_alive()
@@ -5195,6 +5480,17 @@ def main():
     if cmd_assert_no_dirty() != 0:
         print('\n🔴 拒绝推送 —— 推上去的将是工作区内容，而不是仓库里的版本')
         return 1
+
+    # 🔑 G432：**推送消息必须含轮次**（第一百四十二轮）。
+    #    🔴 41 轮实测：远端 59 个 commit 里 43 个消息是
+    #       `同步（N 个文件）`，解析不出轮次 → 远端历史无法逐轮回溯。
+    _rmsg_bad = _round_msg_bad(msg)
+    if _rmsg_bad:
+        print('\n🔴 推送消息校验未通过 —— 拒绝推送：')
+        for _r in _rmsg_bad:
+            print(f'   - {_r}')
+        print('   🔑 处置：用 -m "第一百XX轮：..." 重新推送')
+        sys.exit(1)
 
     files = list_files()
     print(f'🔑 受管文件 {len(files)} 个')
