@@ -130,6 +130,12 @@ DEPENDENT_NAMES = {
     #    按 115/120/127/139 轮同一条规程：新增常量**必须同步登记**。
     'REMOTE_ROUNDS_SINCE': ('const', '远端轮次对账起始轮（G432 依赖，142 轮新增）'),
     'REMOTE_ROUND_GAP_ALLOWLIST': ('const', '远端轮次缺口豁免清单路径（G432 依赖）'),
+    # 🔑 第一百四十三轮：G433（文档轮次 ↔ 清单轮次互相印证）依赖的常量/函数。
+    #    🔴 按 115/120/127/139/142 轮同一条规程：新增常量**必须同步登记**，
+    #       否则 G406 会报"未登记"（它已在真实工作流中生效三次）。
+    'DOC_ROUND_MIN_FILES': ('const', '文档轮次扫描 md 文件数下限（G433 依赖）'),
+    'DOC_CLAIMS_SINCE': ('const', '文档↔清单对账起始轮（G433 依赖，143 轮新增）'),
+    '_doc_claims_closure_bad': ('fn', 'G433 判据②③④⑤ 的唯一实现'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -4770,6 +4776,196 @@ def cmd_assert_remote_rounds():
     return 0
 
 
+# 🔑 第一百四十三轮：G433 —— **文档轮次与清单轮次必须互相印证**。
+#    🔴 142 轮诚实结论②（本轮指引）：G432 的本地轮次集合**只有 claims 一个来源**
+#       （`_local_round_set()` 只 glob `ledger/claims_*.txt`）。
+#    🔴 于是：claims_<N>.txt 被改名 / 漏写 / 编号写错 → 本地集合**少一轮**
+#       → G432 判据③只要求「远端 max ≥ 本地 max」→ **缺口凭空消失**，rc=0 放行。
+#    🔑 "文档里写了第 N 轮"是**独立于 claims 文件的第二个证据源**：
+#       想让一轮悄悄消失，必须同时改**文档和清单两处**（109 轮同一已知边界）。
+DOC_ROUND_MIN_FILES = 20
+# 🔑 对账起始轮：**75**（G381 起才有声明清单机制）。
+#    🔴 不用 REMOTE_ROUNDS_SINCE(142)：那只是"远端"对账基线；
+#       文档↔清单是**本地两个证据源**之间的比对，覆盖面应更宽 ——
+#       🔑 实测：若只用 142，删掉"第一百一十轮"的文档记录**无人发现**
+#       （G384 只查最新一轮 · G418 只查清单有无 · G432 只看远端）。
+DOC_CLAIMS_SINCE = 75
+# 🔑 扫描范围：仓库内所有 .md，**排除** work/（已 gitignore 的回归产物）。
+DOC_ROUND_SKIP_PARTS = ('/work/', '/.git/')
+
+
+def _doc_round_set():
+    """🔑 文档里声称的轮次集合。返回 (dict{轮次:set(文件)}|None, md 文件数)。
+
+    🔑 None = **读不到**（md 文件数不足，或解析不出任何轮次）—— 拒绝给结论，
+       与"文档里没有轮次"严格区分（106 轮："读不到 ≠ 没有违规"）。
+    """
+    hits = {}
+    n_md = 0
+    for f in glob.glob(os.path.join(ROOT, '**', '*.md'), recursive=True):
+        fp = f.replace('\\', '/')
+        if any(p in fp for p in DOC_ROUND_SKIP_PARTS):
+            continue
+        n_md += 1
+        try:
+            with io.open(f, encoding='utf-8', errors='ignore') as fh:
+                t = fh.read()
+        except Exception:
+            continue
+        for m in re.finditer(u'第([零一二三四五六七八九十百]+)轮', t):
+            n_ = _cn_round(m.group(0))
+            if n_:
+                hits.setdefault(n_, set()).add(os.path.relpath(f, ROOT))
+    if n_md < DOC_ROUND_MIN_FILES or not hits:
+        return None, n_md
+    return hits, n_md
+
+
+def _load_round_gaps():
+    """🔑 轮次断号豁免。返回 (dict|None, 路径)；None = **读不到**。
+
+    🔴 该常量定义在 **claim_verify.py**（不是本模块）—— 直接写裸名会
+       `NameError`（84/111/118/119/133 轮同款错误，**第六次**）。
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from claim_verify import ROUND_GAP_ALLOWLIST as _p
+    try:
+        with io.open(_p, encoding='utf-8') as f:
+            out = {}
+            for ln in f:
+                ln = ln.strip()
+                if not ln or ln.startswith('#'):
+                    continue
+                k = ln.split(':', 1)[0].strip()
+                if k.isdigit():
+                    out[int(k)] = ln.split(':', 1)[1].strip() if ':' in ln else ''
+            return out, _p
+    except Exception:
+        return None, _p
+
+
+def _doc_claims_closure_bad(doc_rounds, claim_rounds, gaps, since):
+    """🔑 G433 判据②③④⑤ 的**唯一实现**（可被行为反证直接调用）。
+
+    🔑 doc_rounds / claim_rounds 为 int 集合，gaps 为 {轮次: 理由}。
+    🔑 返回阻断理由列表（空 = 通过）。
+    """
+    bad = []
+    if not doc_rounds or not claim_rounds:
+        return [u'文档轮次或清单轮次为空 —— **拒绝给结论**']
+    dmax, cmax = max(doc_rounds), max(claim_rounds)
+    # ── 判据②：两边最大轮次必须指向同一轮 ──
+    if dmax != cmax:
+        bad.append(u'文档最大轮次 %d **不等于**清单最大轮次 %d —— 两边必须指向同一轮'
+                   u'（文档有而清单无：%s / 清单有而文档无：%s）'
+                   % (dmax, cmax,
+                      sorted(x for x in doc_rounds if x > cmax)[:8],
+                      sorted(x for x in claim_rounds if x > dmax)[:8]))
+    # ── 判据③：文档声称的轮次必须有清单，除非已登记豁免且理由充分 ──
+    miss = sorted(x for x in doc_rounds
+                  if x >= since and x not in claim_rounds)
+    unreg = [x for x in miss if x not in gaps]
+    if unreg:
+        bad.append(u'文档声称但**无清单且未登记**的轮次（≥ %d）：%s'
+                   % (since, unreg[:12]))
+    thin = [x for x in miss if x in gaps and len(gaps.get(x, '')) < 10]
+    if thin:
+        bad.append(u'已登记豁免但**理由不足 10 字符**：%s' % thin[:12])
+    # ── 判据④（反向）：有清单却无文档记录 ──
+    orphan = sorted(x for x in claim_rounds
+                    if x >= since and x not in doc_rounds)
+    if orphan:
+        bad.append(u'有清单但**文档无该轮记录**（≥ %d）：%s' % (since, orphan[:12]))
+    # ── 判据⑤：僵尸豁免 ──
+    zombie = sorted(x for x in gaps if x in claim_rounds)
+    if zombie:
+        bad.append(u'僵尸豁免（登记了断号但 claims 文件其实在）：%s' % zombie[:12])
+    return bad
+
+
+def cmd_assert_doc_round_closure():
+    """🔑 G433：**文档轮次与清单轮次必须互相印证**（两个独立证据源）。
+
+    🔴 142 轮诚实结论②：G432 的本地集合只有 claims 一个来源 ——
+       claims 文件改名 / 漏写 / 编号写错 → 本地少一轮 →
+       G432 判据③「远端 max ≥ 本地 max」**直接失明**（rc=0）。
+    🔑 "文档写了第 N 轮"是第二个证据源：想让一轮悄悄消失，
+       必须同时改**文档和清单两处**（109 轮「同时改两处」的已知边界）。
+
+    🔑 六条判据：
+       ① 文档集合可读（md 数 ≥ 下限且解析出轮次）—— 读不到**拒绝给结论**
+       ② 🔑 文档最大轮次 == 清单最大轮次（核心：两边必须指向同一轮）
+       ③ 文档有而清单无（≥ 基线）→ 须已登记豁免且理由 ≥ 10 字符
+       ④ 清单有而文档无（≥ 基线）→ 报（反向，防"清单凭空多一轮"）
+       ⑤ 僵尸豁免：登记了断号却其实有 claims 文件 → 报
+       ⑥ **行为反证**：真跑一次改坏的输入，断言判据会响（防判据被改成桩）
+    """
+    print('=' * 70)
+    print(u'🔑 G433 文档轮次 ↔ 清单轮次互相印证（两个独立证据源）')
+    print('=' * 70)
+    bad = []
+
+    # ── 判据①：文档集合可读 ──
+    if not isinstance(DOC_ROUND_MIN_FILES, int) or DOC_ROUND_MIN_FILES <= 0:
+        bad.append(u'DOC_ROUND_MIN_FILES 非正整数 —— 判据① 失效')
+    if not isinstance(DOC_CLAIMS_SINCE, int) or DOC_CLAIMS_SINCE <= 0:
+        bad.append(u'DOC_CLAIMS_SINCE 非正整数 —— 对账基线失效')
+    doc, n_md = _doc_round_set()
+    print(u'\n🔑 扫描 md %d 个（下限 %d）' % (n_md, DOC_ROUND_MIN_FILES))
+    if doc is None:
+        bad.append(u'文档轮次集合**读不到**（md %d 个 < 下限 %d，或解析不出轮次）'
+                   u' —— **拒绝给结论**' % (n_md, DOC_ROUND_MIN_FILES))
+    else:
+        print(u'🔑 文档声称轮次 %d 个（最大 %d）' % (len(doc), max(doc)))
+
+    claims = _local_round_set()
+    if not claims:
+        bad.append(u'清单轮次集合为空 —— **拒绝给结论**')
+    else:
+        print(u'🔑 清单轮次 %d 个（最大 %d）' % (len(claims), max(claims)))
+
+    gaps, gpath = _load_round_gaps()
+    if gaps is None:
+        bad.append(u'读不到 %s —— **拒绝给结论**（读不到 ≠ 没有豁免）'
+                   % os.path.basename(gpath))
+    else:
+        print(u'🔑 断号豁免已登记 %d 条：%s' % (len(gaps), sorted(gaps)[:12]))
+
+    # ── 判据②③④⑤（唯一实现）──
+    if doc is not None and claims and gaps is not None:
+        if '_doc_claims_closure_bad' not in globals():
+            bad.append(u'_doc_claims_closure_bad 不存在 —— 判据静默失效')
+        else:
+            bad.extend(_doc_claims_closure_bad(
+                set(doc), claims, gaps, DOC_CLAIMS_SINCE))
+            # ── 判据⑥：行为反证 ──
+            for d_, c_, g_, s_, want, why in (
+                    ({100}, {100}, {}, 100, 0, u'完全一致'),
+                    ({101, 100}, {100}, {}, 100, 1, u'文档多一轮（无清单）'),
+                    ({100}, {101, 100}, {}, 100, 1, u'清单多一轮（文档无记录）'),
+                    ({100}, {100}, {100: u'理由理由理由'}, 100, 1, u'僵尸豁免'),
+                    ({100, 99}, {100}, {99: u'短'}, 99, 1, u'理由不足 10 字符'),
+            ):
+                got = 1 if _doc_claims_closure_bad(d_, c_, g_, s_) else 0
+                if got != want:
+                    bad.append(u'行为反证失败[%s]：实测 %d，期望 %d'
+                               % (why, got, want))
+            print(u'🔑 行为反证 5 例已跑（含"完全一致"应为通过）')
+
+    print()
+    if bad:
+        for b in bad:
+            print(u'🔴 %s' % b)
+        print('=' * 70)
+        print(u'🔴 守卫失效（G433）')
+        print('=' * 70)
+        return 1
+    print(u'✅ 两个证据源一致：文档最大轮次 == 清单最大轮次 == %d，'
+          u'且自第 %d 轮起无未登记缺口' % (max(claims), DOC_CLAIMS_SINCE))
+    print('=' * 70)
+    return 0
+
+
 def cmd_assert_push_exclusive_alive():
     """🔑 G430：推送互斥守卫**名字锚点 + 行为反证**。
 
@@ -5236,6 +5432,9 @@ def main():
                     help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
     ap.add_argument('--assert-remote-rounds', action='store_true',
                     help='G432：远端轮次对账（本轮必须抵达远端 · 历史可逐轮回溯）')
+    ap.add_argument('--assert-doc-round-closure', action='store_true',
+                    help='G433：文档轮次与清单轮次必须互相印证'
+                         '（G432 的本地集合只有 claims 一个来源）')
     ap.add_argument('--assert-push-exclusive-alive', action='store_true',
                     help='G430：推送互斥守卫的**名字锚点 + 行为反证**'
                          '（139 轮：一致改名 / 实现换成 return [] 都照绿）')
@@ -5384,6 +5583,9 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_blob_retry()
 
+    if a.assert_doc_round_closure:
+        print()
+        return cmd_assert_doc_round_closure()
     if a.assert_remote_rounds:
         os.chdir(ROOT)
         return cmd_assert_remote_rounds()
