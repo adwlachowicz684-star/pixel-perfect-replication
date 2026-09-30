@@ -131,6 +131,36 @@
    ],
    "why": "G413 判据⑤：豁免清单**不可读时必须拒绝给结论**，不得当\"没有豁免\"。🔴 第一百零六轮实测：字段缺失被当成\"没有违规\"，判据静默跳过。改成 `or {}` 后 G413 不会发现。",
    "round": 136
+  },
+  "G430_c2_名字锚点": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_assert_push_exclusive_alive",
+   "require": [
+    "名字集合与锚点不一致"
+   ],
+   "why": "🔴 第一百三十九轮破坏实测：把 _other_pushers 与 G429 判据里的期望名一起改成同一个新名字（一致改名），G429 三条判据全部通过 rc=0 —— 期望名与被判对象同名时，“改名”与“换实现”无法区分。本判据把期望名写进 trust_root.json::PUSH_EXCLUSIVE_NAMES（独立文件），代码集合必须与锚点完全一致，一致改名即被抓。",
+   "round": 140
+  },
+  "G430_c3_行为反证": {
+   "defined_in": "scripts/push_api.py",
+   "in_fn": "cmd_assert_push_exclusive_alive",
+   "require": [
+    "未发现刚起的假并发进程"
+   ],
+   "require_ast": [
+    {
+     "type": "ref_name",
+     "name": "_other_pushers"
+    }
+   ],
+   "why": "🔴 139 轮更阴的一层：把 _other_pushers 实现体换成 return []（永远没有并发）而名字不动，G429 判据②有定义、判据③main 真调用，两条全部照绿 —— 守卫看起来完备，实际永远放行并发推送。判据：静态存在性判据验证不了“实现是不是真的那个实现”，必须真起一个假并发进程并调用真实实现。与 G412_c4 / G425_c8 同构。",
+   "round": 140
   }
- }
+ },
+ "PUSH_EXCLUSIVE_NAMES": [
+  "PUSH_LOCK_ARGS",
+  "PUSH_LOCK_FILE",
+  "_other_pushers",
+  "cmd_assert_push_exclusive"
+ ]
 }

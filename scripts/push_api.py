@@ -101,6 +101,12 @@ DEPENDENT_NAMES = {
     #    （G406 **第三次**在真实工作流中生效：115 轮 TRUST_ROOT_FILE、
     #      120 轮 CLEANUP_ALLOWLIST、本轮 ROUND_GAP_ALLOWLIST）
     'ROUND_GAP_ALLOWLIST': ('const', '轮次断号豁免清单路径（G418 依赖）'),
+    # 🔑 第一百三十八轮：G428（哑门禁变异扫描）依赖的三个路径常量。
+    #    🔴 按 115/120/127 轮同一条规程：新增常量**必须同步登记**，
+    #       否则 G406 会报"未登记"（它已在真实工作流中生效三次）。
+    'MUTATION_SCAN_FILE': ('const', '哑门禁扫描产物路径（G428 依赖）'),
+    'MUTE_ALLOWLIST': ('const', '哑门禁豁免清单路径（G428 依赖）'),
+    'MUTATION_TMP': ('const', '变异体副本路径（G428 写，已被 gitignore）'),
     # ── 登记项本身：改名会让 G403/G404 静默失效 ──
     'MIRROR_WRITE_FN': ('const', '镜像写入函数名登记项'),
     # 🔑 第一百三十一轮：G424 依赖它定位"推送主流程末尾的回读调用"
@@ -115,6 +121,11 @@ DEPENDENT_NAMES = {
     # 🔑 第一百三十四轮：G425 判据④ 的唯一实现（防"只引用不调用"）
     '_gate_calls_helper': ('fn', '判断门禁函数体是否真调用 helper'),
     'TRUST_ROOT_FILE': ('const', '信任根文件路径（G408 依赖）'),
+    # 🔑 第一百四十轮：G406 **第三次在真实工作流中生效**（115 轮 TRUST_ROOT_FILE、
+    #    120 轮 CLEANUP_ALLOWLIST 之后）—— 139 轮新增它时忘了登记，无人提醒。
+    'PUSH_LOCK_FILE': ('const', '推送互斥锁文件路径（G429 依赖，139 轮新增）'),
+    'BLOB_NET_RETRY': ('const', 'blob 网络失败重试次数（G431 依赖，141 轮新增）'),
+    'BLOB_RETRY_SLEEP': ('const', 'blob 重试退避基数秒（G431 依赖，141 轮新增）'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -161,7 +172,12 @@ SELF_REGISTERED_META = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
 CRITERIA_ROOTS_REQUIRED = ('G425_c8_行为反证', 'G425_c9_判据不能验自己',
                            # 🔑 第一百三十六轮推广：G412/G413 的判据同样"可被改成桩"
                            'G412_c2_真跑真实实现', 'G412_c4_反证静默失败',
-                           'G413_c1_扫描下限', 'G413_c5_豁免不可读须拒绝')
+                           'G413_c1_扫描下限', 'G413_c5_豁免不可读须拒绝',
+                           # 🔑 第一百四十轮：G430 的两条核心判据同样"可被改成桩"。
+                           #    🔴 139 轮已证明：G429 的名字判据在"一致改名"下 rc=0；
+                           #    🔴 且"实现体换成 return []"时 G429 三条判据**照绿**
+                           #       —— 只有**真起进程跑真实实现**能发现。
+                           'G430_c2_名字锚点', 'G430_c3_行为反证')
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -393,13 +409,31 @@ def blob_content(path):
 
 
 def mk_blob(path):
+    """🔑 上传单个 blob（**网络层抖动必须重试** —— 第一百四十一轮）。
+
+    🔴 真实事故：**连续三轮（137/138/139）内容始终没有抵达远端**，
+       报的都是"域名解析失败"。实测一次推送 321 个文件里有 **26 个**
+       因 `NET:URLError ... Temporary failure in name resolution` 失败，
+       而**只要有一个失败，整次推送就中止**（fail-safe，但也意味着
+       🔴 **一次抖动 = 整轮白干**）。
+    🔑 判据：**网络抖动是可重试的失败，内容错误不是** ——
+       只重试 `__err` 以 `NET:` 开头的（104 轮定义的网络层形态），
+       HTTP 4xx/5xx 一律不重试（那是内容/权限问题，重试无意义且会放大故障）。
+    """
     try:
         raw = blob_content(path)
     except Exception as e:
         return (path, None, f'读取失败: {e}')
-    d = req('POST', f'{API}/git/blobs',
-            {'content': base64.b64encode(raw).decode(),
-             'encoding': 'base64'})
+    payload = {'content': base64.b64encode(raw).decode(),
+               'encoding': 'base64'}
+    d = req('POST', f'{API}/git/blobs', payload)
+    for _i in range(BLOB_NET_RETRY):
+        if '__err' not in d:
+            break
+        if not str(d.get('__err', '')).startswith('NET:'):
+            break
+        time.sleep(BLOB_RETRY_SLEEP * (_i + 1))
+        d = req('POST', f'{API}/git/blobs', payload)
     if '__err' in d:
         return (path, None, f"HTTP {req_err_desc(d)}")
     return (path, d['sha'], None)
@@ -1357,6 +1391,7 @@ def _criteria_ast_missing(fn_node, specs):
     | `call` | 函数体内必须**调用**该名字（`Call(func=Name(name))`） |
     | `call_attr` | 必须调用 `obj.attr(...)` |
     | `assign_attr` | 必须**赋值**给 `obj.attr`（如 monkeypatch `shutil.rmtree = ...`）；可再加 `value` 约束 RHS 形状（`lambda`/`name`） |
+    | `ref_name` | 函数体内必须**引用**该名字（`Name` Load **或**字符串常量）—— 🔑 第一百四十轮新增：`call` 认不出「`fn = globals().get('f')` 再 `fn()`」这一形态（与 133 轮"判据不认写法"同源，第 4 次） |
 
     🔑 `call` **不认写法**：除 `Name` 外还识别两种**动态取用**形态 ——
        `globals()['f']()` 与 `getattr(mod, 'f')()`。
@@ -1366,7 +1401,13 @@ def _criteria_ast_missing(fn_node, specs):
     call_attrs = set()
     assign_attrs = set()
     assign_shapes = set()
+    ref_names = set()
     for n in ast.walk(fn_node):
+        # 🔑 第一百四十轮：`ref_name` —— 引用即可（Name Load 或字符串常量）
+        if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+            ref_names.add(n.id)
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str):
+            ref_names.add(n.value)
         if isinstance(n, ast.Call):
             f = n.func
             if isinstance(f, ast.Name):
@@ -1401,6 +1442,9 @@ def _criteria_ast_missing(fn_node, specs):
             vs = s.get('value')
             if hit and vs:
                 hit = (s.get('obj'), s.get('attr'), vs) in assign_shapes
+        elif t == 'ref_name':
+            # 🔑 第一百四十轮新增：只要求**引用**该名字（不要求调用形态）
+            hit = s.get('name') in ref_names
         else:
             hit = False
         if not hit:
@@ -3775,6 +3819,1087 @@ def cmd_assert_round_end_single():
     return 0
 
 
+def _index_worktree_diff():
+    """🔑 G427 判据②：返回**工作区已改但未入索引**的文件；`None` = 无法确定。
+
+    🔑 与 `_dirty_tracked()` 语义不同：
+       `_dirty_tracked()` 比的是 **HEAD**（有没有未提交的修改）；
+       本函数比的是 **索引**（工作区内容与索引是否一致）。
+    🔴 第一百三十六轮事故正是这个形态：`git add -A` 之后又有脚本写了文件 ——
+       HEAD 落后（dirty）**且** 索引落后（worktree ≠ index），
+       而推送读的是**工作区** → 推上去的东西与仓库里记的不是一个版本。
+    """
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ['git', '-c', 'core.quotepath=false', 'diff', '--name-only', '-z'],
+            capture_output=True, text=True, timeout=120, cwd=ROOT)
+        if proc.returncode != 0:
+            return None
+    except Exception:
+        return None
+    return [x for x in proc.stdout.split('\0') if x.strip()]
+
+
+def _no_dirty_wired_bad():
+    """🔑 G427 判据③④：本检查必须**真的接在推送主流程**、早于首次网络写入、
+       且**结果真的会导致拒绝推送**。
+
+    🔑 与 G424 同源：**"入口在" ≠ "有人跑"**。
+    🔴 判定"早于"的锚点取 `req('POST', ...git/trees...)` —— 那是第一次真正
+       把内容写进远端的地方；在它之后调用本检查就毫无意义。
+    🔴 判据④（第一百三十七轮补）：`if cmd_assert_no_dirty() != 0: return 1`
+       若被改成 `if False:` 或删掉 `return 1`，调用仍在、时序仍对，
+       🔑 **但结果被丢掉了** —— 检查变成摆设，而判据③照绿。
+       （与第一百一十八轮"改进代码把 G410 弄失效而它不会自述"同源）
+    """
+    import ast
+    text = io.open(os.path.join(ROOT, 'scripts', 'push_api.py'),
+                   encoding='utf-8').read()
+    try:
+        tree = ast.parse(text)
+    except Exception as e:
+        return [f'解析失败：{e}']
+    main_fn = None
+    for n in ast.walk(tree):
+        if isinstance(n, ast.FunctionDef) and n.name == 'main':
+            main_fn = n
+            break
+    if main_fn is None:
+        return ['找不到 main()']
+    lines = text.splitlines()
+    t_line = None
+    for n in ast.walk(main_fn):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) \
+                and n.func.id == 'req' and n.args:
+            a0 = n.args[0]
+            if isinstance(a0, ast.Constant) and a0.value == 'POST':
+                seg = lines[n.lineno - 1] if n.lineno - 1 < len(lines) else ''
+                if 'git/trees' in seg and t_line is None:
+                    t_line = n.lineno
+    # 🔑 判据③：**守卫结构**本身（`if <call> != 0: return 1`）。
+    #    🔴 不能只找"有没有调用" —— dispatch 里也有一处
+    #       `return cmd_assert_no_dirty()`，那会让"删掉推送前守卫"**照样绿**
+    #       （第一百一十一轮"存在但无关"同病，破坏①实测蒙混成功）。
+    guard_line = None
+    for n in ast.walk(main_fn):
+        if not isinstance(n, ast.If):
+            continue
+        hit_call = any(
+            isinstance(x, ast.Call) and isinstance(x.func, ast.Name)
+            and x.func.id == 'cmd_assert_no_dirty'
+            for x in ast.walk(n.test))
+        if not hit_call:
+            continue
+        ret1 = any(isinstance(x, ast.Return)
+                   and isinstance(x.value, ast.Constant)
+                   and x.value.value == 1
+                   for x in ast.walk(n))
+        if ret1:
+            guard_line = n.lineno
+            break
+    bad = []
+    if guard_line is None:
+        bad.append('main() 里**没有** `if cmd_assert_no_dirty() != 0: return 1`'
+                   ' 的守卫结构 —— 🔴 调用还在（dispatch 里有一处），'
+                   '但**结果被丢掉了**，检查变成摆设（111 轮"存在但无关"）')
+    if t_line is None:
+        bad.append('main() 里找不到 req(\'POST\', ...git/trees...)'
+                   ' —— 🔴 无法判定时序，拒绝给结论')
+    if guard_line and t_line and guard_line > t_line:
+        bad.append(f'守卫在第 {guard_line} 行，**晚于**首次远端写入'
+                   f'（第 {t_line} 行） —— 🔴 推完了才查，等于没查')
+    return bad
+
+
+def cmd_assert_no_dirty():
+    """🔑 G427：**推送前必须无未提交修改**（把 G391 第⑤层提前到推送前）。
+
+    🔴 第一百三十六轮真实事故：只 `git add -A` 而**未本地 commit**，
+       随后 `--audit-history` 又重写了台账与镜像 —— 索引里是**旧内容**，
+       而推送读的是**工作区**（新内容）→ 远端与本地索引对不上：
+       `内容不一致 2 个 · 本地有 10 个未提交的修改`，G391 第⑤层**推送后**才报出来。
+    🔑 判据：**推送的必须是"仓库里的那个版本"**，而"仓库里的版本"
+       由 **HEAD** 定义 —— 未提交的东西不属于它。
+
+    | 判据 | 内容 |
+    |---|---|
+    | ① | 无**已跟踪未提交**的修改（`??` 归 G390 管，两者方向不同） |
+    | ② | **索引 == 工作区**（`git diff --name-only` 为空）—— 136 轮事故的**具体形态** |
+    | ③ | 本检查**真的接在推送主流程**，且早于首次 `git/trees` 远端写入 |
+    """
+    print('🔑 **推送前未提交修改检查**（G427）')
+    print('=' * 70)
+    bad = []
+
+    d = _dirty_tracked()
+    if d is None:
+        bad.append('**无法确定**是否有未提交修改（git 不可用）')
+    elif d:
+        bad.append(f'{len(d)} 个文件已跟踪但**未提交**'
+                   f' —— 推上去的将是工作区内容，而不是仓库里的版本')
+        for f in d[:10]:
+            print(f'   - {f}')
+        if len(d) > 10:
+            print(f'   … 另 {len(d) - 10} 个')
+
+    dif = _index_worktree_diff()
+    if dif is None:
+        bad.append('**无法确定**索引与工作区是否一致（git 不可用）')
+    elif dif:
+        bad.append(f'{len(dif)} 个文件**工作区已改但未入索引**'
+                   f' —— 🔴 136 轮事故形态：推的是工作区，比的却是索引')
+        for f in dif[:10]:
+            print(f'   - {f}')
+        if len(dif) > 10:
+            print(f'   … 另 {len(dif) - 10} 个')
+
+    bad.extend(_no_dirty_wired_bad())
+
+    print('=' * 70)
+    if bad:
+        for b in bad:
+            print('🔴 ' + b)
+        print('🔑 处理：git add -A && git commit -m "说明" 之后再推送')
+        return 1
+    print('✅ 无未提交修改 · 索引与工作区一致 · 本检查已接在推送前'
+          ' —— 推的就是仓库里的版本')
+    return 0
+
+
+# ==================== 第一百三十八轮：G428 哑门禁变异扫描 ====================
+# 🔴 第一百三十六轮指引③（第一百三十七轮诚实结论④明说**没做**）：
+#    "用脚本自动扫**哪些判据可被改成桩而门禁仍绿**"。
+#    🔑 此前每一轮都是**手工**做 4~6 方向破坏实测 —— 手工做的极限是：
+#       **只测本轮新写的那几条**，而 30 个已有 cmd_* 门禁**从未被系统性地问过**
+#       "把它整个换成 `return 0`，全仓库有谁会响？"
+#    🔑 判据：**"被跑" ≠ "被守望"**。
+#       GATES 表登记了 → 回归每轮都跑它；但把它改成桩后回归**依然全绿**
+#       —— 没有任何东西会指出"这条门禁已经哑了"。
+#       这正是 121 轮"整轮空转无人发现"在**门禁粒度**上的同构问题。
+MUTATION_SCAN_FILE = os.path.join(ROOT, 'ledger', 'mutation_scan.json')
+MUTE_ALLOWLIST = os.path.join(ROOT, 'ledger', 'mute_gate_allowlist.txt')
+MUTATION_TARGET_MIN = 20
+# 🔑 扫描器自身必须排除 —— 否则它会把自己当成最后一个目标（93 轮"扫到自己"）
+MUTATION_SELF_EXCLUDE = ('cmd_mutation_scan', 'cmd_assert_mutation',
+                         '_mutation_probe')
+# 🔴 第一百三十八轮**真实事故**：第一版把变异体**写回 push_api.py 本身**，
+#    结果磁盘上的文件出现**两段文本字节错位**（第 4479 行 SyntaxError）：
+#    `print('🔴 **无法确定** git 索引 mode —— 拒绝` + `确定**是否有漏传…`
+#    🔴 即：被测文件在变异过程中被**写坏**，而"恢复"只是把坏内容再写一遍。
+#    🔑 判据：**变异测试绝不能写被测文件本身** —— 写坏了连"原文"都失去参照。
+#    ✅ 改为把变异体写成**临时副本** scripts/_mutant_138.py，原文件全程不动。
+MUTATION_TMP = os.path.join(HERE, '_mutant_138.py')
+
+# 🔑 第一百三十九轮：G429 —— **推送必须互斥**。
+#    🔴 真实事故（本轮）：工具报 TimeoutError，我据此判断"推送没启动"，
+#       于是又启动两次 —— 实际**三个 push_api.py -m 进程同时存活**
+#       （ps 可见 pid 1088 / 1161 / 1207）。
+#    🔴 危害：三者都读取**同一个** parent ref 并各自建 commit，
+#       最后更新 ref 的那个胜出 —— 另两个的工作**静默丢失**，
+#       而胜出者的输出看起来完全正常（"推送成功"）。
+#    🔑 判据：**命令超时 ≠ 命令没跑**。判活必须查进程，不能凭退出码/报错推断。
+# 🔑 第一百四十一轮：**网络抖动必须重试**（真实事故驱动）。
+#    🔴 137/138/139 三轮内容**始终没抵达远端**，报的都是"域名解析失败"；
+#       实测 321 个文件里 26 个因 NET 失败 → 整次推送中止 → **整轮白干**。
+#    🔑 只重试 `__err` 以 'NET:' 开头的（104 轮定义的网络层形态）；
+#       HTTP 4xx/5xx 不重试 —— 那是内容/权限问题，重试无意义且放大故障。
+BLOB_NET_RETRY = 5
+BLOB_RETRY_SLEEP = 2.0
+
+PUSH_LOCK_ARGS = ('push_api.py', '-m')
+PUSH_LOCK_FILE = os.path.join(ROOT, 'audit', '.push_lock')
+
+# 🔑 第一百四十轮：**推送互斥守卫的名字锚点**（G430 判据②）。
+#    🔴 139 轮破坏实测：把 `_other_pushers` 与判据里的期望名**一起改**成
+#       同一个新名字（一致改名）→ G429 三条判据**全部通过 rc=0**。
+#       因为判据的"期望名"与被判对象**是同一个字符串** ——
+#       🔑 判据：期望名与被判对象同名时，**"改名"与"换实现"无法区分**。
+#    🔑 处置：把期望名写进 `ledger/trust_root.json::PUSH_EXCLUSIVE_NAMES`
+#       （**独立于代码**的外部锚点），代码里的名字必须与锚点一致。
+#    🔴 已知边界：同时改代码与锚点仍会绕过（109 轮同源），靠 git 审计兜底。
+PUSH_EXCLUSIVE_NAMES = ('PUSH_LOCK_ARGS', 'PUSH_LOCK_FILE', '_other_pushers',
+                        'cmd_assert_push_exclusive')
+
+
+def _atomic_write_text(path, text):
+    """🔑 原子写入（第一百三十五轮：破坏/变异脚本必须原子写入）。
+
+    🔴 非原子写入在进程被杀时留下**半截文件** —— 那既不是原文也不是变异体，
+       恢复无从下手（本仓库已被沙盒中断打断多次）。
+    """
+    import tempfile
+    d = os.path.dirname(path) or '.'
+    fd, tmp = tempfile.mkstemp(dir=d, prefix='.aw138_', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    # 🔑 写后**读回校验**（138 轮真实事故：写出的文件字节错位却无人发现）
+    try:
+        with open(path, encoding='utf-8') as f:
+            got = f.read()
+    except Exception as e:
+        raise RuntimeError('写入后无法读回：%s' % e)
+    if hashlib.sha1(got.encode('utf-8')).hexdigest() != \
+            hashlib.sha1(text.encode('utf-8')).hexdigest():
+        raise RuntimeError('写入后读回内容与预期不一致 —— 拒绝继续')
+
+
+def _top_fn_ranges(text):
+    """顶层 def 的 (起始行, 结束行)（1-based，含）。"""
+    out = {}
+    try:
+        tree = _ast.parse(text)
+    except SyntaxError:
+        return out
+    for n in tree.body:
+        if isinstance(n, _ast.FunctionDef):
+            out[n.name] = (n.lineno, n.end_lineno)
+    return out
+
+
+def _cmd_flag_map(text):
+    """main() 中 `if a.xxx: return cmd_yyy()` → {cmd_yyy: 'xxx'}。"""
+    out = {}
+    try:
+        tree = _ast.parse(text)
+    except SyntaxError:
+        return out
+    for n in tree.body:
+        if not isinstance(n, _ast.FunctionDef) or n.name != 'main':
+            continue
+        for x in _ast.walk(n):
+            if not isinstance(x, _ast.If):
+                continue
+            t = x.test
+            attr = None
+            if (isinstance(t, _ast.Attribute)
+                    and isinstance(t.value, _ast.Name) and t.value.id == 'a'):
+                attr = t.attr
+            elif (isinstance(t, _ast.Compare)
+                  and isinstance(t.left, _ast.Attribute)
+                  and isinstance(t.left.value, _ast.Name)
+                  and t.left.value.id == 'a'
+                  and len(t.ops) == 1
+                  and isinstance(t.ops[0], _ast.IsNot)
+                  and isinstance(t.comparators[0], _ast.Constant)
+                  and t.comparators[0].value is None):
+                # 🔑 `if a.xxx is not None:` 形式（如 --show-legacy-files）
+                #    🔴 只认 `if a.xxx:` 会让这类门禁**拿不到 flag** →
+                #       桩化后无法实跑，扫描只能给"未知"（138 轮实测）。
+                attr = t.left.attr
+            if not attr:
+                continue
+            for b in _ast.walk(x):
+                if (isinstance(b, _ast.Return) and isinstance(b.value, _ast.Call)
+                        and isinstance(b.value.func, _ast.Name)
+                        and b.value.func.id.startswith('cmd_')):
+                    out.setdefault(b.value.func.id, attr)
+    return out
+
+
+def _stub_replace(lines, sig_line, end_line):
+    """把 [sig_line, end_line] 整个函数体替换为单独一句 `    return 0`。
+
+    🔑 只改这一个函数、其余字节不动 —— 比 `ast.unparse` 安全得多
+       （后者会丢掉全文件注释，一旦恢复失败就是不可逆损毁）。
+    """
+    head = lines[:sig_line - 1]
+    sig = lines[sig_line - 1]
+    tail = lines[end_line:]
+    body = head + [sig, '    return 0'] + tail
+    new = '\n'.join(body)
+    if not new.endswith('\n'):
+        new += '\n'
+    return new
+
+
+def _callers_of(text, callee):
+    """顶层函数中**真的调用**了 callee 的（AST Call + func 是 Name）。"""
+    try:
+        tree = _ast.parse(text)
+    except SyntaxError:
+        return []
+    out = []
+    for n in tree.body:
+        if not isinstance(n, _ast.FunctionDef) or n.name == callee:
+            continue
+        for sub in _ast.walk(n):
+            if (isinstance(sub, _ast.Call) and isinstance(sub.func, _ast.Name)
+                    and sub.func.id == callee):
+                out.append(n.name)
+                break
+    return out
+
+
+def _flag_for_fn(text, fn, flags, depth=0):
+    """把任意函数映射到**可执行命令**（自身没有 flag 就向上找调用者）。"""
+    if fn in flags:
+        return flags[fn]
+    if depth >= 3:
+        return None
+    cs = _callers_of(text, fn)
+    for c in cs:
+        if c in flags:
+            return flags[c]
+    for c in cs:
+        r = _flag_for_fn(text, c, flags, depth + 1)
+        if r:
+            return r
+    return None
+
+
+def _watchers_of(text, target, exclude, flags):
+    """🔑 守望者 = 桩化 target 之后**仍然会响**的其它命令。
+
+    🔴 第一百三十八轮**判据对象选错层级**（与 110 轮 grep、118 轮 mode 同源）：
+       第一版只认 **AST Name 引用**（真的调用它）→ 结果 30 个门禁**全是 mute**。
+       🔑 真相：本仓库的守望者**不是"调用它"，而是"解析源码找它"** ——
+          如 `_no_dirty_wired_bad()` 是 `ast.parse` main() 后比 `n.func.id`，
+          名字出现在**字符串比较**里，AST Name 引用统计**永远数不到**。
+       ✅ 改为：先用**文本**找候选函数（宽），再映射到可执行命令并**实跑**（严）
+          —— 宽进严出，误报由实跑过滤（rc=0 记 static_only，不算守望者）。
+    """
+    ranges = _top_fn_ranges(text)
+    if not ranges:
+        return None
+    pat = re.compile(r'\b' + re.escape(target) + r'\b')
+    lines = text.split('\n')
+    cand = []
+    for name, (s, e) in sorted(ranges.items()):
+        if name == target or name in exclude:
+            continue
+        seg = '\n'.join(lines[s - 1:e])
+        if pat.search(seg):
+            cand.append(name)
+    out = []
+    for c in cand:
+        f = _flag_for_fn(text, c, flags)
+        # 🔑 自己守自己不算（G427 的 _no_dirty_wired_bad 就属于这种）
+        if f and f != flags.get(target):
+            out.append((c, f))
+    return sorted(set(out))
+
+
+def _run_flag(flag, timeout=90):
+    """跑 push_api.py 的某个 flag，返回 rc；异常/超时返回 None。"""
+    if not flag:
+        return None
+    cmd = [sys.executable, os.path.join(HERE, 'push_api.py'),
+           '--' + flag.replace('_', '-')]
+    try:
+        p = subprocess.run(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=timeout)
+        return p.returncode
+    except Exception:
+        return None
+
+
+def _run_mut(mut_path, flag, timeout=90):
+    # 🔑 跑**变异体副本**而不是原文件（138 轮真实事故）。
+    #    🔴 写被测文件本身一旦写坏，"恢复"就没有参照物了。
+    if not flag:
+        return (None, '')
+    cmd = [sys.executable, mut_path, '--' + flag.replace('_', '-')]
+    try:
+        p = subprocess.run(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=timeout)
+        return (p.returncode, (p.stdout or b'').decode('utf-8', 'replace'))
+    except Exception as e:
+        return (None, '<异常> %s: %s' % (type(e).__name__, e))
+
+
+def _run_flag2(flag, timeout=90):
+    """同 _run_flag，但把 stdout/stderr 一并返回 —— 🔑 便于区分
+    "拒绝"与"代码坏掉"（第一百零四轮：崩溃的 rc 也是 1）。"""
+    if not flag:
+        return (None, '')
+    cmd = [sys.executable, os.path.join(HERE, 'push_api.py'),
+           '--' + flag.replace('_', '-')]
+    try:
+        p = subprocess.run(cmd, cwd=ROOT, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=timeout)
+        return (p.returncode, (p.stdout or b'').decode('utf-8', 'replace'))
+    except Exception as e:
+        return (None, f'<异常> {type(e).__name__}: {e}')
+
+
+def _other_pushers():
+    """🔑 返回**其它**正在推送的进程 pid 列表（不含自己）。
+
+    🔴 判活必须查 /proc（真实进程），不能凭"上次命令报了超时"推断
+       —— 139 轮真实事故：工具报 TimeoutError，三个推送进程却都活着。
+    🔑 读不到 /proc（非 Linux / 权限问题）时返回 None —— 拒绝给结论，
+       与第一百零六轮"字段缺失不能当成没有违规"同一判据。
+    """
+    if not os.path.isdir('/proc'):
+        return None
+    me = os.getpid()
+
+    def _ppid(pid):
+        try:
+            st = io.open('/proc/%d/stat' % pid, encoding='utf-8').read()
+            return int(st.rsplit(')', 1)[1].split()[1])
+        except Exception:
+            return None
+
+    # 🔑 必须排除**自己的祖先进程**（139 轮真实误报）：
+    #    🔴 调用 push_api.py 的那条 bash -c 命令行里同样含
+    #       'push_api.py' 与 '-m'（`git commit -m` / heredoc 里的源码），
+    #       子串匹配会**把发起命令的 shell 自己当成并发推送** ——
+    #       结果是每次推送都被自己堵死。
+    #    🔑 判据：**"命令行里出现这两个词" ≠ "这个进程在推送"**。
+    anc = set()
+    p = me
+    for _ in range(64):
+        anc.add(p)
+        q = _ppid(p)
+        if not q or q == p or q in anc:
+            break
+        p = q
+
+    out = []
+    try:
+        for e in os.listdir('/proc'):
+            if not e.isdigit():
+                continue
+            pid = int(e)
+            if pid in anc:
+                continue
+            try:
+                cl = io.open('/proc/%s/cmdline' % e, 'rb').read()
+            except OSError:
+                continue
+            # 🔑 按 **argv 分词**匹配，而不是整条命令行做子串匹配
+            argv = [x.decode('utf-8', 'replace')
+                    for x in cl.split(b'\0') if x]
+            if not argv:
+                continue
+            if not any(a.endswith(PUSH_LOCK_ARGS[0]) for a in argv):
+                continue
+            if PUSH_LOCK_ARGS[1] not in argv:
+                continue
+            out.append(pid)
+    except OSError:
+        return None
+    return sorted(out)
+
+
+def cmd_assert_push_exclusive():
+    """🔑 G429：断言"推送互斥"这条守卫**仍在代码里**。
+
+    ① `PUSH_LOCK_ARGS` 常量非空且被引用
+    ② `_other_pushers()` 有定义
+    ③ 🔑 `main()` 推送路径里真有 `if _other_pushers(): return 1` 守卫
+       —— 只验①②不够：常量和函数都在，但没人调用它，守卫等于不存在
+       （与第一百一十一轮"登记了却没被引用"同源）
+    """
+    print('🔑 **推送互斥守卫检查**（G429）')
+    print('=' * 70)
+    text = io.open(os.path.join(HERE, 'push_api.py'), encoding='utf-8').read()
+    bad = []
+
+    val = globals().get('PUSH_LOCK_ARGS')
+    if not val:
+        bad.append('PUSH_LOCK_ARGS 为空 —— 门禁会静默失效')
+    elif not isinstance(val, tuple):
+        bad.append('PUSH_LOCK_ARGS 不是 tuple —— 门禁会静默失效')
+
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as ex:
+        print('🔴 push_api.py 无法解析: %s —— 拒绝给结论' % ex)
+        return 1
+    refs = 0
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Name) and n.id == 'PUSH_LOCK_ARGS' \
+                and isinstance(n.ctx, ast.Load):
+            refs += 1
+    if refs == 0:
+        bad.append('PUSH_LOCK_ARGS **无任何引用** —— 常量形同虚设')
+
+    fns = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
+    if '_other_pushers' not in fns:
+        bad.append('_other_pushers() **未定义** —— 门禁会 NameError')
+    m = [n for n in tree.body
+         if isinstance(n, ast.FunctionDef) and n.name == 'main']
+    guard = False
+    if m:
+        for n in ast.walk(m[0]):
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) \
+                    and n.func.id == '_other_pushers':
+                guard = True
+    if not guard:
+        bad.append('main() 里**没有**调用 _other_pushers() —— 守卫等于不存在')
+
+    if bad:
+        print('🔴 推送互斥守卫**不完备**：')
+        for b in bad:
+            print('   - ' + b)
+        print('=' * 70)
+        return 1
+    print('✅ 推送互斥守卫完备：常量已登记 · 函数已定义 · main() 真调用')
+    print('=' * 70)
+    return 0
+
+
+def _spawn_fake_pusher():
+    """🔑 起一个**假并发推送进程**（真的占住 /proc/<pid>/cmdline）。
+
+    🔑 为什么必须造**真进程**而不造假 /proc 数据：
+       🔴 若改成"造一个假 /proc 喂给它"，那就是**自测在测自己抄的那份**
+          （第一百轮自证循环）—— 实现体换成 `return []` 时照样"通过"。
+    🔑 假脚本名以 `push_api.py` 结尾（`_other_pushers` 用 endswith 匹配），
+       内容只是 `time.sleep` —— **不会真推送**。
+       🔴 139 轮事故的本体就是"真推送进程并发"，自测绝不能复刻它。
+    🔑 落在 `scripts/_selftest_tmp/`（第一百一十八轮已 gitignore 且 G411 断言
+       其真生效），故即便残留也进不了 git 索引。
+    """
+    d = os.path.join(HERE, '_selftest_tmp')
+    try:
+        if not os.path.isdir(d):
+            os.makedirs(d, exist_ok=True)
+        p = os.path.join(d, '.fake_push_api.py')
+        io.open(p, 'w', encoding='utf-8').write(
+            'import time\ntime.sleep(120)\n')
+        return (p, subprocess.Popen([sys.executable, p, '-m'],
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL))
+    except Exception:
+        return (None, None)
+
+
+def cmd_assert_blob_retry():
+    """🔑 G431：blob 上传的**网络抖动必须重试**（第一百四十一轮）。
+
+    🔴 真实事故（本条的动机）：**137/138/139 三轮内容始终没抵达远端**，
+       每次报的都是"域名解析失败"。本轮实测一次推送 321 个文件里 **26 个**
+       因 `NET:URLError ... Temporary failure in name resolution` 失败；
+       🔑 只要有一个失败整次推送就中止（fail-safe），于是
+       🔴 **一次抖动 = 整轮白干** —— 而且失败原因看起来像"网络不好"，
+          不会有人去查"为什么没有重试"。
+
+    🔑 四条判据：
+       ① `BLOB_NET_RETRY` / `BLOB_RETRY_SLEEP` 存在且为正
+          （🔴 缺失/为 0 → 重试静默变成"不重试"，与 106 轮同病）
+       ② AST：`mk_blob` 内确有重试循环，且过滤条件是 `startswith('NET:')`
+          —— 🔑 **重试必须只覆盖网络层**；HTTP 4xx/5xx 重试无意义且放大故障
+       ③ **行为反证（真调用实现，不抄一份）**：把 `req` 换成"前 2 次返回
+          NET 错误、第 3 次成功"，断言 `mk_blob` **最终成功**且真调了 3 次
+          → 防"实现被换成只发一次"（130/132 轮判据唯一实现的同款洞）
+       ④ **反向行为反证**：`req` 恒返回 HTTP 500，断言**只调用 1 次**
+          → 防"无差别重试"（把内容/权限错误也重试，会放大故障）
+    """
+    print('🔑 **blob 网络抖动必须重试**（G431）')
+    print('=' * 70)
+    os.chdir(ROOT)
+    bad = []
+
+    n = globals().get('BLOB_NET_RETRY')
+    sl = globals().get('BLOB_RETRY_SLEEP')
+    if not isinstance(n, int) or n <= 0:
+        bad.append('BLOB_NET_RETRY 不是正整数 —— 重试会静默变成"不重试"')
+    if not isinstance(sl, (int, float)) or sl <= 0:
+        bad.append('BLOB_RETRY_SLEEP 不是正数 —— 退避形同虚设')
+    print(f'① 常量 BLOB_NET_RETRY={n} · BLOB_RETRY_SLEEP={sl}')
+
+    # ② AST：重试循环 + 只认 NET
+    try:
+        tree = ast.parse(io.open(os.path.join(ROOT, 'scripts', 'push_api.py'),
+                                encoding='utf-8').read())
+    except Exception as e:
+        bad.append(f'无法解析源码 —— 拒绝给结论: {e}')
+        tree = None
+    has_loop = has_net = False
+    if tree is not None:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == 'mk_blob':
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.For):
+                        for s2 in ast.walk(sub):
+                            if isinstance(s2, ast.Call) and isinstance(
+                                    s2.func, ast.Attribute)                                     and s2.func.attr == 'startswith'                                     and any(isinstance(a, ast.Constant)
+                                            and a.value == 'NET:'
+                                            for a in s2.args):
+                                has_loop = has_net = True
+    if not has_loop:
+        bad.append('mk_blob 内找不到"仅对 NET 错误重试"的循环 —— 116~140 轮旧实现')
+    print(f'② AST 重试循环 · 只认 NET: {has_loop and has_net}')
+
+    # ③ 行为反证：抖 2 次后应成功
+    real_req = globals().get('req')
+    old_sleep = globals().get('BLOB_RETRY_SLEEP')
+    calls = []
+
+    def _fake_net(m, u, d=None):
+        calls.append(1)
+        if len(calls) <= 2:
+            return {'__err': 'NET:URLError:<urlopen error '
+                             '[Errno -3] Temporary failure in name resolution>'}
+        return {'sha': '0' * 40}
+
+    globals()['req'] = _fake_net
+    globals()['BLOB_RETRY_SLEEP'] = 0
+    try:
+        _p, sha, err = mk_blob('README.md')
+    except Exception as e:
+        sha, err = None, f'异常 {type(e).__name__}: {e}'
+    finally:
+        globals()['req'] = real_req
+        globals()['BLOB_RETRY_SLEEP'] = old_sleep
+    if sha is None:
+        bad.append(f'连抖 2 次后仍失败（{err}）—— 重试没生效')
+    elif len(calls) < 3:
+        bad.append(f'只调用了 {len(calls)} 次 —— 重试次数不足')
+    print(f'③ 行为反证：抖 2 次 → 调用 {len(calls)} 次 · 结果 '
+          f'{"成功" if sha else "失败"}')
+
+    # ④ 反向：HTTP 错误不得重试
+    calls2 = []
+
+    def _fake_http(m, u, d=None):
+        calls2.append(1)
+        return {'__err': 500, '__body': 'boom'}
+
+    globals()['req'] = _fake_http
+    globals()['BLOB_RETRY_SLEEP'] = 0
+    try:
+        mk_blob('README.md')
+    except Exception:
+        pass
+    finally:
+        globals()['req'] = real_req
+        globals()['BLOB_RETRY_SLEEP'] = old_sleep
+    if len(calls2) != 1:
+        bad.append(f'HTTP 500 被调用了 {len(calls2)} 次 —— 无差别重试会放大故障')
+    print(f'④ 反向反证：HTTP 500 调用 {len(calls2)} 次（应为 1）')
+
+    if bad:
+        for b in bad:
+            print('🔴', b)
+        print('=' * 70)
+        return 1
+    print('✅ blob 网络抖动重试 4 条判据全部通过')
+    print('=' * 70)
+    return 0
+
+
+def cmd_assert_push_exclusive_alive():
+    """🔑 G430：推送互斥守卫**名字锚点 + 行为反证**。
+
+    🔴 第一百三十九轮破坏实测（本条要补的那两个洞）：
+       - **一致改名** rc=0：把 `_other_pushers` 与 G429 判据里的期望名**一起**
+         改成同一个新名字 → G429 三条判据**全部通过**。
+         🔑 判据：**期望名与被判对象同名时，"改名"与"换实现"无法区分。**
+       - 更阴的一层（🔴 这才是真危害）：把实现体换成 `return []` 而**名字不动**
+         → G429 判据②（有定义）✅ 判据③（main 真调用）✅ → **照绿**。
+         守卫看起来完备，实际**永远放行并发推送**（139 轮的事故会重演）。
+
+    🔑 三条判据：
+       ① 外部锚点 `ledger/trust_root.json::PUSH_EXCLUSIVE_NAMES` 必须可读
+          （🔴 读不到 → **拒绝给结论**，不当"没有名字要守"）
+       ② 代码里的名字集合必须与锚点**完全一致**（多一个/少一个都报）
+          → 一致改名会被抓（锚点没跟着改）
+       ③ **行为反证**：真起一个假并发进程，调用**真实实现** `_other_pushers()`
+          （🔑 `globals().get` 取，**不抄一份** —— 第一百轮自证循环），
+          断言它**真的发现了那个 pid**：
+          - 返回 None  → 拒绝给结论 rc=1
+          - 不含假 pid → rc=1「守卫可能已被换成 return []」
+          - 含自己/祖先 → rc=1（139 轮误报方向的反向断言）
+    """
+    print('🔑 **推送互斥守卫 · 名字锚点与行为反证**（G430）')
+    print('=' * 70)
+    bad = []
+    tr = _trust_root()
+    if tr is None:
+        print('🔴 信任根不可读 —— 拒绝给结论（不静默当"没有名字要守"）')
+        print('=' * 70)
+        return 1
+    anchor = tr.get('PUSH_EXCLUSIVE_NAMES')
+    if not anchor or not isinstance(anchor, (list, tuple)):
+        print('🔴 锚点 PUSH_EXCLUSIVE_NAMES 未登记或格式不对 —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    want = set(anchor)
+    local = globals().get('PUSH_EXCLUSIVE_NAMES')
+    if not local:
+        print('🔴 代码里 PUSH_EXCLUSIVE_NAMES 未登记 —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    if set(local) != want:
+        bad.append(
+            '名字集合与锚点不一致：锚点有而代码无 %s / 代码有而锚点无 %s'
+            ' —— 🔴 一致改名会让 G429 静默失效'
+            % (sorted(want - set(local)), sorted(set(local) - want)))
+    # ② 名字必须**真的存在**于代码（锚点一致 ≠ 真的定义了）
+    try:
+        text = io.open(os.path.join(HERE, 'push_api.py'),
+                       encoding='utf-8').read()
+        tree = ast.parse(text)
+    except SyntaxError as ex:
+        print('🔴 push_api.py 无法解析: %s —— 拒绝给结论' % ex)
+        print('=' * 70)
+        return 1
+    top_names = set()
+    for n in tree.body:
+        if isinstance(n, ast.FunctionDef):
+            top_names.add(n.name)
+        elif isinstance(n, ast.Assign):
+            for t in n.targets:
+                if isinstance(t, ast.Name):
+                    top_names.add(t.id)
+    gone = sorted(x for x in want if x not in top_names)
+    if gone:
+        bad.append('锚点登记的名字在代码里**不存在**：%s' % gone)
+
+    # ③ 行为反证
+    path, proc = _spawn_fake_pusher()
+    if proc is None:
+        print('🔴 无法启动假并发进程 —— 拒绝给结论（不能跳过行为反证）')
+        print('=' * 70)
+        return 1
+    killed = True
+    try:
+        time.sleep(0.8)
+        fn = globals().get('_other_pushers')
+        if fn is None:
+            bad.append('_other_pushers **未定义** —— 无法行为反证')
+            res = None
+        else:
+            res = fn()
+        if res is None:
+            bad.append('_other_pushers() 返回 None —— 拒绝给结论'
+                       '（读不到进程表 ≠ 没有并发）')
+        elif proc.pid not in res:
+            bad.append(
+                '未发现刚起的假并发进程（pid %d）—— 🔴 守卫可能已被换成'
+                ' return []，届时并发推送将**永远放行**' % proc.pid)
+        else:
+            print('   ✅ 行为反证：真实实现发现了假并发进程 pid %d' % proc.pid)
+        me = os.getpid()
+        if isinstance(res, list) and me in res:
+            bad.append('把**自己**（pid %d）当成了并发推送 —— 139 轮误报方向'
+                       % me)
+    finally:
+        try:
+            proc.kill()
+            proc.wait(timeout=5)
+        except Exception:
+            killed = False
+        # 🔑 清理自断言（第一百一十九轮：失败必须让调用方知道，不能只打印）
+        try:
+            if path and os.path.exists(path):
+                os.remove(path)
+            if path and os.path.exists(path):
+                killed = False
+        except Exception:
+            killed = False
+    if not killed:
+        bad.append('假并发进程/临时脚本**清理失败** —— 会污染后续门禁')
+
+    if bad:
+        print('🔴 推送互斥守卫**不完备**：')
+        for b in bad:
+            print('   - ' + b)
+        print('=' * 70)
+        return 1
+    print('✅ 名字与锚点一致 · 行为反证通过（真实实现真能发现并发进程）')
+    print('=' * 70)
+    return 0
+
+
+def cmd_mutation_scan():
+    """🔑 G428-扫描：**哑门禁变异扫描**。
+
+    🔑 做法（变异测试）：把每个 `cmd_*` 门禁函数整体换成 `return 0`，
+       然后问"**还有谁会响**"：
+       - `guarded`    ：至少一个守望者**实跑** rc=1（真会被发现）
+       - `static_only`：有函数引用了它，但实跑**全部 rc=0**（存在但无关）
+       - `mute`       ：**无人引用** —— 改成桩后全仓库没有任何东西会发现
+    """
+    print('🔑 **哑门禁变异扫描**（G428）')
+    print('=' * 70)
+    src = os.path.join(HERE, 'push_api.py')
+    orig = open(src, encoding='utf-8').read()
+    orig_sha = hashlib.sha1(orig.encode('utf-8')).hexdigest()
+    ranges = _top_fn_ranges(orig)
+    flags = _cmd_flag_map(orig)
+    exclude = set(MUTATION_SELF_EXCLUDE) | {'main'}
+    targets = sorted(k for k in ranges
+                     if k.startswith('cmd_') and k not in exclude)
+    if len(targets) < MUTATION_TARGET_MIN:
+        print(f'🔴 目标函数只有 {len(targets)} 个'
+              f'（下限 {MUTATION_TARGET_MIN}）—— 拒绝给结论')
+        print('   🔑 目标被大量删除时扫描会"扫得少却全绿"，必须拦住')
+        print('=' * 70)
+        return 1
+    print(f'   目标门禁 {len(targets)} 个 · 逐个桩化为 `return 0` 后看谁会响')
+    res = {}
+    failed = []
+    for t in targets:
+        s, e = ranges[t]
+        new = _stub_replace(orig.split('\n'), s, e)
+        if hashlib.sha1(new.encode('utf-8')).hexdigest() == orig_sha:
+            failed.append(f'{t}：**变异未改变文件** —— 扫描结论不可信')
+            continue
+        try:
+            _atomic_write_text(MUTATION_TMP, new)
+            own_rc, own_out = _run_mut(MUTATION_TMP, flags.get(t))
+            wnames = _watchers_of(new, t, exclude, flags) or []
+            wl = []
+            for w, wf in wnames:
+                wl.append({'fn': w,
+                           'flag': ('--' + wf.replace('_', '-')) if wf else None,
+                           'rc': _run_mut(MUTATION_TMP, wf)[0]})
+            if own_rc != 0:
+                verdict = 'unknown'
+                tail = [x for x in (own_out or '').strip().split('\n')
+                        if x.strip()][-4:]
+                failed.append(f'{t}：桩化后自身 rc={own_rc}（应为 0）'
+                              f' —— 变异体有副作用，结论不可用')
+                print(f'   🔴 {t} rc={own_rc}')
+                for x in tail:
+                    print('      | ' + x[:150])
+            elif any(x['rc'] == 1 for x in wl):
+                verdict = 'guarded'
+            elif wl:
+                verdict = 'static_only'
+            else:
+                verdict = 'mute'
+            res[t] = {'flag': ('--' + flags[t].replace('_', '-'))
+                      if t in flags else None,
+                      'muted_rc': own_rc, 'verdict': verdict, 'watchers': wl}
+        finally:
+            try:
+                os.unlink(MUTATION_TMP)
+            except OSError:
+                pass
+            # 🔑 第一百四十轮：清理自断言（第一百一十九轮同款）
+            #    🔴 `except OSError: pass` 会把"清理失败"伪装成"没什么要清理的"；
+            #       残留会让**下次扫描读到旧变异体**，结论变成编的。
+            if os.path.exists(MUTATION_TMP):
+                print("🔴 变异体副本**清理失败** —— 残留会让下次扫描读到旧变异体")
+    # 🔑 原文件**全程未被写过** —— 这里校验它确实还是原文
+    back = open(src, encoding='utf-8').read()
+    if hashlib.sha1(back.encode('utf-8')).hexdigest() != orig_sha:
+        print('🔴 **push_api.py 被改动过** —— 扫描不该写它，拒绝写产物')
+        print('=' * 70)
+        return 1
+    if failed:
+        print('🔴 扫描过程中出现不可用结论：')
+        for f in failed:
+            print('   - ' + f)
+        print('=' * 70)
+        return 1
+    import collections
+    cnt = collections.Counter(v['verdict'] for v in res.values())
+    print()
+    print(f'   guarded     {cnt.get("guarded", 0)} 个（有守望者，实跑 rc=1）')
+    print(f'   static_only {cnt.get("static_only", 0)} 个（被引用但抓不到）')
+    print(f'🔴 mute        {cnt.get("mute", 0)} 个（**改成桩全仓库无人发现**）')
+    print()
+    for t in sorted(res):
+        if res[t]['verdict'] != 'mute':
+            w = ', '.join(f"{x['fn']}(rc={x['rc']})" for x in res[t]['watchers'])
+            print(f'   ✅ {t:<38} {res[t]["verdict"]:<11} ← {w}')
+    mute = [t for t in sorted(res) if res[t]['verdict'] == 'mute']
+    if mute:
+        print()
+        print(f'🔴 **哑门禁 {len(mute)} 个**（部分列出）：')
+        for t in mute[:12]:
+            print(f'   - {t}')
+        if len(mute) > 12:
+            print(f'   … 其余 {len(mute) - 12} 个见产物')
+    try:
+        os.makedirs(os.path.dirname(MUTATION_SCAN_FILE), exist_ok=True)
+        payload = {'src_sha': orig_sha, 'targets': len(targets),
+                   'count': dict(cnt), 'gates': res}
+        _atomic_write_text(MUTATION_SCAN_FILE,
+                           json.dumps(payload, ensure_ascii=False,
+                                      indent=1, sort_keys=True))
+        print()
+        print(f'   产物：{os.path.relpath(MUTATION_SCAN_FILE, ROOT)}')
+    except Exception as e:
+        print(f'🔴 写产物失败：{e}')
+        print('=' * 70)
+        return 1
+    print('=' * 70)
+    return 0
+
+
+def _mutation_probe(payload):
+    """🔑 行为反证：**真跑一次**桩化，验证产物里记的 rc 不是编的。
+
+    🔴 没有这一步，扫描器完全可以"声称某个门禁有守望者"而从不验证
+       —— 与第一百轮"自测测了自己抄的那份"同源。
+    """
+    src = os.path.join(HERE, 'push_api.py')
+    orig = open(src, encoding='utf-8').read()
+    gates = payload.get('gates') or {}
+    cand = [k for k in sorted(gates) if gates[k].get('verdict') == 'guarded']
+    if not cand:
+        return (False, '产物中**没有** guarded 门禁 —— 无法证明扫描可信，'
+                       '拒绝给结论')
+    t = cand[0]
+    ranges = _top_fn_ranges(orig)
+    if t not in ranges:
+        return (False, f'{t} 在代码中已不存在 —— 产物过期')
+    flags = _cmd_flag_map(orig)
+    exclude = set(MUTATION_SELF_EXCLUDE) | {'main'}
+    s, e = ranges[t]
+    new = _stub_replace(orig.split('\n'), s, e)
+    got = []
+    try:
+        _atomic_write_text(MUTATION_TMP, new)
+        for w, wf in (_watchers_of(new, t, exclude, flags) or []):
+            got.append((w, _run_mut(MUTATION_TMP, wf)[0]))
+    finally:
+        try:
+            os.unlink(MUTATION_TMP)
+        except OSError:
+            pass
+        # 🔑 第一百四十轮：清理自断言（第一百一十九轮同款）
+        #    🔴 `except OSError: pass` 会把"清理失败"伪装成"没什么要清理的"；
+        #       残留会让**下次扫描读到旧变异体**，结论变成编的。
+        if os.path.exists(MUTATION_TMP):
+            print("🔴 变异体副本**清理失败** —— 残留会让下次扫描读到旧变异体")
+    back = open(src, encoding='utf-8').read()
+    if hashlib.sha1(back.encode('utf-8')).hexdigest() != \
+            hashlib.sha1(orig.encode('utf-8')).hexdigest():
+        return (False, '反证后 push_api.py 被改动 —— 不该发生')
+    want = {x['fn']: x['rc'] for x in gates[t].get('watchers', [])}
+    got_d = dict(got)
+    if not any(v == 1 for v in got_d.values()):
+        return (False, f'反证失败：{t} 桩化后守望者实测 {got_d} '
+                       f'**无人 rc=1**，而产物声称 guarded')
+    for k, v in want.items():
+        if k in got_d and got_d[k] != v:
+            return (False, f'反证失败：{k} 产物记 rc={v}，实测 rc={got_d[k]}')
+    return (True, f'{t} 桩化后守望者实测 {got_d} —— 与产物一致')
+
+
+def cmd_assert_mutation():
+    """🔑 G428-断言：**哑门禁必须被登记为已知风险**。
+
+    🔑 判据：
+       ① 扫描产物必须可读 —— 读不到**拒绝给结论**（读不到 ≠ 没有哑门禁）
+       ② 覆盖目标数 ≥ 下限（防"扫得少却全绿"）
+       ③ `mute` / `static_only` 必须在豁免清单登记：理由 ≥ 10 字符
+          + 批准轮次 ≤ 文档最大轮次（G389 同款）
+       ④ **僵尸豁免**：登记了但已不在扫描结果中 → 应删除
+       ⑤ 🔑 **行为反证**：真跑一次桩化，验证产物记的 rc 与实测一致
+    """
+    print('🔑 **哑门禁断言**（G428）')
+    print('=' * 70)
+    try:
+        with open(MUTATION_SCAN_FILE, encoding='utf-8') as f:
+            payload = json.load(f)
+    except FileNotFoundError:
+        print(f'🔴 扫描产物不存在：{os.path.relpath(MUTATION_SCAN_FILE, ROOT)}')
+        print('   🔑 先跑 `--mutation-scan`')
+        print('=' * 70)
+        return 1
+    except ValueError as e:
+        print(f'🔴 产物解析失败：{e} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    gates = payload.get('gates')
+    if not isinstance(gates, dict) or not gates:
+        print('🔴 产物中没有 gates —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    if int(payload.get('targets') or 0) < MUTATION_TARGET_MIN:
+        print(f'🔴 产物覆盖目标 {payload.get("targets")} < '
+              f'{MUTATION_TARGET_MIN} —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    src = os.path.join(HERE, 'push_api.py')
+    try:
+        cur = hashlib.sha1(open(src, encoding='utf-8').read()
+                           .encode('utf-8')).hexdigest()
+    except Exception:
+        cur = None
+    if cur and payload.get('src_sha') and cur != payload['src_sha']:
+        print('⚠️  产物基于旧版 push_api.py —— 建议重跑 --mutation-scan')
+        print(f'   产物 {str(payload.get("src_sha"))[:12]} · '
+              f'当前 {cur[:12]}')
+    mx = None
+    try:
+        mx = _doc_max_round()
+    except Exception:
+        mx = None
+    # 豁免清单
+    allow = {}
+    try:
+        with open(MUTE_ALLOWLIST, encoding='utf-8') as f:
+            for ln in f:
+                s = ln.strip()
+                if not s or s.startswith('#'):
+                    continue
+                parts = s.split('::', 1)
+                if len(parts) != 2 or not parts[1].strip():
+                    continue
+                allow[parts[0].strip()] = parts[1].strip()
+    except FileNotFoundError:
+        print(f'🔴 豁免清单不存在：{os.path.relpath(MUTE_ALLOWLIST, ROOT)}')
+        print('   🔑 读不到 ≠ 没有哑门禁 —— 拒绝给结论')
+        print('=' * 70)
+        return 1
+    bad = []
+    risky = [k for k in sorted(gates)
+             if gates[k].get('verdict') in ('mute', 'static_only')]
+    for k in risky:
+        v = gates[k]['verdict']
+        why = allow.get(k)
+        if not why:
+            bad.append(f'{k}（{v}）**未登记豁免** —— 改成桩无人发现')
+            continue
+        if len(why) < 10:
+            bad.append(f'{k} 豁免理由过短（{len(why)}<10）—— 必须写明处置')
+        m = re.search(r'(\d+)\s*轮', why)
+        if not m:
+            bad.append(f'{k} 豁免理由未写批准轮次（须形如"138轮"）')
+        elif mx is not None and int(m.group(1)) > mx:
+            bad.append(f'{k} 批准轮次 {m.group(1)} > 文档最大轮次 {mx}'
+                       f' —— 🔴 来自未来的批准')
+    # ④ 僵尸豁免
+    for k in sorted(allow):
+        if k not in gates:
+            bad.append(f'僵尸豁免：{k} **不在**扫描结果中 —— 应删除')
+        elif gates[k].get('verdict') == 'guarded':
+            bad.append(f'僵尸豁免：{k} 实测 **guarded**（有人守）'
+                       f' —— 不该再豁免')
+    # ⑤ 行为反证
+    ok, note = _mutation_probe(payload)
+    if not ok:
+        bad.append(f'行为反证失败 —— {note}')
+    print(f'   目标 {payload.get("targets")} 个 · '
+          f'guarded {payload.get("count", {}).get("guarded", 0)} · '
+          f'static_only {payload.get("count", {}).get("static_only", 0)} · '
+          f'🔴 mute {payload.get("count", {}).get("mute", 0)}')
+    print(f'   已登记豁免 {len(allow)} 条 · 需处置 {len(risky)} 条')
+    print(f'   行为反证：{note}')
+    print()
+    if bad:
+        print('🔴 哑门禁处置不完整：')
+        for b in bad[:20]:
+            print('   - ' + b)
+        if len(bad) > 20:
+            print(f'   … 其余 {len(bad) - 20} 条')
+        print('=' * 70)
+        return 1
+    print(f'✅ {len(risky)} 条哑门禁均已登记处置 · 无僵尸豁免 · 反证一致')
+    print('=' * 70)
+    return 0
+
+
 def main():
     msg = None
     # 🔑 第九十七轮：改用 **argparse**。
@@ -3822,6 +4947,17 @@ def main():
                     help='G408：信任根闭合（代码元登记项 == 信任根文件）')
     ap.add_argument('--assert-criteria-roots', action='store_true',
                     help='G426：判据存在性信任根闭合（G425 判据⑧/⑨ 必须仍在代码中）')
+    ap.add_argument('--assert-no-dirty', action='store_true',
+                    help='G427：推送前必须**无未提交修改**'
+                         '（防推的是工作区而非仓库版本，136 轮真实事故）')
+    ap.add_argument('--assert-push-exclusive', action='store_true',
+                    help='G429：推送必须互斥（并发推送会静默丢失工作，'
+                         '139 轮真实事故：三个推送进程同时存活）')
+    ap.add_argument('--assert-blob-retry', action='store_true',
+                    help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
+    ap.add_argument('--assert-push-exclusive-alive', action='store_true',
+                    help='G430：推送互斥守卫的**名字锚点 + 行为反证**'
+                         '（139 轮：一致改名 / 实现换成 return [] 都照绿）')
     ap.add_argument('--assert-meta-names', action='store_true',
                     help='G407：元登记项（登记表本身）必须闭合')
     ap.add_argument('--assert-path-consts', action='store_true',
@@ -3848,6 +4984,10 @@ def main():
                    help='G412：自测临时目录清理自断言（防 rmtree 静默失败）')
     ap.add_argument('--assert-cleanup-verified', action='store_true',
                    help='G413：全部清理类调用必须带结果校验或登记豁免')
+    ap.add_argument('--mutation-scan', action='store_true',
+                    help='G428：把每个门禁**桩化**一遍，看还有谁会响')
+    ap.add_argument('--assert-mutation', action='store_true',
+                    help='G428：哑门禁必须登记处置 + 扫描结论须**行为反证**')
     ap.add_argument('--check-gitlink', action='store_true',
                     help='G395：gitlink（mode 160000）识别自测')
     ap.add_argument('--check-symlink', action='store_true',
@@ -3951,6 +5091,30 @@ def main():
         os.chdir(ROOT)
         return cmd_assert_round_end_single()
 
+    if a.assert_no_dirty:
+        os.chdir(ROOT)
+        return cmd_assert_no_dirty()
+
+    if a.assert_push_exclusive:
+        os.chdir(ROOT)
+        return cmd_assert_push_exclusive()
+
+    if a.assert_blob_retry:
+        os.chdir(ROOT)
+        return cmd_assert_blob_retry()
+
+    if a.assert_push_exclusive_alive:
+        os.chdir(ROOT)
+        return cmd_assert_push_exclusive_alive()
+
+    if a.mutation_scan:
+        os.chdir(ROOT)
+        return cmd_mutation_scan()
+
+    if a.assert_mutation:
+        os.chdir(ROOT)
+        return cmd_assert_mutation()
+
     if a.check_leak:
         # 🔑 G390：只做**漏传检查**，不统计不推送
         os.chdir(ROOT)
@@ -3972,6 +5136,25 @@ def main():
     #    🔴 真实事故：127 轮推送 08:07:59 完成，claims_127.txt 08:17:47 才写
     #       → 漏传；而 G390 当时是**绿的**（那一刻文件还不存在）。
     #    🔑 判据：G390 守"已存在但没 add"，本条守"还没写就推了" —— 互补。
+    # 🔑 第一百三十九轮：**G429 推送必须互斥**。
+    #    🔴 真实事故（本轮）：工具报 TimeoutError → 我判断"没启动"→ 又启两次
+    #       → **三个推送进程同时存活**，都基于同一个 parent 建 commit，
+    #         最后更新 ref 的胜出，另两个的工作**静默丢失且无人报错**。
+    #    🔑 判据：判活查进程；查不到进程表时**拒绝给结论**，不当成"没有并发"。
+    others = _other_pushers()
+    if others is None:
+        print('\n🔴 **无法确定**是否有其它推送进程在跑（读不到进程表）')
+        print('  🔑 这与"没有并发"是两回事 —— 拒绝推送，不静默放行')
+        return 1
+    if others:
+        print('\n🔴 检测到 %d 个**其它**推送进程仍在运行：%s'
+              % (len(others), others[:8]))
+        print('  🔑 并发推送会各自基于同一个 parent 建 commit —— '
+              '最后更新 ref 的胜出，其余工作**静默丢失**')
+        print('  🔑 判据：**命令超时 ≠ 命令没跑**；判活必须查进程')
+        print('\n🔴 拒绝推送 —— 并发推送的失败是静默的')
+        return 1
+
     if cmd_assert_round_claims() != 0:
         print('\n🔴 拒绝推送 —— 清单漏传会让"本轮做过什么"无法复核')
         return 1
@@ -4003,6 +5186,15 @@ def main():
             print('   或加 `--allow-untracked` 明确接受漏传（不推荐）')
             print('\n🔴 拒绝推送 —— 静默漏传比推送失败危险得多')
             return 1
+
+    # 🔑 第一百三十七轮：**G427 推送前必须无未提交修改**。
+    #    🔴 第一百三十六轮真实事故：只 `git add -A` 而**未本地 commit**，
+    #       随后 `--audit-history` 又重写了台账与镜像 —— 索引里是旧内容，
+    #       而推送读的是**工作区** → 远端与本地对不上（内容不一致 2 个）。
+    #    🔑 G391 第⑤层只在**推送后**才发现；本条把它提前到**推送前拒绝**。
+    if cmd_assert_no_dirty() != 0:
+        print('\n🔴 拒绝推送 —— 推上去的将是工作区内容，而不是仓库里的版本')
+        return 1
 
     files = list_files()
     print(f'🔑 受管文件 {len(files)} 个')

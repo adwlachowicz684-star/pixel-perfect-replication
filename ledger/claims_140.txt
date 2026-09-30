@@ -1,0 +1,17 @@
+# 第一百四十轮完成声明（G381/G382/G383 校验）
+grep:scripts/push_api.py::cmd_assert_push_exclusive_alive
+grep:scripts/push_api.py::_spawn_fake_pusher
+grep:scripts/push_api.py::PUSH_EXCLUSIVE_NAMES
+grep:scripts/push_api.py::--assert-push-exclusive-alive
+grep:scripts/push_api.py::G430_c2_名字锚点
+grep:scripts/push_api.py::ref_name
+grep:scripts/run_all_gates.py::G430
+grep:ledger/trust_root.json::PUSH_EXCLUSIVE_NAMES
+grep:references/游戏引擎复刻.md::第一百四十轮
+grep:README.md::第一百四十轮
+cmd:push_api.py --assert-push-exclusive-alive
+cmd:push_api.py --assert-push-exclusive
+cmd:push_api.py --assert-criteria-roots
+gate:G430
+gate:G429
+gate:G426

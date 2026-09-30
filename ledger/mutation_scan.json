@@ -1,0 +1,209 @@
+{
+ "count": {
+  "guarded": 2,
+  "mute": 27,
+  "static_only": 1
+ },
+ "gates": {
+  "cmd_assert_baseline_fp": {
+   "flag": "--assert-baseline-fp",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_cleanup_verified": {
+   "flag": "--assert-cleanup-verified",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_criteria_roots": {
+   "flag": "--assert-criteria-roots",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_dependent_names": {
+   "flag": "--assert-dependent-names",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_fp_history": {
+   "flag": "--assert-fp-history",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_fp_mirror": {
+   "flag": "--assert-fp-mirror",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_history_known": {
+   "flag": "--assert-history-known",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_index_pushed": {
+   "flag": "--assert-index-pushed",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_legacy_dump": {
+   "flag": "--assert-legacy-dump",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_legacy_files": {
+   "flag": "--assert-legacy-files",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_meta_names": {
+   "flag": "--assert-meta-names",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_mirror_fn": {
+   "flag": "--assert-mirror-fn",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_no_dirty": {
+   "flag": "--assert-no-dirty",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_no_tmp_in_index": {
+   "flag": "--assert-no-tmp-in-index",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_path_consts": {
+   "flag": "--assert-path-consts",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_round_claims": {
+   "flag": "--assert-round-claims",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_round_end": {
+   "flag": "--assert-round-end",
+   "muted_rc": 0,
+   "verdict": "guarded",
+   "watchers": [
+    {
+     "flag": "--assert-round-end-single",
+     "fn": "cmd_assert_round_end_single",
+     "rc": 1
+    }
+   ]
+  },
+  "cmd_assert_round_end_single": {
+   "flag": "--assert-round-end-single",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_round_end_wired": {
+   "flag": "--assert-round-end-wired",
+   "muted_rc": 0,
+   "verdict": "guarded",
+   "watchers": [
+    {
+     "flag": "--assert-round-end-single",
+     "fn": "cmd_assert_round_end_single",
+     "rc": 1
+    }
+   ]
+  },
+  "cmd_assert_selftest_ignored": {
+   "flag": "--assert-selftest-ignored",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_trust_root": {
+   "flag": "--assert-trust-root",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_assert_write_pairing": {
+   "flag": "--assert-write-pairing",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_audit_history": {
+   "flag": "--audit-history",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_check_gitlink": {
+   "flag": "--check-gitlink",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_check_selftest_reset": {
+   "flag": "--check-selftest-reset",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_check_symlink": {
+   "flag": "--check-symlink",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_dump_legacy_files": {
+   "flag": "--dump-legacy-files",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_round_end": {
+   "flag": "--round-end",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_show_legacy_files": {
+   "flag": "--show-legacy-files",
+   "muted_rc": 0,
+   "verdict": "mute",
+   "watchers": []
+  },
+  "cmd_verify_push": {
+   "flag": "--verify-push",
+   "muted_rc": 0,
+   "verdict": "static_only",
+   "watchers": [
+    {
+     "flag": "--assert-round-end-wired",
+     "fn": "cmd_assert_round_end_wired",
+     "rc": 0
+    }
+   ]
+  }
+ },
+ "src_sha": "0800d2b889b63705d0f47ee7fa07c9a25a23372a",
+ "targets": 30
+}

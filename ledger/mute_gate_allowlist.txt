@@ -1,0 +1,42 @@
+# 第一百三十八轮：**哑门禁豁免清单**（G428 依赖）
+#
+# 🔑 来源：`push_api.py --mutation-scan` **实测** —— 把每个 cmd_* 门禁整体
+#    换成 `return 0` 后，看还有哪个命令会 rc=1。
+# 🔴 实测结果：30 个目标中 guarded **只有 2 个**
+#    （cmd_assert_round_end / cmd_assert_round_end_wired ← G425），
+#    static_only 1 个（cmd_verify_push），**mute 27 个**。
+#
+# 🔑 判据：**"被跑" ≠ "被守望"**。GATES 表登记了 → 回归每轮都跑它；
+#    但把它改成桩后回归**依然全绿**，没有任何东西指出"这条门禁已经哑了"。
+# 🔴 登记 ≠ 解决：本清单把"没人知道"变成"**可断言的事实**"，
+#    并使"新增哑门禁"必须显式登记（否则 G428 阻断）。
+# 🔑 格式：`门禁函数名::理由（含批准轮次，须 ≤ 文档最大轮次）`
+#
+cmd_assert_baseline_fp::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_cleanup_verified::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_criteria_roots::138轮 mute：G426 判据存在性信任根，桩化后"判据还在不在"无人查；处置=依赖 trust_root.json 外部锚点，哑化靠 G405/G407 元登记检查部分兜底
+cmd_assert_dependent_names::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_fp_history::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_fp_mirror::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_history_known::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_index_pushed::138轮 mute：G422 本地索引⊆远端，桩化后漏传无人发现；处置=接在轮次末尾三项中，哑化靠 G391 全量比对兜底
+cmd_assert_legacy_dump::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_legacy_files::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_meta_names::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_mirror_fn::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_no_dirty::138轮 mute：G427 推送前未提交检查，桩化后仅"自我检查"式守望者（_no_dirty_wired_bad 属自身），无人会响；处置=接在推送主流程，哑化靠推送后 G391 回读兜底
+cmd_assert_no_tmp_in_index::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_path_consts::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_round_claims::138轮 mute：G421 本轮清单，桩化后推送流程仍调用它但恒返回0；处置=已接在推送前（G424 守调用时序），哑化靠 G422 本地⊆远端兜底
+cmd_assert_round_end_single::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_selftest_ignored::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_trust_root::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_assert_write_pairing::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_audit_history::138轮 mute：G394 只读审计（发现即报告，本就返回0），桩化后历史权限遗留无人记录；处置=人工门禁，台账由 G396/G397/G398 守
+cmd_check_gitlink::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_check_selftest_reset::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_check_symlink::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_dump_legacy_files::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_round_end::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_show_legacy_files::138轮 mute：桩化为 return 0 后全仓库无人发现；处置=已入 GATES 回归，哑化靠 git 审计与相邻门禁部分兜底
+cmd_verify_push::138轮 static_only：守望者 cmd_assert_round_end_wired 实跑 rc=0（只查时序不查内容），有名无实；处置=G391 是推送主流程末尾的严格回读，哑化由 G422 部分兜底

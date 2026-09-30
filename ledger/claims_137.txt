@@ -1,0 +1,20 @@
+# 第一百三十七轮完成声明（G381/G382/G383 校验）
+# 指引来源：第一百三十六轮末尾 —— 🔴 本轮被真实事故带偏，未执行指引③（见文档诚实结论④）
+grep:scripts/push_api.py::cmd_assert_no_dirty
+grep:scripts/push_api.py::_no_dirty_wired_bad
+grep:scripts/push_api.py::_index_worktree_diff
+grep:scripts/push_api.py::--assert-no-dirty
+grep:scripts/push_api.py::守卫结构
+grep:scripts/push_api.py::git/trees
+grep:scripts/push_api.py::已跟踪但**未提交**
+grep:scripts/push_api.py::工作区已改但未入索引
+grep:scripts/run_all_gates.py::G427
+grep:references/游戏引擎复刻.md::第一百三十七轮
+grep:references/游戏引擎复刻.md::4 / 4
+grep:references/游戏引擎复刻.md::索引 == 工作区
+grep:README.md::第一百三十七轮
+cmd:push_api.py --assert-no-dirty
+cmd:push_api.py --assert-criteria-roots
+cmd:push_api.py --assert-cleanup-verified
+gate:G427
+gate:G391

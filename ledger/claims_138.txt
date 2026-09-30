@@ -1,0 +1,22 @@
+# 第一百三十八轮完成声明（G381/G382/G383 校验）
+# 指引来源：第一百三十六轮指引③ —— 137 轮诚实结论④明说「没做」
+grep:scripts/push_api.py::cmd_mutation_scan
+grep:scripts/push_api.py::cmd_assert_mutation
+grep:scripts/push_api.py::_watchers_of
+grep:scripts/push_api.py::_run_mut
+grep:scripts/push_api.py::_flag_for_fn
+grep:scripts/push_api.py::MUTATION_TMP
+grep:scripts/push_api.py::mute
+grep:scripts/push_api.py::static_only
+grep:scripts/push_api.py::--mutation-scan
+grep:scripts/push_api.py::--assert-mutation
+grep:scripts/run_all_gates.py::G428
+grep:ledger/mute_gate_allowlist.txt::cmd_assert_baseline_fp
+grep:references/游戏引擎复刻.md::第一百三十八轮扫描结果
+grep:references/游戏引擎复刻.md::哑门禁
+grep:references/游戏引擎复刻.md::6 / 6
+grep:README.md::第一百三十八轮
+cmd:push_api.py --mutation-scan
+cmd:push_api.py --assert-mutation
+gate:G428
+gate:G391
