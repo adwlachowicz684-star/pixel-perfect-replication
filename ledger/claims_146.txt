@@ -1,0 +1,16 @@
+# 第一百四十六轮完成声明（G381/G382/G383 校验）
+# 🔑 本轮不新增门禁编号：判据④⑤⑥⑦⑧ 属于 G399（"互补层并存"本就是它的职责）
+grep:scripts/run_all_gates.py::BOTH_LAYERS_MIN
+grep:scripts/run_all_gates.py::BOTH_LAYERS_WHY_MIN
+grep:scripts/run_all_gates.py::被登记了 **
+grep:scripts/run_all_gates.py::去重后只有
+grep:scripts/run_all_gates.py::**未点名**
+grep:scripts/run_all_gates.py::两层的编号**相同**
+grep:scripts/run_all_gates.py::why 只有
+grep:scripts/run_all_gates.py::组（去重后）
+grep:scripts/push_api.py::BOTH_LAYERS_MIN
+grep:scripts/push_api.py::BOTH_LAYERS_WHY_MIN
+grep:README.md::第一百四十六轮
+grep:references/游戏引擎复刻.md::第一百四十六轮
+cmd:run_all_gates.py --check-both-layers
+gate:G399

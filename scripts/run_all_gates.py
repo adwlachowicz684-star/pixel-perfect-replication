@@ -980,6 +980,14 @@ GATES = [
 #       G398 会"一致地错"（落盘与台账同源且都错）。
 #    🔑 所以**查远端的那个不能被删** —— 两者互为补强，删任一个都开洞。
 #    (在线层, 离线层, 为什么必须并存)
+# 🔑 第一百四十六轮：G399 判据④⑦ 依赖的两个常量（防"删一组 + 复制一组"充数）
+#    去重后真实组数 = 15（145 轮实测：16 组里有 1 组是 114 轮误插的重复项）
+#    🔑 不新增门禁编号 —— 判据属于 G399（"互补层并存"本身就是它的职责）
+BOTH_LAYERS_MIN = 15
+# 🔑 why 是**人工写的理由**（105 轮诚实结论④）—— 只能做弱约束：
+#    必须同时出现两个编号（防整段复制）+ 长度下限（防敷衍）
+BOTH_LAYERS_WHY_MIN = 60
+
 BOTH_LAYERS = (
     ('G397', 'G398',
      'G397 查远端防台账撒谎；G398 查落盘防离线答不了。'
@@ -1017,12 +1025,6 @@ BOTH_LAYERS = (
      '🔴 只有 G404 → 其它名字改名仍静默失效；'
      '只有 G405 → 最关键那条链缺少"在特定函数内被引用"这层。'),
     # 🔑 第一百一十三轮：第七组（112 轮诚实结论①，本机制最大的洞）
-    ('G405', 'G406',
-     'G405 从**登记表侧**查（已登记的都闭合吗）；'
-     'G406 从**代码侧**反向查（代码里的路径常量都登记了吗）。'
-     '🔴 只有 G405 → 新增路径常量没人提醒登记，G405 照样绿；'
-     '只有 G406 → 已登记项改名后是否仍被引用无从知晓。'),
-    # 🔑 第一百一十四轮：第八组 —— 元登记项闭合（113 轮③）
     ('G405', 'G406',
      'G405 从**登记表侧**查（已登记的都闭合吗）；'
      'G406 从**代码侧**反向查（代码里的路径常量都登记了吗）。'
@@ -2093,9 +2095,45 @@ def cmd_check_both_layers():
     print('=' * 70)
     gmap = {g[0]: g for g in GATES}
     bad = 0
+    # 🔑 第一百四十六轮判据④：(on, off) 无序对**不得重复**
+    seen = {}
+    for on, off, _w in BOTH_LAYERS:
+        k = tuple(sorted((on, off)))
+        seen[k] = seen.get(k, 0) + 1
+    for k, c in sorted(seen.items()):
+        if c > 1:
+            print(f'    🔴 互补层 {k[0]} ↔ {k[1]} 被登记了 **{c} 次** —— '
+                  f'同一条链查两遍，组数**虚高**（145 轮实测：16 组实为 15 组）')
+            bad += 1
+    uniq = len(seen)
+    # 🔑 判据⑦：**去重后**组数不得小于下限
+    if uniq < BOTH_LAYERS_MIN:
+        print(f'    🔴 去重后只有 {uniq} 组 < 下限 {BOTH_LAYERS_MIN} —— '
+              f'可能是"删掉一组真实需要的、再复制一组已有的"来充数'
+              f'（总数可以不变，但独立的链变少了）')
+        bad += 1
+    else:
+        print(f'    ✅ 去重后 {uniq} 组 ≥ 下限 {BOTH_LAYERS_MIN}')
+
     for on, off, why in BOTH_LAYERS:
         print(f'\n### {on}（在线） ↔ {off}（离线）')
         print(f'    {why}')
+        # 🔑 判据⑤：自己跟自己"互补"是假的
+        if on == off:
+            print(f'    🔴 两层的编号**相同**（{on}）—— "两层"是假的')
+            bad += 1
+        # 🔑 判据⑥：人工写的理由必须**点名两个编号**
+        #    （防把一组的理由整段复制到另一组编号上；105 轮诚实结论④）
+        if on not in why or off not in why:
+            miss = [g for g in (on, off) if g not in why]
+            print(f'    🔴 why **未点名** {miss} —— 理由与编号对不上'
+                  f'（像是从别组整段复制来的）')
+            bad += 1
+        # 🔑 判据⑧：理由长度下限
+        if len(why) < BOTH_LAYERS_WHY_MIN:
+            print(f'    🔴 why 只有 {len(why)} 字 < {BOTH_LAYERS_WHY_MIN} —— '
+                  f'未说明"删任一个会开什么洞"')
+            bad += 1
         for gid in (on, off):
             if gid not in gmap:
                 print(f'    🔴 {gid} **不在自动门禁表** '
@@ -2126,7 +2164,8 @@ def cmd_check_both_layers():
         print(f'🔴 **层缺失 / 层退化** {bad} 处 —— 只留一层会开洞')
         print('=' * 70)
         return 1
-    print(f'✅ {len(BOTH_LAYERS)} 组在线/离线层**均并存**且命令互异')
+    print(f'✅ {uniq} 组（去重后）在线/离线层**均并存**且命令互异'
+          f'· 登记 {len(BOTH_LAYERS)} 条')
     print('=' * 70)
     return 0
 
