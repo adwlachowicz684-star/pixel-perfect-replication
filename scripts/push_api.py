@@ -143,8 +143,13 @@ DEPENDENT_NAMES = {
     'DOC_ROUND_AR_RE': ('const', '文档轮次阿拉伯数字正则（G434 依赖）'),
     'DOC_ROUND_AR_MAX': ('const', '阿拉伯轮次上限（防噪音把 max 顶飞）'),
     '_round_hits': ('fn', '轮次解析唯一实现（不认写法：中文 ↔ 阿拉伯）'),
+    '_cn_round': ('fn', '轮次中文解析唯一实现（G432/G434 共用）'),
     'ROUND_PARSE_FN': ('const', '轮次解析函数名登记项（G434 依赖，防一致改名静默失效）'),
     'NOTATION_SAMPLES': ('const', '写法反证样本（G434 判据③ 依赖，防清空后恒通过）'),
+    # 🔑 第一百四十五轮：G435（轮次正则**单一实现**）依赖的常量/函数。
+    #    🔴 按 115/120/127/139/142/143/144 轮同一条规程：新增必须同步登记。
+    'ROUND_CN_SHARED_RE': ('const', '轮次正则常量名登记项（G435 依赖，防一致改名失效）'),
+    'ROUND_CN_SHARED_FN': ('const', '轮次中文解析函数名登记项（G435 依赖）'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -4535,10 +4540,20 @@ def _cn_round(msg):
 
     🔴 第一百零八轮真实 bug：`partition('百')` 把"一百零七"解析成 **100**。
        ✅ 现在复用 claim_verify 的逐字符累计实现（**不抄一份**）。
+
+    🔑 第一百四十五轮：正则**共用** `DOC_ROUND_CN_RE`（定义见下方 G434 区）——
+       🔴 144 轮诚实结论③：本函数里曾有该正则的**第二份字面量**。
+          🔑 两份字面量的危害不是"重复"，而是**改一处不够** ——
+             想让轮次解析失效/失效后仍能用，只需改其中一个。
+       🔑 用 `globals().get` 而非裸名：常量缺失时返回 None（**拒绝给结论**），
+          而不是 NameError 崩溃（104 轮：崩溃与拒绝在 rc 上无法区分）。
     """
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from claim_verify import _cn2num
-    m = re.search(u'第([零一二三四五六七八九十百]+)轮', msg or '')
+    _pat = globals().get(ROUND_CN_SHARED_RE)
+    if not _pat:
+        return None
+    m = re.search(_pat, msg or '')
     if not m:
         return None
     return _cn2num(m.group(1))
@@ -4809,6 +4824,14 @@ DOC_ROUND_SKIP_PARTS = ('/work/', '/.git/')
 #       （143 轮破坏⑦ 正是靠这个触发）。
 #       🔑 反过来：G433 判据④ 会对"文档其实记了、只是换了写法"**误报**。
 DOC_ROUND_CN_RE = u'第([零一二三四五六七八九十百]+)轮'
+# 🔑 第一百四十五轮：G435 —— 轮次正则**单一实现**（不许有第二份字面量）。
+#    🔴 144 轮诚实结论③：`_cn_round` 里有一份**同值字面量** ——
+#       🔑 只改 `DOC_ROUND_CN_RE` 时，中文解析**照旧工作**，
+#          于是"解析改了"这件事**没有任何证据**（G434 判据③ 仍绿）。
+#    🔑 登记项：G435 用**常量名**去找它，一致改名不会让判据静默失效
+#       （111 轮 MIRROR_WRITE_FN 同款）。
+ROUND_CN_SHARED_RE = 'DOC_ROUND_CN_RE'
+ROUND_CN_SHARED_FN = '_cn_round'
 DOC_ROUND_AR_RE = u'第\\s?([0-9]{1,3})\\s?轮'
 # 🔑 阿拉伯上限：防止文中出现的大数字（时间戳 / 行号等）被误当成轮次。
 DOC_ROUND_AR_MAX = 999
@@ -5067,6 +5090,13 @@ def cmd_assert_doc_round_notation():
     if not isinstance(ar_max, int) or ar_max <= 0:
         bad.append(u'DOC_ROUND_AR_MAX = %r 非正整数 —— 阿拉伯轮次上限失效'
                    % (ar_max,))
+    # 🔑 判据①′：为空即**拒绝给结论**（145 轮破坏④ 实测：
+    #    DOC_ROUND_CN_RE = '' 时 `if fn is not None and cn_re and ar_re`
+    #    **整段跳过**，判据③④ 不跑，G434 竟然 rc=0）。
+    for nm, val in (('DOC_ROUND_CN_RE', cn_re), ('DOC_ROUND_AR_RE', ar_re)):
+        if not (isinstance(val, str) and val.strip()):
+            bad.append(u'%s = %r 为空或非字符串 —— 判据③④ **静默跳过**，'
+                       u'**拒绝给结论**' % (nm, val))
 
     # ── 判据②：解析函数存在 ──
     fn = globals().get(parse_fn) if parse_fn else None
@@ -5121,6 +5151,205 @@ def cmd_assert_doc_round_notation():
     print('=' * 70)
     return 0
 
+
+def _cn_re_literal_sites(pat):
+    """🔑 全 scripts/*.py 中，值 **等于** 该正则的字符串常量出现位置。
+
+    🔑 返回 [(文件名, 行号), ...]。
+    🔑 只按**值**比对：标题行正则（`^#{1,4}\s*第([0-9]+|[...]+)轮`）是**另一个串**，
+       不会误伤（144 轮实测：全仓 5 处含中文数字，其中 3 处是标题锚点）。
+    """
+    out = []
+    if not pat:
+        return out
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            with io.open(f, encoding='utf-8') as fh:
+                tree = _ast.parse(fh.read())
+        except Exception:
+            continue
+        for n in _ast.walk(tree):
+            if (isinstance(n, _ast.Constant) and isinstance(n.value, str)
+                    and n.value == pat):
+                out.append((os.path.basename(f), n.lineno))
+    return out
+
+
+def _cn_re_assign_sites(re_name, pat):
+    """🔑 赋给 `re_name` 的那个字面量在哪里。返回 [(文件名, 行号), ...]。"""
+    out = []
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            with io.open(f, encoding='utf-8') as fh:
+                tree = _ast.parse(fh.read())
+        except Exception:
+            continue
+        for n in _ast.walk(tree):
+            if not isinstance(n, _ast.Assign) or len(n.targets) != 1:
+                continue
+            t = n.targets[0]
+            if not isinstance(t, _ast.Name) or t.id != re_name:
+                continue
+            v = n.value
+            if isinstance(v, _ast.Constant) and isinstance(v.value, str):
+                if v.value == pat:
+                    out.append((os.path.basename(f), n.lineno))
+    return out
+
+
+def _name_load_count(name):
+    """🔑 该名字在 scripts/*.py 中作为 **Load** 出现的次数。
+
+    🔑 排除赋值目标（110 轮：定义处自己算一次 → 检查退化为恒真）；
+    🔑 也排除 `ROUND_CN_SHARED_FN = '_cn_round'` 这类**字符串**（那是 Constant
+       不是 Name —— 114 轮"按名字访问 vs 按字符串访问"是两种引用形态）。
+    """
+    n_ = 0
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            with io.open(f, encoding='utf-8') as fh:
+                tree = _ast.parse(fh.read())
+        except Exception:
+            continue
+        for node in _ast.walk(tree):
+            if (isinstance(node, _ast.Name) and node.id == name
+                    and isinstance(node.ctx, _ast.Load)):
+                n_ += 1
+    return n_
+
+
+def cmd_assert_round_regex_single():
+    """🔑 G435：轮次正则**单一实现**（不许有第二份字面量）。
+
+    🔴 144 轮诚实结论③（本轮指引）：`_cn_round` 里有一份与 `DOC_ROUND_CN_RE`
+       **同值**的字面量。🔑 危害不是"代码重复"，而是：
+         - 只改其中一处 → 另一处照旧工作 → "解析改了"这件事**没有任何证据**
+           （G434 判据③ 反证的是 `_round_hits`，而它调 `_cn_round` → 仍绿）；
+         - 想让中文解析失效、或失效后仍能用，只需动一个地方。
+
+    🔑 四条判据（**两条腿**：静态数数 + 行为反证）：
+       ① 静态：值等于该正则的字符串常量**恰好 1 处**，且正是赋给
+          `DOC_ROUND_CN_RE` 的那一处（多一处 → 第二字面量）
+       ② 🔑 行为反证：把常量**改坏**，`_cn_round` 必须**跟着坏**
+          —— 若它自己抄了一份，改坏常量它照样解析出 143 → 抓到
+       ③ `ROUND_CN_SHARED_FN` 登记项闭合（已定义 + 真被引用），
+          防 111 轮"一致改名 → 判据静默失效"
+       ④ 常量缺失时 `_cn_round` 必须返回 None（**拒绝给结论**）而非抛异常
+          —— 104 轮：崩溃与拒绝在 rc 上无法区分
+    """
+    print('=' * 70)
+    print(u'🔑 G435 轮次正则单一实现（不许有第二份字面量）')
+    print('=' * 70)
+    bad = []
+
+    re_name = globals().get('ROUND_CN_SHARED_RE')
+    fn_name = globals().get('ROUND_CN_SHARED_FN')
+
+    # ── 判据③：登记项自身闭合 ──
+    if not re_name:
+        bad.append(u'ROUND_CN_SHARED_RE 为空 —— 判据①②④ 静默失效')
+    if not fn_name:
+        bad.append(u'ROUND_CN_SHARED_FN 为空 —— 判据②④ 静默失效')
+    if not re_name or re_name not in globals():
+        bad.append(u'%r 未定义 —— **拒绝给结论**' % (re_name,))
+        re_name = None
+    fn = globals().get(fn_name) if fn_name else None
+    if fn is None or not callable(fn):
+        bad.append(u'%r 未定义或不可调用 —— **拒绝给结论**' % (fn_name,))
+        fn = None
+    if fn is not None and _name_load_count(fn_name) <= 0:
+        bad.append(u'%r 无任何引用 —— 共用实现被绕过' % fn_name)
+
+    pat = globals().get(re_name) if re_name else None
+
+    # 🔑 判据①′：**为空即拒绝给结论**。
+    #    🔴 本轮破坏④ 实测：把 DOC_ROUND_CN_RE 置成 '' 时，
+    #       `if pat and ...` 让判据①②④ **整段跳过** → G435 竟然 rc=0。
+    #    🔑 106 轮同一条规律**第六次**生效：字段缺失/为空 ≠ 没有违规。
+    if re_name and not (isinstance(pat, str) and pat.strip()):
+        bad.append(u'%s = %r 为空或非字符串 —— 判据①②④ **静默跳过**，'
+                   u'**拒绝给结论**' % (re_name, pat))
+        pat = None
+
+    if pat and re_name:
+        # ── 判据①：静态 —— 值等于正则的字面量必须恰好 1 处 ──
+        sites = _cn_re_literal_sites(pat)
+        assign = _cn_re_assign_sites(re_name, pat)
+        if len(sites) != 1:
+            bad.append(u'正则字面量出现 %d 处（应恰好 1）：%s'
+                       u' —— 存在**第二份字面量**'
+                       % (len(sites), sites))
+        elif not assign:
+            bad.append(u'该字面量不是赋给 %s 的（%s）' % (re_name, sites))
+        print(u'🔑 字面量出现 %d 处 · 赋值处 %s' % (len(sites), assign))
+
+    if fn is not None and re_name and pat:
+        probe = u'第一百四十三轮'
+        want = 143
+
+        # ── 正控：先把"它本来能解析"证明出来（否则后面全是假信号）──
+        try:
+            base = fn(probe)
+        except Exception as e:
+            base = None
+            bad.append(u'正控抛异常：%r —— **拒绝给结论**' % (e,))
+        if base != want:
+            bad.append(u'正控失败：%s(%r) = %r，期望 %d —— **拒绝给结论**'
+                       % (fn_name, probe, base, want))
+
+        # ── 判据②：行为反证 —— 改坏常量，_cn_round 必须跟着坏 ──
+        saved = globals().get(re_name)
+        globals()[re_name] = u'ZZZ_NOT_A_ROUND_ZZZ'
+        try:
+            got_bad = fn(probe)
+            err_bad = None
+        except Exception as e:
+            got_bad, err_bad = None, e
+        globals()[re_name] = saved
+        if err_bad is not None:
+            bad.append(u'改坏常量后 %s 抛异常：%r' % (fn_name, err_bad))
+        elif got_bad == want:
+            bad.append(u'把 %s 改坏后 %s(%r) 仍 = %r'
+                       u' —— 它自己抄了一份正则（第二字面量）'
+                       % (re_name, fn_name, probe, got_bad))
+        print(u'🔑 行为反证：改坏 %s → %s = %r（不得仍为 %d）'
+              % (re_name, fn_name, got_bad, want))
+
+        # ── 判据④：常量缺失 → 返回 None（拒绝给结论），不得抛异常 ──
+        globals().pop(re_name, None)
+        try:
+            got_miss = fn(probe)
+            err_miss = None
+        except Exception as e:
+            got_miss, err_miss = None, e
+        globals()[re_name] = saved
+        if err_miss is not None:
+            bad.append(u'%s 缺失时 %s 抛异常 %r'
+                       u' —— 崩溃与拒绝在 rc 上无法区分（104 轮）'
+                       % (re_name, fn_name, err_miss))
+        elif got_miss is not None:
+            bad.append(u'%s 缺失时 %s 返回 %r 而非 None —— 未拒绝给结论'
+                       % (re_name, fn_name, got_miss))
+        print(u'🔑 缺失反证：删掉 %s → %s = %r（应为 None）'
+              % (re_name, fn_name, got_miss))
+
+        # ── 收尾 sanity：恢复后必须又能解析（防上面的改写没恢复）──
+        if fn(probe) != want:
+            bad.append(u'恢复后 %s(%r) = %r —— 状态未复原，**拒绝给结论**'
+                       % (fn_name, probe, fn(probe)))
+
+    print()
+    if bad:
+        for b in bad:
+            print(u'🔴 %s' % b)
+        print('=' * 70)
+        print(u'🔴 守卫失效（G435）')
+        print('=' * 70)
+        return 1
+    print(u'✅ 轮次正则仅 1 份字面量，且 %s 真共用它（改坏即坏 · 缺失即拒绝）'
+          % fn_name)
+    print('=' * 70)
+    return 0
 
 def cmd_assert_push_exclusive_alive():
     """🔑 G430：推送互斥守卫**名字锚点 + 行为反证**。
@@ -5594,6 +5823,9 @@ def main():
     ap.add_argument('--assert-doc-round-notation', action='store_true',
                     help='G434：文档轮次识别不认写法'
                          '（中文数字 ↔ 阿拉伯数字）')
+    ap.add_argument('--assert-round-regex-single', action='store_true',
+                    help='G435：轮次正则单一实现'
+                         '（不许有第二份字面量 · 改坏常量解析必须跟着坏）')
     ap.add_argument('--assert-push-exclusive-alive', action='store_true',
                     help='G430：推送互斥守卫的**名字锚点 + 行为反证**'
                          '（139 轮：一致改名 / 实现换成 return [] 都照绿）')
@@ -5748,6 +5980,9 @@ def main():
     if a.assert_doc_round_notation:
         print()
         return cmd_assert_doc_round_notation()
+    if a.assert_round_regex_single:
+        print()
+        return cmd_assert_round_regex_single()
     if a.assert_remote_rounds:
         os.chdir(ROOT)
         return cmd_assert_remote_rounds()
