@@ -1,0 +1,28 @@
+# 第一百五十轮完成声明（G381/G382/G383 校验）
+# 🔑 本轮把 G438 由"**抽样**复核"改为"**全量**复核"
+#    🔴 149 轮诚实结论①：N=3 时 known_legacy 第 4、5 条被篡改**发现不了**
+#    🔑 抽样 = 部分覆盖 = "未抽到的条目被篡改"无人发现
+#       （106 轮"缺失 ≠ 没有违规"在**覆盖范围**上的又一次应用）
+# 🔑 新增判据⑥：**全量覆盖** —— 条目数 > CACHE_RECHECK_N → **拒绝给结论**（绝不静默少查）
+# 🔑 新增判据⑦：**行为反证**从"只验首条"扩为"首/中/尾三条各造一次篡改"
+#    🔑 判据不认写法，只认"改了会不会响"（133 轮）；
+#       D7（判据⑦退化为只验首条 + 实现只查前 2 条）实测**漏** → 证明中/尾那层是起作用的。
+# 🔑 G437 判据⑤ 声称更正：台账**只落盘 dist**；tree_sha 由 commit sha **内容寻址唯一决定**
+#    🔴 选"改注释"而非"补落盘 tree_sha"：再存一份 = 同一事实两个真相（124 轮 G416 同病）。
+# 🔴 本轮**真实事故**：破坏脚本被并发启动 3 次（工具读取超时但进程真起来了），
+#    多实例并发改同一个 push_api.py → 一个实例的破坏态被另一个当成"干净基准"备份
+#    → D3 needle MISS、文件最终停在破坏态 sample = kl[:2]。
+#    ✅ 已加**单实例锁**（O_EXCL）+ 基准断言（不得含 kl[:2]/kl[:_n]）。
+# 🔑 对照实验（同一状态：篡改第 5/5 条 dist）：旧实现(抽样3) rc=0 放行 · 新实现(全量) rc=1 抓到
+grep:scripts/push_api.py::CACHE_RECHECK_N = 64
+grep:scripts/push_api.py::    sample = kl
+grep:scripts/push_api.py::u'known_legacy %d 条 > 上限 %d —— %d 条**未被复核**，'
+grep:scripts/push_api.py::_idxs = sorted(set([0, len(kl) // 2, len(kl) - 1]))
+grep:scripts/push_api.py::u'判据⑦ 行为反证失败：篡改第 %d 条（共 %d 条）'
+grep:scripts/push_api.py::def cmd_assert_cache_recheck():
+grep:scripts/push_api.py::u'known_legacy %d 条 > CACHE_RECHECK_N=%d —— %d 条未被复核'
+grep:scripts/run_all_gates.py::("G438", "**内容寻址缓存全量复核**（缓存被篡改后不得仍被信任）",
+grep:README.md::第一百五十轮
+grep:references/游戏引擎复刻.md::第一百五十轮
+cmd:push_api.py --assert-cache-recheck
+gate:G438

@@ -1,8 +1,11 @@
 # 第一百四十九轮完成声明（G381/G382/G383 校验）
 # 🔑 本轮新增门禁编号 G438：内容寻址缓存抽样复核（148 轮"信任缓存"削弱的补偿）
 # 🔴 148 轮诚实结论：内容寻址让 G396 信任台账缓存、不再逐个重测 —— 缓存被手工篡改后无人发现
+# 🔴 第一百五十轮同步更新：CACHE_RECHECK_N 由 3 改为 64（语义：抽样条数 → 全量覆盖上限），
+#    G438 文案由"抽样复核"统一为"全量复核" —— 原 needle 已失效，故按**当前真实值/文案**更正，
+#    🔑 不掩盖"149 轮当时写的是 3"这一事实：更正记录写在此处，可审计。
 # 🔑 本轮先完成 148 轮遗留的回读排查：G432 报 [147] 未独立抵达（147 随 148 同一 commit 抵达）
-grep:scripts/push_api.py::CACHE_RECHECK_N = 3
+grep:scripts/push_api.py::CACHE_RECHECK_N = 64
 grep:scripts/push_api.py::CACHE_RECHECK_FN = '_cache_recheck_bad'
 grep:scripts/push_api.py::def _cache_recheck_bad(d, _budget=None):
 grep:scripts/push_api.py::def cmd_assert_cache_recheck():
@@ -11,7 +14,7 @@ grep:scripts/push_api.py::if a.assert_cache_recheck:
 grep:scripts/push_api.py::'CACHE_RECHECK_N': ('const'
 grep:scripts/push_api.py::'CACHE_RECHECK_FN': ('const'
 grep:scripts/push_api.py::'_cache_recheck_bad': ('fn'
-grep:scripts/run_all_gates.py::("G438", "**内容寻址缓存抽样复核**（缓存被篡改后不得仍被信任）",
+grep:scripts/run_all_gates.py::("G438", "**内容寻址缓存全量复核**（缓存被篡改后不得仍被信任）",
 grep:scripts/run_all_gates.py::('G438', 'G437',
 grep:ledger/remote_round_gap_allowlist.txt::147: 147 轮内容随 148 轮同一 commit（2c30d1b）抵达
 grep:README.md::第一百四十九轮

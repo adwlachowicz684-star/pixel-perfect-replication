@@ -174,12 +174,12 @@ DEPENDENT_NAMES = {
     # 🔴 判据⑥：G437 判据③ 用 NET_GUARD_FN 定位守卫，故它自己也要被登记
     'NET_GUARD_FN_DEFAULT': ('const', '预算守卫默认名（防登记项被清空后静默）'),
     '_net_guard': ('fn', 'G437 时间预算守卫的唯一实现（G394/G396 共用）'),
-    # 🔑 第一百四十九轮：G438（内容寻址缓存抽样复核）依赖的常量/函数。
+    # 🔑 第一百四十九轮：G438（内容寻址缓存**全量**复核）依赖的常量/函数。
     #    🔴 按 115/120/127/139/142/143/144/145/146/147/148 轮同一条规程：
     #       新增**必须同步登记**，否则 G406 会报"未登记"（已生效三次）。
-    'CACHE_RECHECK_N': ('const', '缓存抽样复核条数上限（G438 依赖）'),
+    'CACHE_RECHECK_N': ('const', '缓存复核全量覆盖的条目上限（G438 依赖）'),
     'CACHE_RECHECK_FN': ('const', '复核判据函数名登记项（G438 依赖）'),
-    '_cache_recheck_bad': ('fn', 'G438 缓存抽样复核的唯一实现'),
+    '_cache_recheck_bad': ('fn', 'G438 缓存**全量**复核的唯一实现'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -309,11 +309,17 @@ NET_GUARD_FN_DEFAULT = '_net_guard'  # 判据⑥：登记项被清空时的兜�
 # 🔴 第一百四十八轮诚实结论（本轮指引）：内容寻址让 G396 **信任台账缓存**、
 #    不再逐个重测（67 棵树 → 只拉新增） —— 代价是
 #    🔴 **台账缓存被手工篡改后无人发现**（旧做法每次重测，改了必被发现）。
-# 🔑 补偿：**抽样复核** —— 真去远端重测台账里已缓存的条目，比对 dist / tree_sha。
+# 🔑 补偿：**全量复核** —— 真去远端重测台账里已缓存的条目，比对 dist。
 #    🔑 与 109 轮"镜像放指纹"同源：**捷径（缓存）必须配一条独立的复核路径**。
 #    🔴 第一百四十九轮实测更正：台账条目**只落盘了 dist**（+ checked_shas），
-#       148 轮注释/判据⑤ 声称的 tree_sha **并未落盘** —— 本轮按**实测**只比对 dist。
-CACHE_RECHECK_N = 3        # 抽样复核条数上限（联网，受 NET_BUDGET_S 预算约束）
+#       148 轮注释/判据⑤ 声称的 tree_sha **并未落盘** —— 按**实测**只比对 dist。
+#    🔴 第一百五十轮：抽样 → **全量**（N=3 时第 4、5 条被篡改发现不了）。
+# 🔑 第一百五十轮：语义从"抽样条数"改为"**全量覆盖的上限**"。
+#    🔴 149 轮诚实结论①：N=3 时第 4、5 条被篡改**发现不了**。
+#    🔑 抽样 = 部分覆盖 = "未抽到的条目被篡改"无人发现
+#       （106 轮"缺失 ≠ 没有"在**覆盖范围**上的又一次应用）。
+#    🔴 故改为**全量**；N 只作规模上限：超出即**拒绝给结论**，不静默少查。
+CACHE_RECHECK_N = 64       # 缓存复核**全量覆盖**的条目上限（超 → 拒绝给结论）
 CACHE_RECHECK_FN = '_cache_recheck_bad'  # 复核判据函数名登记项（防一致改名失效）
 
 
@@ -2136,8 +2142,10 @@ def cmd_audit_history():
                    'baseline_modes': dict(want),
                    # 🔑 第一百四十八轮：**内容寻址** —— commit 列表里已含 tree_sha。
                    #    🔑 同一 commit sha ⇒ 其 tree **必然不变**（git 内容寻址），
-                   #       故台账记下 tree_sha + dist 后，G396 只需 1 次请求
+                   #       故台账记下 **dist** 后，G396 只需 1 次请求
                    #       （拿 commit 列表）即可核对，无需再拉 67 个树。
+                   #    🔑 第一百五十轮更正：tree_sha **不落盘**（由 sha 唯一决定），
+                   #       落盘一份只会制造"两个真相"（124 轮 G416 同病）。
                    'dist': dict(dist)}
             bad.append((sha[:12], msg, odd, dist, ent))
             details[sha[:12]] = flat
@@ -2780,8 +2788,13 @@ def cmd_assert_net_budget():
           `_net_guard`（🔑 按 Name 计数，**不认写法** —— 133 轮教训）
        ④ **行为反证**（真调用唯一实现，不抄一份）：t0=now → False；
           t0 早于预算 → True 且**立即返回**；预算为 0/缺失 → True
-       ⑤ **内容寻址判据**：台账每条必须含 `tree_sha` + `dist`
-          （缺 → 快路径失效，退回 67 次请求 —— 106 轮：缺失 ≠ 没有）
+       ⑤ **内容寻址判据**：台账每条必须含 `dist`
+          🔑 第一百五十轮**更正**：148 轮注释声称"必须含 tree_sha + dist"，
+             **实测台账只落盘 dist** → 声称与实现不符（121 轮同病：
+             带细节的声称比含糊的怀疑更难被自己质疑）。
+          🔴 选"改注释"而非"补落盘 tree_sha"：同一 commit sha ⇒ tree
+             **内容寻址唯一决定**，再存一份等于**同一事实两个真相**
+             （124 轮 G416：基线顶层 90 与 results 101 并存的同一病）。
        ⑥ 判据②的常量名来自 `NET_TIMEOUT_S` 登记项，防一致改名静默失效
     """
     print('=' * 70)
@@ -2881,7 +2894,7 @@ def cmd_assert_net_budget():
     print(f'④ 行为反证 未耗尽={r_now} · 已耗尽={r_old}({_el:.3f}s) · '
           f'0={r_zero} · None={r_none}')
 
-    # ⑤ 内容寻址：台账每条含 tree_sha + dist
+    # ⑤ 内容寻址：台账每条含 dist（tree_sha 由 commit sha 决定，**不落盘**）
     try:
         with io.open(HISTORY_KNOWN, encoding='utf-8') as f:
             _rec = json.load(f)
@@ -2916,7 +2929,10 @@ def cmd_assert_net_budget():
 
 
 def _cache_recheck_bad(d, _budget=None):
-    """🔑 G438 **唯一实现**：真去重测台账里已缓存的条目，比对 dist / tree_sha。
+    """🔑 G438 **唯一实现**：真去重测台账里已缓存的条目，比对 dist。
+
+    🔑 第一百五十轮：**全量**（不抽样）—— 149 轮 N=3 时第 4、5 条被篡改发现不了。
+    🔑 tree_sha 由 commit sha **内容寻址唯一决定**，不落盘（见 G437 判据⑤ 更正）。
 
     🔑 返回 bad 列表（空 = 缓存与实测一致）。
     🔴 读不到远端 → **拒绝给结论**（断网 ≠ 没被篡改），绝不能返回空。
@@ -2927,8 +2943,14 @@ def _cache_recheck_bad(d, _budget=None):
         return [u'台账缺 known_legacy 列表 —— **拒绝给结论**']
     _n = CACHE_RECHECK_N
     if not isinstance(_n, int) or _n <= 0:
-        return [u'CACHE_RECHECK_N 非正整数 —— 抽样复核失效（拒绝给结论）']
-    sample = kl[:_n]
+        return [u'CACHE_RECHECK_N 非正整数 —— 全量复核失效（拒绝给结论）']
+    # 🔑 第一百五十轮：**全量**复核 —— 抽样会让"未抽到的条目"无人为其背书。
+    #    🔴 N 只作规模上限：超出即拒绝给结论（绝不静默少查）。
+    if len(kl) > _n:
+        return [u'known_legacy %d 条 > 上限 %d —— %d 条**未被复核**，'
+                u'全量复核失效（拒绝给结论：请提高上限或分批）'
+                % (len(kl), _n, len(kl) - _n)]
+    sample = kl
     if not sample:
         return [u'known_legacy 为空 —— 无可复核条目，**拒绝给结论**']
     _t0 = time.time()
@@ -2936,7 +2958,7 @@ def _cache_recheck_bad(d, _budget=None):
     for i, e in enumerate(sample, 1):
         if _g is not None and _g(_t0, i, len(sample),
                                  _budget or NET_BUDGET_S):
-            bad.append(u'抽样复核超出时间预算 —— **拒绝给结论**（分批跑）')
+            bad.append(u'全量复核超出时间预算 —— **拒绝给结论**（分批跑）')
             break
         sha = e.get('sha')
         if not sha:
@@ -2961,7 +2983,7 @@ def _cache_recheck_bad(d, _budget=None):
 
 
 def cmd_assert_cache_recheck():
-    """🔑 G438：**内容寻址缓存抽样复核**（148 轮"信任缓存"削弱的补偿）。
+    """🔑 G438：**内容寻址缓存全量复核**（148 轮"信任缓存"削弱的补偿）。
 
     判据：
       ① CACHE_RECHECK_N 为正整数
@@ -2969,13 +2991,17 @@ def cmd_assert_cache_recheck():
       ③ **行为反证**：篡改后的台账**必须**被发现；真实台账**必须**无异常
       ④ 台账读不到 / 无可复核条目 → **拒绝给结论**
       ⑤ 时间预算守卫真在循环里（防回归被杀重演）
+      ⑥ **全量覆盖**：条目数 > CACHE_RECHECK_N → 拒绝给结论（不静默少查）
+      ⑦ **行为反证**（首/中/尾三条各造一次篡改）：每一条都必须被发现
+         🔑 不查"代码里写了全量"这种写法，只认"改了会不会响"
+         （133 轮：判据不能认写法；134 轮：反证必须真跑）
     """
     print('=' * 70)
-    print(u'\U0001f511 **内容寻址缓存抽样复核**（G438 · 148 轮削弱的补偿）')
+    print(u'\U0001f511 **内容寻址缓存全量复核**（G438 · 148 轮削弱的补偿）')
     print('=' * 70)
     bad = []
     if not isinstance(CACHE_RECHECK_N, int) or CACHE_RECHECK_N <= 0:
-        bad.append(u'CACHE_RECHECK_N 非正整数 —— 抽样复核失效')
+        bad.append(u'CACHE_RECHECK_N 非正整数 —— 全量复核失效')
     _fn = globals().get(CACHE_RECHECK_FN)
     if _fn is None or not callable(_fn):
         bad.append(u'%s 不存在或不可调用 —— 复核**静默失效**'
@@ -2992,23 +3018,43 @@ def cmd_assert_cache_recheck():
     except Exception as ex:
         print(u'\U0001f534 台账读不到（%s）—— **拒绝给结论**（读不到 ≠ 没被篡改）' % ex)
         return 1
+    # ── 判据⑥：全量覆盖 —— 条目数不得超出上限（超出 = 有条目未被复核）──
+    _kl = d.get('known_legacy')
+    _kl_len = len(_kl) if isinstance(_kl, list) else 0
+    if _kl_len > CACHE_RECHECK_N:
+        bad.append(u'known_legacy %d 条 > CACHE_RECHECK_N=%d —— %d 条未被复核'
+                   u'（全量覆盖失效，拒绝给结论）'
+                   % (_kl_len, CACHE_RECHECK_N, _kl_len - CACHE_RECHECK_N))
+    print(u'\U0001f511 判据⑥ 全量覆盖：条目 %d · 上限 %d · %s'
+          % (_kl_len, CACHE_RECHECK_N,
+             u'全覆盖' if _kl_len <= CACHE_RECHECK_N else u'**未覆盖**'))
     # ── 判据③ 行为反证：篡改样本必须被发现 ──
     import copy as _copy
     tam = _copy.deepcopy(d)
     kl = tam.get('known_legacy')
     if isinstance(kl, list) and kl:
-        kl[0]['dist'] = dict(kl[0].get('dist') or {})
-        kl[0]['dist']['999999'] = 1   # 🔑 塞一个索引里没有的 mode
-        got = _fn(tam, NET_BUDGET_S)
-        if not got:
-            bad.append(u'行为反证失败：篡改后的台账**未被发现** —— 复核实现是桩')
-        print(u'\U0001f511 行为反证：篡改样本 → 复核报 %d 条' % len(got))
+        # 🔑 第一百五十轮判据⑦：**首 / 中 / 尾** 三条各造一次篡改。
+        #    🔴 只验首条时，"实现悄悄改回 kl[:N]（只查前几条）"**发现不了**。
+        _idxs = sorted(set([0, len(kl) // 2, len(kl) - 1]))
+        for _i in _idxs:
+            t2 = _copy.deepcopy(d)
+            t2['known_legacy'][_i]['dist'] = dict(
+                t2['known_legacy'][_i].get('dist') or {})
+            t2['known_legacy'][_i]['dist']['999999'] = 1
+            got = _fn(t2, NET_BUDGET_S)
+            if not got:
+                bad.append(u'判据⑦ 行为反证失败：篡改第 %d 条（共 %d 条）'
+                           u'**未被发现** —— 复核未覆盖该条（实现是桩或退回抽样）'
+                           % (_i + 1, len(kl)))
+            print(u'\U0001f511 判据⑦ 反证 第 %d/%d 条 → 复核报 %d 条 %s'
+                  % (_i + 1, len(kl), len(got),
+                     u'✅' if got else u'\U0001f534'))
     else:
         bad.append(u'台账 known_legacy 为空 —— 无法做行为反证，**拒绝给结论**')
     # ── 真实台账 ──
     real = _fn(d, NET_BUDGET_S)
-    print(u'\U0001f511 真实台账抽样复核 %d 条 → %s'
-          % (min(CACHE_RECHECK_N, len(d.get('known_legacy') or [])),
+    print(u'\U0001f511 真实台账**全量**复核 %d 条 → %s'
+          % (len(d.get('known_legacy') or []),
              u'一致' if not real else u'发现 %d 条' % len(real)))
     bad.extend(real)
     # ── 判据⑤：时间预算守卫被引用 ──
@@ -3021,8 +3067,8 @@ def cmd_assert_cache_recheck():
             print(u'\U0001f534 ' + b)
         print(u'\n\U0001f534 守卫失效（G438）')
         return 1
-    print(u'\u2705 内容寻址缓存抽样复核通过：台账缓存与远端实测一致'
-          u'（缓存被篡改会被本门禁发现）')
+    print(u'\u2705 内容寻址缓存**全量**复核通过'
+          u'（首/中/尾三条反证均已覆盖；任一条被篡改都会被发现）')
     return 0
 
 
@@ -3073,7 +3119,7 @@ def cmd_assert_history_known():
     # 🔑 第一百四十八轮：**内容寻址** —— commit 列表里已含 tree_sha。
     #    🔴 旧实现逐个拉 {N} 个树 → 实测 0.53~7.87s/次，**无上界** → 回归被杀。
     #    🔑 同一 commit sha ⇒ 其 tree 必然不变（git 内容寻址）：
-    #       台账已核对过的 commit **无需再拉树**，比对 tree_sha 即可。
+    #       台账已核对过的 commit **无需再拉树**，比对 sha 全集即可。
     _t0 = time.time()
     rshas = {c['sha'][:12] for c in d}
     # 🔑 已核对过的 sha 全集（遗留 + 当次审计扫过的全部 commit）
@@ -6532,7 +6578,7 @@ def main():
                     help='G437：联网型入口**不得挂起**（超时常量 + 时间预算'
                          ' + 进度 + 内容寻址；128/146/147 轮回归被杀的真因）')
     ap.add_argument('--assert-cache-recheck', action='store_true',
-                    help='G438：内容寻址缓存**抽样复核**（缓存被篡改后'
+                    help='G438：内容寻址缓存**全量复核**（缓存被篡改后'
                          '不得仍被信任；148 轮"信任缓存"削弱的补偿）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
