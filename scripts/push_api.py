@@ -32,6 +32,7 @@ import ast
 #    🔑 判据：重复出现的同类错误，应改到"让它不可能发生"，而不是每次补一处。
 import ast as _ast
 import base64
+import collections
 import glob
 import hashlib
 import io
@@ -155,6 +156,24 @@ DEPENDENT_NAMES = {
     #       新增常量**必须同步登记**，否则 G406 会报"未登记"。
     'BOTH_LAYERS_MIN': ('const', '互补层去重后组数下限（G399 判据⑦ 依赖）'),
     'BOTH_LAYERS_WHY_MIN': ('const', '互补层理由长度下限（G399 判据⑧ 依赖）'),
+    # 🔑 第一百四十七轮：G436（登记表不得重复）依赖的常量。
+    #    🔴 按 115/120/127/139/142/143/144/145/146 轮同一条规程：
+    #       新增常量**必须同步登记**，否则 G406 会报"未登记"（已生效三次）。
+    'REGISTERED_TABLES': ('const', '人工维护登记表清单（G436 判据① 依赖）'),
+    'TABLE_KINDS': ('const', '登记表形态集合（G436 判据② 依赖）'),
+    'TABLE_CROSS_ALLOW': ('const', '跨表重名豁免（G436 判据⑦ 依赖）'),
+    'REGISTERED_TABLES_MIN': ('const', '登记表数量下限（防清空后恒通过）'),
+    # 🔑 第一百四十八轮：G437（联网型入口不得挂起）依赖的常量/函数。
+    #    🔴 按 115/120/127/139/142/143/144/145/146/147 轮同一条规程：
+    #       新增常量**必须同步登记**，否则 G406 会报"未登记"（已生效三次）。
+    'NET_TIMEOUT_S': ('const', '单次网络请求超时上限（G437 依赖）'),
+    'NET_BUDGET_S': ('const', '断言类联网入口时间预算（G437 依赖）'),
+    'NET_BUDGET_AUDIT_S': ('const', '建台账入口时间预算（G437 依赖）'),
+    'NET_PROGRESS_EVERY': ('const', '联网循环进度打印间隔（G437 依赖）'),
+    'NET_GUARD_FN': ('const', '预算守卫函数名登记项（G437 依赖，防一致改名失效）'),
+    # 🔴 判据⑥：G437 判据③ 用 NET_GUARD_FN 定位守卫，故它自己也要被登记
+    'NET_GUARD_FN_DEFAULT': ('const', '预算守卫默认名（防登记项被清空后静默）'),
+    '_net_guard': ('fn', 'G437 时间预算守卫的唯一实现（G394/G396 共用）'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -177,8 +196,8 @@ PATH_CONST_ALLOW = {
     # 🔑 117 轮：只**读**信任根作对照，不是产物路径 → 走 ALLOW 而非 DEPENDENT_NAMES
     '_scan_cross_ref_consts.py::TRUST_ROOT_FILE': '只读信任根作对照，不写产物；由 G406 抓到后登记',
     # registry.yaml 是工具注册表，不是产物路径；改它不会让门禁静默失效
-    'registry_normalize.py::REG': '工具注册表路径，非产物/台账路径',
-    'tool_run.py::REGISTRY': '工具注册表路径，非产物/台账路径',
+    'registry_normalize.py::REG': 'registry.yaml 归一化用的工具注册表路径，非产物/台账路径',
+    'tool_run.py::REGISTRY': 'tool_run 运行时工具注册表路径，非产物/台账路径',
 }
 # 🔑 豁免**必须非空** —— 空表 + 新常量 = 应报未登记，不得静默
 PATH_CONST_ALLOW_MIN_REASON = 6
@@ -267,11 +286,25 @@ def req_err_desc(d):
     return f"{d['__err']} {str(d.get('__body', ''))[:150]}"
 
 
+# ── 第一百四十八轮：G437（联网型入口**不得挂起**）──
+# 🔴 真因（本轮实测）：G396 逐个拉 67 个远端 commit 的树（`recursive=1`，341 条/次），
+#    单次 0.53s / 1.92s / 7.87s —— 相差 15 倍，**没有上界**。
+#    🔑 回归"卡住"的根因不是断网，是**没有时间预算**：
+#       无输出的等待与"还在跑"对调用方完全一样，只能杀掉 → 整轮结果丢失
+#       （128 / 146 / 147 轮各一次，本轮 G396 在 300s 内仍未跑完）。
+NET_TIMEOUT_S = 30        # 单次请求超时上限（🔴 原为硬编码字面量 120）
+NET_BUDGET_S = 300        # **断言类**联网入口的时间预算（秒）
+NET_BUDGET_AUDIT_S = 900  # **建台账**（--audit-history）的预算：人工入口，本来就慢
+NET_PROGRESS_EVERY = 10   # 每 N 个 commit 打印一次进度（无输出 = 看起来像挂了）
+NET_GUARD_FN = '_net_guard'        # 预算守卫函数名登记项（G437 判据③ 定位用）
+NET_GUARD_FN_DEFAULT = '_net_guard'  # 判据⑥：登记项被清空时的兜底名
+
+
 def req(method, url, data=None):
     body = json.dumps(data).encode() if data is not None else None
     r = urllib.request.Request(url, data=body, headers=HDR, method=method)
     try:
-        with urllib.request.urlopen(r, timeout=120) as f:
+        with urllib.request.urlopen(r, timeout=NET_TIMEOUT_S) as f:
             return json.loads(f.read().decode())
     except urllib.error.HTTPError as e:
         try:
@@ -287,6 +320,32 @@ def req(method, url, data=None):
         #       "远端不可达"与"代码有 bug"。
         return {'__err': f'NET:{type(e).__name__}:{e}'}
 
+
+
+def _net_guard(t0, done=0, total=0, budget=None):
+    """🔑 G437：**联网循环的时间预算守卫**（G394/G396 共用的唯一实现）。
+
+    返回 True = 预算耗尽 → 调用方必须**拒绝给结论**（return 1），
+    🔴 **绝不允许继续跑下去**。
+
+    🔑 为什么"预算缺失"也必须返回 True：
+       `NET_BUDGET_S` 被删/为 0 时若不拒绝，就退化成 116~147 轮的旧实现
+       —— 无限期等待，而"挂起"比"失败"更危险（106 轮：缺失 ≠ 没有违规）。
+    """
+    b = NET_BUDGET_S if budget is None else budget
+    if not isinstance(b, (int, float)) or b <= 0:
+        return True
+    el = time.time() - t0
+    pe = globals().get('NET_PROGRESS_EVERY')
+    if isinstance(pe, int) and pe > 0 and done and total and done % pe == 0:
+        print(f'   \u2026 进度 {done}/{total} · 已耗时 {el:.0f}s / 预算 {b:.0f}s')
+    if el > b:
+        print(f'\U0001f534 **时间预算耗尽**：已耗时 {el:.0f}s > 预算 {b:.0f}s'
+              f'（{done}/{total}）—— **拒绝给结论**')
+        print('   \U0001f511 挂起比失败更危险：无输出的等待无法与"还在跑"区分，'
+              '只能杀掉 → 整轮结果丢失（128/146/147 轮）')
+        return True
+    return False
 
 
 def check_untracked():
@@ -344,8 +403,10 @@ def list_files():
 #    `remove` 是极常见的方法名（`list.remove` / `set.remove`），只按方法名扫会
 #    **把业务调用误判成清理调用** —— 实测 param_extract.py 的 only_old.remove(ko)
 #    就被误报了两次。🔑 与 110 轮「grep 分不清写与只读」同源：**判据对象选错层级**。
-CLEANUP_CALLS = ('os.remove', 'os.unlink', 'shutil.rmtree',
-                 'os.rmdir', 'shutil.rmtree')
+# 🔑 第一百四十七轮：删掉 120 轮误插的**重复项** `'shutil.rmtree'`
+#    （G436 一上岗实测抓到：5 项里 2 项相同 → 只有 4 个不同的调用）
+#    🔴 危害同 146 轮 BOTH_LAYERS：`len()` 虚高，且"数个数"的下限可被充数蒙混
+CLEANUP_CALLS = ('os.remove', 'os.unlink', 'shutil.rmtree', 'os.rmdir')
 # 🔑 什么算"结果校验"：调用之后**查询了**被删路径的状态，或**显式处理了失败**。
 CLEANUP_VERIFY_FNS = ('exists', 'lexists', 'isdir', 'isfile', 'listdir',
                       'islink', 'access')
@@ -1155,6 +1216,36 @@ def cmd_assert_path_consts():
     print('=' * 70)
     return 0
 
+def _ref_counts(names):
+    """🔑 统计一组名字在 scripts/*.py 里的引用次数（**三种形态**全算）。
+
+    🔑 形态一 `Name`(Load)：直接写 `X`
+    🔑 形态二 `Attribute.attr`：`obj.X`
+    🔑 形态三 **字符串常量** `'X'`：`globals().get('X')` 这种访问
+       🔴 114 轮踩过：只统计 Name → 按字符串访问的引用**永远数不到**，
+          表现为"存在但无引用"的假警报。本函数是**唯一实现**（G407/G436 共用）。
+    """
+    watch = set(names)
+    refs = {}
+    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
+        try:
+            with io.open(f, encoding='utf-8') as fh:
+                tree = ast.parse(fh.read())
+        except Exception:
+            continue
+        for n in ast.walk(tree):
+            nm = None
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+                nm = n.id
+            elif isinstance(n, ast.Attribute):
+                nm = n.attr
+            elif isinstance(n, ast.Constant) and isinstance(n.value, str):
+                nm = n.value
+            if nm in watch:
+                refs[nm] = refs.get(nm, 0) + 1
+    return refs
+
+
 def _meta_names_bad(refs):
     """🔑 元登记项校验（被 G405 与 **G407** 共用，避免两处各写一份）。
 
@@ -1191,23 +1282,9 @@ def cmd_assert_meta_names():
     print('=' * 70)
     import ast
     meta = globals().get('SELF_REGISTERED_META') or ()
-    refs = {}
-    watch = set(meta)
-    for f in sorted(glob.glob(os.path.join(HERE, '*.py'))):
-        try:
-            tree = ast.parse(open(f, encoding='utf-8').read())
-        except (SyntaxError, ValueError):
-            continue
-        for n in ast.walk(tree):
-            nm = None
-            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
-                nm = n.id
-            elif isinstance(n, ast.Attribute):
-                nm = n.attr
-            elif isinstance(n, ast.Constant) and isinstance(n.value, str):
-                nm = n.value
-            if nm in watch:
-                refs[nm] = refs.get(nm, 0) + 1
+    # 🔑 第一百四十七轮：改用 **_ref_counts**（与 G436 共用唯一实现）
+    #    132 轮教训：同口径两处实现会让两条门禁给出矛盾结论而无人发现。
+    refs = _ref_counts(meta)
     bad = _meta_names_bad(refs)
     if bad:
         for b in bad:
@@ -1993,10 +2070,18 @@ def cmd_audit_history():
         return 1
     print(f'🔑 远端 commit {len(d)} 个\n')
 
+    # 🔑 第一百四十八轮：进度 + 时间预算（G437）
+    _t0 = time.time()
+    _n = 0
     bad = []
     details = {}          # 🔑 第一百零三轮：文件级明细（供 --show-legacy-files）
     for c in d:
         sha = c['sha']
+        _n += 1
+        # 🔑 G437 判据③：预算守卫（建台账用 AUDIT 预算 —— 人工入口，本来就慢）
+        if _net_guard(_t0, _n, len(d), NET_BUDGET_AUDIT_S):
+            print('   🔑 处置：分批跑，或先只核对最近的 commit')
+            return 1
         t = req('GET', f'{API}/git/trees/{sha}?recursive=1')
         if '__err' in t:
             print(f"⚠️ {sha[:12]} 树读取失败 HTTP {t['__err']} —— 跳过")
@@ -2031,7 +2116,12 @@ def cmd_audit_history():
                    #       检查**静默跳过**（rc=0）而破坏**没被拦住**。
                    #    🔑 这是"读不到 ≠ 没有"的镜像：
                    #       不仅要区分，还必须在缺失时**拒绝给结论**。
-                   'baseline_modes': dict(want)}
+                   'baseline_modes': dict(want),
+                   # 🔑 第一百四十八轮：**内容寻址** —— commit 列表里已含 tree_sha。
+                   #    🔑 同一 commit sha ⇒ 其 tree **必然不变**（git 内容寻址），
+                   #       故台账记下 tree_sha + dist 后，G396 只需 1 次请求
+                   #       （拿 commit 列表）即可核对，无需再拉 67 个树。
+                   'dist': dict(dist)}
             bad.append((sha[:12], msg, odd, dist, ent))
             details[sha[:12]] = flat
             print(f'🔴 {sha[:12]}  {msg}')
@@ -2072,6 +2162,11 @@ def cmd_audit_history():
         #       与"历史被修好导致遗留消失"**无法区分**。
         'baseline_fp': cur_fp,
         'checked_commits': len(d),
+        # 🔑 第一百四十八轮：**已核对的 commit sha 全集**。
+        #    🔴 台账只记 5 条遗留 → 其余 62 个 commit 每轮都被当成"新的"
+        #       → 快路径形同虚设（本轮实测：新拉树 62 个 · 耗时 142s）。
+        #    🔑 有了全集，"新 commit"才等于**真的没核对过**（通常 0~1 个）。
+        'checked_shas': sorted(c['sha'][:12] for c in d),
         # 🔑 第一百零三轮：每条含**文件级**信息：
         #    odd_count（异常文件总数）· odd_sample（排序后前 N 个路径）
         #    · odd_paths_sha（全部异常路径的指纹）
@@ -2651,6 +2746,158 @@ def cmd_check_gitlink():
 
 
 
+def cmd_assert_net_budget():
+    """🔑 G437：联网型入口**不得挂起**（第一百四十八轮）。
+
+    🔴 真实事故：128 / 146 / 147 轮的回归都"卡住"—— 看起来像网络断了，
+       实测根因是 G396 逐个拉 67 个远端树（0.53~7.87s/次），**没有上界**。
+       🔑 无输出的等待与"还在跑"对调用方完全一样，只能杀掉 → 整轮结果丢失。
+
+    🔑 六条判据：
+       ① `NET_TIMEOUT_S` / `NET_BUDGET_S` / `NET_BUDGET_AUDIT_S` /
+          `NET_PROGRESS_EVERY` 均存在且为正；且 `NET_TIMEOUT_S <= NET_BUDGET_S`
+          （🔴 反了则单次超时先到，预算形同虚设）
+       ② AST：`req()` 里 urlopen 的 `timeout=` **必须引用常量**
+          —— 🔴 硬编码字面量改不了也查不到（145 轮"第二份字面量"同款）
+       ③ AST：`cmd_audit_history` / `cmd_assert_history_known` 内引用
+          `_net_guard`（🔑 按 Name 计数，**不认写法** —— 133 轮教训）
+       ④ **行为反证**（真调用唯一实现，不抄一份）：t0=now → False；
+          t0 早于预算 → True 且**立即返回**；预算为 0/缺失 → True
+       ⑤ **内容寻址判据**：台账每条必须含 `tree_sha` + `dist`
+          （缺 → 快路径失效，退回 67 次请求 —— 106 轮：缺失 ≠ 没有）
+       ⑥ 判据②的常量名来自 `NET_TIMEOUT_S` 登记项，防一致改名静默失效
+    """
+    print('=' * 70)
+    print('\U0001f511 **联网型入口不得挂起**（G437 · 时间预算 + 内容寻址）')
+    print('=' * 70)
+    bad = []
+
+    ts = globals().get('NET_TIMEOUT_S')
+    bg = globals().get('NET_BUDGET_S')
+    ba = globals().get('NET_BUDGET_AUDIT_S')
+    pe = globals().get('NET_PROGRESS_EVERY')
+    for nm, v in (('NET_TIMEOUT_S', ts), ('NET_BUDGET_S', bg),
+                  ('NET_BUDGET_AUDIT_S', ba)):
+        if not isinstance(v, (int, float)) or v <= 0:
+            bad.append(f'{nm} 非正数（当前 {v!r}）—— 缺失即"永远挂起"'
+                       f'（106 轮：缺失 ≠ 没有违规）')
+    if not isinstance(pe, int) or pe <= 0:
+        bad.append(f'NET_PROGRESS_EVERY 非正整数（当前 {pe!r}）'
+                   f' —— 无输出的等待与"还在跑"无法区分')
+    if isinstance(ts, (int, float)) and isinstance(bg, (int, float)) and ts > bg:
+        bad.append(f'NET_TIMEOUT_S({ts}) > NET_BUDGET_S({bg})'
+                   f' —— 单次超时先到，预算形同虚设')
+    print(f'① 常量 超时={ts}s · 断言预算={bg}s · 建台账预算={ba}s'
+          f' · 进度间隔={pe}')
+
+    # ② AST：urlopen 的 timeout 必须引用常量
+    try:
+        tree = ast.parse(io.open(os.path.join(ROOT, 'scripts', 'push_api.py'),
+                                 encoding='utf-8').read())
+    except Exception as e:
+        bad.append(f'无法解析源码 —— 拒绝给结论: {e}')
+        tree = None
+    has_to = False
+    if tree is not None:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == 'req':
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Call) and isinstance(
+                            sub.func, ast.Attribute)                             and sub.func.attr == 'urlopen':
+                        for kw in sub.keywords:
+                            if kw.arg == 'timeout' and isinstance(
+                                    kw.value, ast.Name):
+                                has_to = True
+    if not has_to:
+        bad.append('req() 的 urlopen 未用**常量**作 timeout'
+                   ' —— 硬编码字面量改不了也查不到（145 轮同款）')
+    print(f'② AST urlopen timeout 引用常量: {has_to}')
+
+    # ③ AST：两个联网入口引用 _net_guard（按 Name，不认写法）
+    fn = globals().get('NET_GUARD_FN') or '_net_guard'
+    refs = {}
+    if tree is not None:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name in (
+                    'cmd_audit_history', 'cmd_assert_history_known'):
+                n = 0
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Name) and sub.id == fn:
+                        n += 1
+                refs[node.name] = n
+    for k in ('cmd_audit_history', 'cmd_assert_history_known'):
+        if not refs.get(k):
+            bad.append(f'{k} 内未引用 `{fn}` —— 该循环没有预算守卫')
+    print(f'③ AST 预算守卫引用: {refs}')
+
+    # ④ 行为反证（真调用唯一实现）
+    old_bg = globals().get('NET_BUDGET_S')
+    try:
+        globals()['NET_BUDGET_S'] = 60
+        _t_now = time.time()
+        r_now = _net_guard(_t_now)                      # 应 False
+        _t_old = _t_now - 120
+        _t1 = time.time()
+        r_old = _net_guard(_t_old)                      # 应 True
+        _el = time.time() - _t1
+        globals()['NET_BUDGET_S'] = 0
+        r_zero = _net_guard(_t_now)                     # 应 True
+        globals()['NET_BUDGET_S'] = None
+        r_none = _net_guard(_t_now)                     # 应 True
+    except Exception as e:
+        bad.append(f'预算守卫抛出异常 —— 拒绝给结论: '
+                   f'{type(e).__name__}: {e}')
+        r_now = r_old = r_zero = r_none = None
+        _el = 0
+    finally:
+        globals()['NET_BUDGET_S'] = old_bg
+    if r_now is not False:
+        bad.append(f'预算未耗尽时 `_net_guard` 应返回 False，实际 {r_now!r}')
+    if r_old is not True:
+        bad.append(f'预算耗尽时 `_net_guard` 应返回 True，实际 {r_old!r}'
+                   f' —— 守卫被换成"恒通过"')
+    if _el > 1.0:
+        bad.append(f'预算判定耗时 {_el:.1f}s —— 守卫本身在等待，等于没设预算')
+    if r_zero is not True or r_none is not True:
+        bad.append(f'预算为 0/缺失时必须返回 True（拒绝给结论），'
+                   f'实际 0→{r_zero!r} · None→{r_none!r}')
+    print(f'④ 行为反证 未耗尽={r_now} · 已耗尽={r_old}({_el:.3f}s) · '
+          f'0={r_zero} · None={r_none}')
+
+    # ⑤ 内容寻址：台账每条含 tree_sha + dist
+    try:
+        with io.open(HISTORY_KNOWN, encoding='utf-8') as f:
+            _rec = json.load(f)
+        _kl = _rec.get('known_legacy', []) or []
+        _no = [e.get('sha') for e in _kl
+               if not isinstance(e.get('dist'), dict) or not e['dist']]
+        if _no:
+            bad.append(f'台账 {len(_no)} 条缺 dist（如 {_no[:3]}）'
+                       f' —— 快路径失效，退回逐个拉树（本轮要修的病）')
+        _cs = _rec.get('checked_shas')
+        if not isinstance(_cs, list) or not _cs:
+            bad.append('台账缺 **checked_shas**（已核对 commit 全集）'
+                       ' —— 62 个"干净"commit 每轮都被当成新的（本轮实测）')
+        print(f'⑤ 台账 known_legacy {len(_kl)} 条 · 缺 dist {len(_no)} 条'
+              f' · checked_shas {len(_cs) if isinstance(_cs, list) else 0} 个')
+    except FileNotFoundError:
+        bad.append(f'台账不存在 —— 拒绝给结论: {HISTORY_KNOWN}')
+    except Exception as e:
+        bad.append(f'台账不可读 —— 拒绝给结论: {e}')
+
+    print()
+    print('=' * 70)
+    if bad:
+        for b in bad:
+            print(f'\U0001f534 {b}')
+        print('=' * 70)
+        return 1
+    print('✅ 联网型入口有超时常量 + 时间预算 + 进度输出 + 内容寻址快路径')
+    print('=' * 70)
+    return 0
+
+
+
 def cmd_assert_history_known():
     """🔑 G396：历史遗留台账必须与**实测**一致（双向断言）。
 
@@ -2695,11 +2942,51 @@ def cmd_assert_history_known():
               '（远端不可达 ≠ 没有遗留）')
         return 1
 
+    # 🔑 第一百四十八轮：**内容寻址** —— commit 列表里已含 tree_sha。
+    #    🔴 旧实现逐个拉 {N} 个树 → 实测 0.53~7.87s/次，**无上界** → 回归被杀。
+    #    🔑 同一 commit sha ⇒ 其 tree 必然不变（git 内容寻址）：
+    #       台账已核对过的 commit **无需再拉树**，比对 tree_sha 即可。
+    _t0 = time.time()
+    rshas = {c['sha'][:12] for c in d}
+    # 🔑 已核对过的 sha 全集（遗留 + 当次审计扫过的全部 commit）
+    _seen = set(known) | set(rec.get('checked_shas') or [])
+    print(f'\U0001f511 台账已核对 {len(_seen)} 个'
+          f'（遗留 {len(known)} + 已扫 {len(rec.get("checked_shas") or [])}）')
+    print(f'\U0001f511 远端 commit {len(d)} 个 · 台账 {len(known)} 条'
+          f' · 列表请求耗时 {time.time() - _t0:.1f}s')
+
+    # 🔑 判据⑥：台账每条必须含 dist（快路径的数据来源）
+    #    🔴 缺失时若静默跳过 → 快路径失效，退回 67 次请求（106 轮：缺失 ≠ 没有）
+    _miss = [h for h, r in known.items()
+             if not isinstance(r.get('dist'), dict) or not r['dist']]
+    if _miss:
+        print(f'\U0001f534 台账 {len(_miss)} 条缺 **dist** —— 拒绝给结论')
+        print('   \U0001f511 处置：跑 `--audit-history` 重建台账（148 轮前的台账无此字段）')
+        return 1
+
+    # 🔑 **内容寻址**：commit sha 仍在远端列表 ⇒ 其 tree **必然未变**
+    #    （git 内容寻址；force push 改写会产生**新 sha**，旧 sha 从列表消失
+    #      → 由下方 `gone` 分支报出）。故已在台账里的 commit **无需再拉树**。
     actual = {}
+    for h, r in known.items():
+        if h not in rshas:
+            continue          # 台账有·远端无 = 历史改写 → 由下方 gone 分支报出
+        odd = {m: n for m, n in r['dist'].items() if m not in want}
+        if odd:
+            actual[h] = odd
+
+    # 🔑 只有"新 commit"（台账没核对过的）才真拉树，且受时间预算约束
+    _fresh = 0
     for c in d:
+        h = c['sha'][:12]
+        if h in _seen:
+            continue
+        _fresh += 1
+        if _net_guard(_t0, _fresh, len(d)):
+            return 1
         t = req('GET', f'{API}/git/trees/{c["sha"]}?recursive=1')
         if '__err' in t:
-            print(f'⚠️ {c["sha"][:12]} 树读取失败 —— 跳过')
+            print(f'⚠️ {h} 树读取失败 —— 跳过')
             continue
         dist = {}
         for it in t.get('tree', []):
@@ -2707,8 +2994,9 @@ def cmd_assert_history_known():
                 dist[it['mode']] = dist.get(it['mode'], 0) + 1
         odd = {m: n for m, n in dist.items() if m not in want}
         if odd:
-            actual[c['sha'][:12]] = odd
-    print(f'🔑 实测遗留 {len(actual)} 条（远端 {len(d)} commit）')
+            actual[h] = odd
+    print(f'\U0001f511 实测遗留 {len(actual)} 条 · 新拉树 {_fresh} 个'
+          f' · 总耗时 {time.time() - _t0:.1f}s（旧实现：67 个树，无上界）')
 
     new_ = sorted(set(actual) - set(known))
     gone = sorted(set(known) - set(actual))
@@ -5223,6 +5511,266 @@ def _name_load_count(name):
     return n_
 
 
+# ══════════════════════════════════════════════════════════════════
+# 🔑 第一百四十七轮：G436 —— **所有**人工维护的登记表不得重复
+# ══════════════════════════════════════════════════════════════════
+# 🔴 146 轮只给 `BOTH_LAYERS` 一张表加了去重判据（G399 判据④）。
+#    本轮把它推广成"**一类**"：所有人工维护的登记表都不得重复。
+#
+#    形态：
+#      'seq' —— 元素是标量，**整体**不得重复（SELF_REGISTERED_META / CLEANUP_CALLS …）
+#      'key' —— 元素是元组，**首元素**（登记键）不得重复（GATES 的 gid …）
+#      'map' —— dict：字面量**键**不得重复（🔴 Python 静默覆盖，不报错）
+#                      且**值**不得重复（防把一组的理由整段复制到另一组）
+#
+# 🔑 **不认写法**（134 轮）：用 AST 找 Assign/AnnAssign，不假设是顶层 `NAME = (...)`。
+#
+# 🔑 本轮实测抓到的**两个真实缺陷**：
+#    ① `CLEANUP_CALLS` 里 'shutil.rmtree' 登记了**两次**（120 轮误插）
+#    ② `PATH_CONST_ALLOW` 两个键的理由**整段相同**（整段复制）
+#
+# 🔑 **BOTH_LAYERS 不纳入本表** —— 它由 G399 判据④⑤⑦ 专管（无序对去重）。
+#    132 轮教训：同口径**不许两处实现**；重复登记会让两条门禁给出矛盾结论而无人发现。
+TABLE_KINDS = ('seq', 'key', 'map')
+
+REGISTERED_TABLES = (
+    ('DEPENDENT_NAMES', 'push_api.py', 'map'),
+    ('PATH_CONST_ALLOW', 'push_api.py', 'map'),
+    ('SELF_REGISTERED_META', 'push_api.py', 'seq'),
+    ('CRITERIA_ROOTS_REQUIRED', 'push_api.py', 'seq'),
+    ('CLEANUP_CALLS', 'push_api.py', 'seq'),
+    ('CLEANUP_VERIFY_FNS', 'push_api.py', 'seq'),
+    ('ROUND_END_STEPS', 'push_api.py', 'seq'),
+    ('ROUND_END_REQUIRED_GIDS', 'push_api.py', 'seq'),
+    ('MUTATION_SELF_EXCLUDE', 'push_api.py', 'seq'),
+    ('PUSH_LOCK_ARGS', 'push_api.py', 'seq'),
+    ('PUSH_EXCLUSIVE_NAMES', 'push_api.py', 'seq'),
+    ('DOC_ROUND_SKIP_PARTS', 'push_api.py', 'seq'),
+    ('NOTATION_SAMPLES', 'push_api.py', 'key'),
+    ('GATES', 'run_all_gates.py', 'key'),
+    ('MANUAL_GATES', 'run_all_gates.py', 'seq'),
+)
+# 🔑 下限：低于此数说明"登记表清单被悄悄删项" → 判据③④⑤⑥ **覆盖面静默缩小**
+REGISTERED_TABLES_MIN = 10
+
+# 🔑 跨表重名豁免：同一个名字**合法地**同时出现在两个表时必须登记在册。
+#    🔴 135 轮真实事件：一个名字被同时登记进 DEPENDENT_NAMES 与
+#       SELF_REGISTERED_META，被 G408 判据③（元项不得退回登记项）当场拦下。
+TABLE_CROSS_ALLOW = (
+    # 🔑 判据⑦ 一上岗就报出 5 条跨表重名 —— **全部是合法的**：
+    #    两张表职责不同（"存在全集" vs "必跑子集" / "自动" vs "人工"），
+    #    重叠是设计如此。🔴 但**新增**一条重名就必须在这里写明理由，
+    #    否则 G436 会拦下（与 G406"该登记没登记的"同一套思路）。
+    ('PUSH_LOCK_FILE', '既是被依赖常量（DEPENDENT_NAMES），又是推送互斥守卫'
+     '要认的进程特征名（PUSH_EXCLUSIVE_NAMES）—— 前者管"改名静默失效"，'
+     '后者管"真起进程验真实实现"'),
+    ('G421', 'GATES 是门禁**存在**的全集；ROUND_END_REQUIRED_GIDS 是轮次末尾'
+     '**必跑**的子集 —— 子集关系是设计如此'),
+    ('G422', '同 G421：轮次末尾必跑项是 GATES 的子集'),
+    ('G391', 'G391 既是人工门禁（MANUAL_GATES）又是轮次末尾必跑项'
+     '（ROUND_END_REQUIRED_GIDS）—— 它是人工门禁但每轮必跑'),
+)
+
+
+def _table_items(text, name):
+    u"""🔑 AST 解析赋给 `name` 的字面量表（**不认写法**：Assign / AnnAssign 皆可）。
+
+    🔑 返回 `(shape, items, dup_keys)`：
+       - shape `'seq'` / `'map'`；解析不到返回 `(None, None, [])`
+       - `dup_keys`：**字面量里重复出现的键**（🔴 Python 静默覆盖，不报错）
+    🔑 解析失败**不抛**（110/133 轮：崩溃与拒绝在 rc 上无法区分）。
+    """
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return (None, None, [])
+    for n in ast.walk(tree):
+        tgt = None
+        v = None
+        if isinstance(n, ast.Assign) and len(n.targets) == 1 \
+                and isinstance(n.targets[0], ast.Name):
+            tgt = n.targets[0].id
+            v = n.value
+        elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
+            tgt = n.target.id
+            v = n.value
+        if tgt != name or v is None:
+            continue
+
+        def ev(x):
+            try:
+                return ast.literal_eval(x)
+            except Exception:
+                return ('<<non-const>>',)
+
+        if isinstance(v, (ast.Tuple, ast.List, ast.Set)):
+            return ('seq', [ev(e) for e in v.elts], [])
+        if isinstance(v, ast.Dict):
+            keys = [ev(k) for k in v.keys]
+            vals = [ev(x) for x in v.values]
+            dupk = [k for k, c in collections.Counter(
+                map(str, keys)).items() if c > 1]
+            return ('map', list(zip(keys, vals)), dupk)
+    return (None, None, [])
+
+
+def _table_dups(items, kind):
+    u"""🔑 按形态返回**重复项**列表（判据④⑤⑥ 的唯一实现）。"""
+    if not items:
+        return []
+    if kind == 'seq':
+        seen = collections.Counter(map(str, items))
+        return [x for x, c in seen.items() if c > 1]
+    if kind == 'key':
+        firsts = []
+        for it in items:
+            firsts.append(it[0] if isinstance(it, (tuple, list)) and it else it)
+        seen = collections.Counter(map(str, firsts))
+        return [x for x, c in seen.items() if c > 1]
+    if kind == 'map':
+        vals = []
+        for _k, v in items:
+            vals.append(v[1] if isinstance(v, (tuple, list)) and len(v) > 1 else v)
+        seen = collections.Counter(map(str, vals))
+        return [x for x, c in seen.items() if c > 1]
+    return []
+
+
+def _registered_tables_bad():
+    u"""🔑 G436 判据①~⑦ 的**唯一实现**（133 轮：不许两处各写一份）。"""
+    bad = []
+    tbl = globals().get('REGISTERED_TABLES')
+    kinds = globals().get('TABLE_KINDS')
+
+    # ── 判据①：登记表清单本身不得为空 ──
+    if not tbl:
+        return [u'REGISTERED_TABLES 缺失或为空 —— 判据③~⑦ **全部静默跳过**，'
+                u'**拒绝给结论**']
+    if not kinds:
+        bad.append(u'TABLE_KINDS 缺失或为空 —— 判据② 静默跳过，**拒绝给结论**')
+    mn = globals().get('REGISTERED_TABLES_MIN')
+    if not isinstance(mn, int) or mn <= 0:
+        bad.append(u'REGISTERED_TABLES_MIN 非正整数 —— 判据⑨ 静默跳过')
+        mn = 0
+    if len(tbl) < mn:
+        bad.append(u'登记表只有 %d 张 < 下限 %d —— 覆盖面被悄悄缩小'
+                   % (len(tbl), mn))
+
+    seen_keys = {}
+    for ent in tbl:
+        # ── 判据②：每项形如 (name, file, kind) ──
+        if not (isinstance(ent, (tuple, list)) and len(ent) == 3):
+            bad.append(u'登记表条目 %r 不是 (名字, 文件, 形态) 三元组' % (ent,))
+            continue
+        name, fname, kind = ent
+        if kind not in (kinds or ()):
+            bad.append(u'%s 的形态 %r 不在 TABLE_KINDS %r 内'
+                       % (name, kind, kinds))
+            continue
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)
+        if not os.path.exists(path):
+            bad.append(u'%s 所在文件 %s 不存在 —— **拒绝给结论**' % (name, fname))
+            continue
+        text = io.open(path, encoding='utf-8').read()
+        shape, items, dupk = _table_items(text, name)
+        # ── 判据③：表必须解析得到且非空 ──
+        if shape is None:
+            bad.append(u'%s 在 %s 里解析不到 —— **拒绝给结论**' % (name, fname))
+            continue
+        if not items:
+            bad.append(u'%s 为空 —— 判据④⑤⑥ **恒通过**，**拒绝给结论**' % name)
+            continue
+        # ── 判据⑥a：dict **字面量重复键**（Python 静默覆盖，不报错）──
+        if kind == 'map' and dupk:
+            bad.append(u'%s 字面量里有重复键 %s —— Python 会**静默覆盖**，'
+                       u'前一条登记被无声吞掉' % (name, dupk))
+        # ── 判据④⑤⑥：重复项 ──
+        d = _table_dups(items, kind)
+        if d:
+            bad.append(u'%s 有重复项（形态 %s）：%s'
+                       % (name, kind, [str(x)[:60] for x in d]))
+        # ── 判据⑦：跨表重名 ──
+        for k, _v in (items if kind == 'map' else
+                      [(x[0] if isinstance(x, (tuple, list)) and x else x, None)
+                       for x in items]):
+            seen_keys.setdefault(str(k), []).append(name)
+
+    allow = globals().get('TABLE_CROSS_ALLOW') or ()
+    allow_names = set()
+    for a in allow:
+        if isinstance(a, (tuple, list)) and a:
+            allow_names.add(str(a[0]))
+    for k, where in seen_keys.items():
+        if len(set(where)) > 1 and k not in allow_names:
+            bad.append(u'名字 %s 同时登记在 %s —— 跨表重名（须在 '
+                       u'TABLE_CROSS_ALLOW 里写明理由）' % (k, sorted(set(where))))
+    return bad
+
+
+def cmd_assert_registered_tables():
+    u"""🔑 G436：**所有**人工维护的登记表不得重复（146 轮判据④ 的推广）。
+
+    🔴 146 轮只给 `BOTH_LAYERS` 一张表加了去重（G399 判据④）。
+       本轮把它推广成一类 —— 其余表（共 15 张）此前**完全没有去重判据**：
+       🔑 组数/项数**虚高**，且"删一项真实需要的 + 复制一项已有的"总数不变 → 无人发现。
+
+    🔑 九条判据（两条腿：静态扫描 + 行为反证）：
+       ① REGISTERED_TABLES 非空（空 → 判据③~⑦ **全部静默跳过**）
+       ② 每项形如 (name, file, kind)，kind ∈ TABLE_KINDS
+       ③ 每张表**解析得到**且非空（缺失 → **拒绝给结论**）
+       ④ 'seq'：元素整体不得重复
+       ⑤ 'key'：元组**首元素**（登记键）不得重复 —— GATES 的 gid 属此
+       ⑥ 'map'：字面量**键**不得重复（🔴 Python 静默覆盖）
+                 + **值**不得重复（防整段复制理由）
+       ⑦ 跨表：同一名字不得同时进两张表（除非 TABLE_CROSS_ALLOW 写明理由）
+       ⑧ 🔑 **行为反证**：临时样本（含重复项）必须被 `_table_dups` 抓到
+          —— 防扫描器被改成恒返回 `[]`（106 轮：恒真的判据看起来在守）
+       ⑨ 元闭合：REGISTERED_TABLES 已登记 + 真被引用（防一致改名静默失效）
+    """
+    print('=' * 70)
+    print(u'🔑 G436 登记表不得重复（推广到所有人工维护的表）')
+    print('=' * 70)
+    bad = []
+
+    # ── 判据⑨：元闭合 ──
+    if 'REGISTERED_TABLES' not in DEPENDENT_NAMES:
+        bad.append(u'REGISTERED_TABLES **未登记**进 DEPENDENT_NAMES'
+                   u' —— 改名会让 G436 静默失效')
+    refs = _ref_counts(('REGISTERED_TABLES', '_table_dups'))
+    if refs.get('REGISTERED_TABLES', 0) <= 0:
+        bad.append(u'REGISTERED_TABLES 无任何引用 —— 登记表清单被绕过')
+    if refs.get('_table_dups', 0) <= 0:
+        bad.append(u'_table_dups 无任何引用 —— 唯一实现被绕过')
+
+    bad.extend(_registered_tables_bad())
+
+    # ── 判据⑧：行为反证（防 `_table_dups` 被改成恒返回 []）──
+    if not _table_dups([('G1', 'G2', 'same'), ('G1', 'G2', 'same')], 'seq'):
+        bad.append(u'行为反证失败：_table_dups(seq) 对**完全相同的元素**返回空'
+                   u' —— 判据④ 恒通过')
+    if not _table_dups([('G1', 'x'), ('G1', 'y')], 'key'):
+        bad.append(u'行为反证失败：_table_dups(key) 对重复首元素**返回空**'
+                   u' —— 判据⑤ 恒通过')
+    if not _table_dups([('a', ('c', 'same')), ('b', ('c', 'same'))], 'map'):
+        bad.append(u'行为反证失败：_table_dups(map) 对重复值**返回空**'
+                   u' —— 判据⑥ 恒通过')
+    # 🔑 反向：不该报的时候不许报（否则"永远报错"也会被当成"在检查"）
+    if _table_dups([('G1', 'G2', 'a'), ('G2', 'G3', 'b')], 'seq'):
+        bad.append(u'反向反证失败：_table_dups 对**无重复**样本也报了重复'
+                   u' —— 判据退化为恒失败')
+
+    tbl = globals().get('REGISTERED_TABLES') or ()
+    print(u'🔑 受管登记表 %d 张 · 行为反证 4 例已跑' % len(tbl))
+
+    if bad:
+        print(u'🔴 登记表去重未通过：')
+        for b in bad:
+            print(u'   - ' + b)
+        return 1
+    print(u'✅ %d 张人工维护登记表**均无重复项**' % len(tbl))
+    return 0
+
+
 def cmd_assert_round_regex_single():
     """🔑 G435：轮次正则**单一实现**（不许有第二份字面量）。
 
@@ -5828,6 +6376,8 @@ def main():
     ap.add_argument('--assert-doc-round-notation', action='store_true',
                     help='G434：文档轮次识别不认写法'
                          '（中文数字 ↔ 阿拉伯数字）')
+    ap.add_argument('--assert-registered-tables', action='store_true',
+                    help=u'G436：所有人工维护的登记表不得重复（146 轮判据④ 的推广）')
     ap.add_argument('--assert-round-regex-single', action='store_true',
                     help='G435：轮次正则单一实现'
                          '（不许有第二份字面量 · 改坏常量解析必须跟着坏）')
@@ -5850,6 +6400,9 @@ def main():
                     help='G401：基准变更史须闭合且可答“哪一轮变的、为什么变”')
     ap.add_argument('--assert-baseline-fp', action='store_true',
                     help='G400：断言基准指纹未被改过（防遗留“消失”被误读成“修复”）')
+    ap.add_argument('--assert-net-budget', action='store_true',
+                    help='G437：联网型入口**不得挂起**（超时常量 + 时间预算'
+                         ' + 进度 + 内容寻址；128/146/147 轮回归被杀的真因）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--assert-no-tmp-in-index', action='store_true',
@@ -5916,6 +6469,10 @@ def main():
         return cmd_assert_fp_history()
     if a.assert_baseline_fp:
         return cmd_assert_baseline_fp()
+    if a.assert_net_budget:
+        os.chdir(ROOT)
+        return cmd_assert_net_budget()
+
     if a.assert_history_known:
         os.chdir(ROOT)
         return cmd_assert_history_known()
@@ -5988,6 +6545,9 @@ def main():
     if a.assert_round_regex_single:
         print()
         return cmd_assert_round_regex_single()
+    if a.assert_registered_tables:
+        print()
+        return cmd_assert_registered_tables()
     if a.assert_remote_rounds:
         os.chdir(ROOT)
         return cmd_assert_remote_rounds()

@@ -21,6 +21,8 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# 🔑 仓库根（第一百四十七轮：`has_inputs` 判定**仓库文件**需要它）
+REPO_ROOT = os.path.dirname(HERE)
 
 # 法律/许可类门禁 ID（**仅在 ownership == third_party 时生效**）
 LEGAL_GATES = {"G21"}
@@ -973,6 +975,22 @@ GATES = [
     ("G435", "**轮次正则单一实现**（不许有第二份字面量）",
      ["{py}", "{s}/push_api.py", "--assert-round-regex-single"], "hard",
      ["scripts/push_api.py"]),
+    # 🔑 第一百四十七轮：G436 —— **登记表不得重复**（推广到所有人工维护的表）。
+    #    🔴 146 轮只给 BOTH_LAYERS 一张表加了去重（G399 判据④），
+    #       其余 15 张表（DEPENDENT_NAMES / GATES / CLEANUP_CALLS …）**完全没有**。
+    #    🔑 本轮实测抓到两个**真实缺陷**：CLEANUP_CALLS 里 'shutil.rmtree' 登记两次、
+    #       PATH_CONST_ALLOW 两条理由整段相同 —— 而 G399 全程 rc=0。
+    ("G436", "**登记表不得重复**（推广到所有人工维护的表）",
+     ["{py}", "{s}/push_api.py", "--assert-registered-tables"], "hard",
+     ["scripts/push_api.py", "scripts/run_all_gates.py"]),
+    # 🔑 第一百四十八轮：G437 —— **联网型入口不得挂起**。
+    #    🔴 真因（本轮实测）：G396 逐个拉 67 个远端树（0.53~7.87s/次，无上界）
+    #       → 128/146/147 轮回归"卡住"被杀 → 整轮结果丢失。
+    #    🔑 四条修法：超时改常量 · 时间预算耗尽即拒绝给结论 · 打印进度
+    #       · **内容寻址**（commit 列表已含 tree_sha，台账已核对过的无需再拉树）。
+    ("G437", "**联网型入口不得挂起**（超时常量 + 时间预算 + 进度 + 内容寻址）",
+     ["{py}", "{s}/push_api.py", "--assert-net-budget"], "hard",
+     ["scripts/push_api.py"]),
 ]
 
 # 🔑 第一百零五轮：**必须并存的层**（在线 ↔ 离线）
@@ -983,7 +1001,7 @@ GATES = [
 # 🔑 第一百四十六轮：G399 判据④⑦ 依赖的两个常量（防"删一组 + 复制一组"充数）
 #    去重后真实组数 = 15（145 轮实测：16 组里有 1 组是 114 轮误插的重复项）
 #    🔑 不新增门禁编号 —— 判据属于 G399（"互补层并存"本身就是它的职责）
-BOTH_LAYERS_MIN = 15
+BOTH_LAYERS_MIN = 16
 # 🔑 why 是**人工写的理由**（105 轮诚实结论④）—— 只能做弱约束：
 #    必须同时出现两个编号（防整段复制）+ 长度下限（防敷衍）
 BOTH_LAYERS_WHY_MIN = 60
@@ -1077,6 +1095,23 @@ BOTH_LAYERS = (
      '🔴 只留 G433 → 把「第一百一十轮」改成「第110轮」即让它从文档里消失，'
      'G433 判据④ 反而**误报**（143 轮破坏⑦ 实测）；'
      '只留 G434 → 解析对了但两个证据源是否一致无人查。'),
+    # 🔑 第一百四十七轮：第十六组（146 轮诚实结论④）
+    ('G399', 'G436',
+     'G399 只给 **BOTH_LAYERS 一张表**加去重判据（判据④⑦：无序对不重复 + 去重后组数）；'
+     'G436 把"登记表不得重复"推广到**全部 15 张**人工维护表'
+     '（seq 元素 / key 首元素 / map 键与值）。'
+     '🔴 只留 G399 → SELF_REGISTERED_META、CLEANUP_CALLS、GATES 等表'
+     '重复登记无人发现：147 轮实测 CLEANUP_CALLS 里 shutil.rmtree 登记了两次、'
+     'PATH_CONST_ALLOW 两条理由整段相同，而 G399 全程 rc=0；'
+     '只留 G436 → 两张表若用同一去重口径会给出矛盾结论（132 轮教训），'
+     '故 BOTH_LAYERS 的**无序对**仍由 G399 专管，G436 刻意不纳入该表。'),
+    # 🔑 第一百四十八轮：第十七组
+    ('G431', 'G437',
+     'G431 让网络抖动**重试**（BLOB_NET_RETRY 次，退避 BLOB_RETRY_SLEEP）；'
+     'G437 给联网入口设**时间预算**（NET_TIMEOUT_S / NET_BUDGET_S），耗尽即拒绝给结论。'
+     '\U0001f534 只留 G431 → 重试把最坏耗时放大 N 倍（5×120s），回归必然被杀；'
+     '只留 G437 → 一次抖动就失败，141 轮"26 个 blob 失败 = 整轮白干"会重演。'
+     '\U0001f511 两者合起来才同时具备"扛得住抖动"与"有可预测的上界"。'),
     # 🔑 第一百四十五轮：第十五组（144 轮诚实结论③）
     ('G434', 'G435',
      'G434 验**解析认不认写法**（中文数字 ↔ 阿拉伯数字，反证走 _round_hits）；'
@@ -1637,7 +1672,25 @@ def is_noop(tpl):
 
 
 def has_inputs(work, files):
-    return all(os.path.exists(os.path.join(work, f)) for f in files)
+    """🔑 输入文件是否存在（**工作区** 或 **仓库根**）。
+
+    🔴 第一百四十七轮实测发现的**真实缺陷**：
+       `--work work/` 跑全量回归时，登记为 `scripts/push_api.py`、
+       `ledger/trust_root.json` 这类**仓库文件**的门禁，被判
+       「缺少输入」而**全部跳过** —— 它们不在工作区产物目录下。
+       🔑 后果：G430~G436（以及同类）在自动回归里**从未真正执行过**，
+          跳过数由 119 涨到 127；此前各轮报告的"实测通过"其实都是
+          **手工单独跑命令**得到的，与自动回归的口径**不一致**
+          （133 轮诚实结论⑤ 那条"口径不一致，未归因"在此部分归因）。
+    🔑 判据：`work` 下存在**或**仓库根 `HERE` 下存在。
+    """
+    for f in files:
+        if os.path.exists(os.path.join(work, f)):
+            continue
+        if os.path.exists(os.path.join(REPO_ROOT, f)):
+            continue
+        return False
+    return True
 
 
 

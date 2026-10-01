@@ -1,0 +1,22 @@
+# 第一百四十八轮完成声明（G381/G382/G383 校验）
+# 🔑 本轮新增门禁编号 G437：联网型入口不得挂起（超时常量 + 时间预算 + 进度 + 内容寻址）
+# 🔴 真因（实测）：G396 逐个拉 67 个远端树，单次 0.53/1.92/7.87s，无上界
+grep:scripts/push_api.py::NET_TIMEOUT_S = 30
+grep:scripts/push_api.py::NET_BUDGET_S = 300
+grep:scripts/push_api.py::NET_BUDGET_AUDIT_S = 900
+grep:scripts/push_api.py::NET_PROGRESS_EVERY = 10
+grep:scripts/push_api.py::def _net_guard(t0, done=0, total=0, budget=None):
+grep:scripts/push_api.py::def cmd_assert_net_budget():
+grep:scripts/push_api.py::ap.add_argument('--assert-net-budget', action='store_true',
+grep:scripts/push_api.py::urllib.request.urlopen(r, timeout=NET_TIMEOUT_S)
+grep:scripts/push_api.py::'checked_shas': sorted(c['sha'][:12] for c in d),
+grep:scripts/push_api.py::_seen = set(known) | set(rec.get('checked_shas') or [])
+grep:scripts/push_api.py::if _net_guard(_t0, _n, len(d), NET_BUDGET_AUDIT_S):
+grep:scripts/push_api.py::if _net_guard(_t0, _fresh, len(d)):
+grep:scripts/run_all_gates.py::("G437", "**联网型入口不得挂起**（超时常量 + 时间预算 + 进度 + 内容寻址）",
+grep:scripts/run_all_gates.py::('G431', 'G437',
+grep:README.md::第一百四十八轮：**联网型入口不得挂起**
+grep:references/游戏引擎复刻.md::第一百四十八轮处理的是「回归卡住」的真因
+cmd:push_api.py --assert-net-budget
+cmd:push_api.py --assert-history-known
+gate:G437

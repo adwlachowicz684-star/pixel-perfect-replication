@@ -1,0 +1,19 @@
+# 第一百四十七轮完成声明（G381/G382/G383 校验）
+# 🔑 本轮新增门禁编号 G436：把 146 轮"登记表不得重复"从一张表推广到 15 张表
+grep:scripts/run_all_gates.py::("G436", "**登记表不得重复**（推广到所有人工维护的表）",
+grep:scripts/push_api.py::ap.add_argument('--assert-registered-tables', action='store_true',
+grep:scripts/push_api.py::def cmd_assert_registered_tables():
+grep:scripts/push_api.py::REGISTERED_TABLES = (
+grep:scripts/push_api.py::REGISTERED_TABLES_MIN = 10
+grep:scripts/push_api.py::TABLE_CROSS_ALLOW = (
+grep:scripts/push_api.py::CLEANUP_CALLS = ('os.remove', 'os.unlink', 'shutil.rmtree', 'os.rmdir')
+grep:scripts/push_api.py::'registry_normalize.py::REG': 'registry.yaml 归一化用的工具注册表路径
+grep:scripts/push_api.py::def _ref_counts(names):
+grep:scripts/push_api.py::def _table_dups(items, kind):
+grep:scripts/run_all_gates.py::('G399', 'G436',
+grep:scripts/run_all_gates.py::BOTH_LAYERS_MIN = 16
+grep:README.md::第一百四十七轮：**登记表不得重复**
+grep:references/游戏引擎复刻.md::第一百四十七轮处理的是 146 轮诚实结论④
+cmd:push_api.py --assert-registered-tables
+cmd:run_all_gates.py --check-both-layers
+gate:G436
