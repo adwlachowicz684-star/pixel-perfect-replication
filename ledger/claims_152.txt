@@ -1,0 +1,28 @@
+# 第一百五十二轮完成声明（G381/G382/G383 校验）
+# 🔑 本轮主题：**非路径常量的反向扫描**（G440），补 151 轮实测③ 的真实缺口
+# 🔴 151 轮实测③：删 `CACHE_PROOF_N` 登记项 → **G405/G406 均 rc=0**。
+#    🔑 真因：G406 只扫**路径**常量（os.path.join(ROOT/HERE,...)），
+#       非路径常量（CACHE_PROOF_N / CACHE_RECHECK_N 等）被删登记**无人发现**。
+# 🔑 新增 G440：核心基建文件（CONST_SCAN_FILES，8 个）里**被引用**的模块级
+#    大写常量，必须仍在 DEPENDENT_NAMES 或 CONST_SCAN_ALLOW 内（理由非空）。
+# 🔑 对照实验①（同一状态：删 CACHE_PROOF_N 登记项）：
+#    G440 rc=1 抓到 · G405(--assert-dependent-names) rc=0 · G406(--assert-path-consts) rc=0。
+# 🔑 六方向破坏实测：②桩化实现 rc=1（下限 CONST_SCAN_MIN=100）· ③新增未登记
+#    大写常量 rc=1 · ④②+CONST_SCAN_MIN=0 → rc=0（证明②里起作用的是下限判据）·
+#    ⑤一致改名 rc=0（不误报）· ⑥删 CONST_SCAN_FILES 登记项 rc=1。
+# 🔴 两个真实坑：① 82 条非路径常量塞进 PATH_CONST_ALLOW → G406 报"僵尸豁免" rc=1
+#    （G406 把每条豁免当路径常量校验）→ 改用独立表 CONST_SCAN_ALLOW（85 条）。
+#    ② globals().get('X') 的 func.value 是 **Call**（globals()）不是 Name，
+#    按 Name 判永远数不到 → 修正后"只经字符串引用"的常量才被计为已引用。
+grep:scripts/push_api.py::CONST_SCAN_ALLOW = {
+grep:scripts/push_api.py::CONST_SCAN_FILES = ('push_api.py'
+grep:scripts/push_api.py::def _scan_ref_consts_bad():
+grep:scripts/push_api.py::def cmd_assert_const_covered():
+grep:scripts/push_api.py::ap.add_argument('--assert-const-covered', action='store_true',
+grep:scripts/push_api.py::    if getattr(a, 'assert_const_covered', False):
+grep:scripts/push_api.py::CONST_SCAN_META_EXEMPT = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
+grep:scripts/run_all_gates.py::("G440", "**非路径常量反向扫描**（被引用的常量必须仍在登记表/豁免表内）",
+grep:README.md::第一百五十二轮
+grep:references/游戏引擎复刻.md::第一百五十二轮
+cmd:push_api.py --assert-const-covered
+gate:G440

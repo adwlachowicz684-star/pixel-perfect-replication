@@ -187,6 +187,14 @@ DEPENDENT_NAMES = {
     # 🔑 第一百五十一轮：G439 依赖
 
     'cmd_assert_cache_recheck_proof': ('fn', 'G439 反证全量覆盖的断言入口'),
+    # 🔑 第一百五十二轮：G440（非路径常量**反向扫描**）依赖
+    'CONST_SCAN_FILES': ('const', '反向扫描覆盖的核心基建文件清单（G440 依赖）'),
+    'CONST_SCAN_MIN': ('const', '反向扫描常量数下限（桩化 → 拒绝给结论）'),
+    'CONST_SCAN_FN': ('const', 'G440 唯一实现函数名登记项'),
+    'CONST_SCAN_META_EXEMPT': ('const', '元项豁免名（SELF_REGISTERED_META 等，防递推）'),
+    '_scan_ref_consts_bad': ('fn', 'G440 非路径常量反向扫描的唯一实现'),
+    'cmd_assert_const_covered': ('fn', 'G440 非路径常量反向扫描的断言入口'),
+
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -212,7 +220,101 @@ PATH_CONST_ALLOW = {
     'registry_normalize.py::REG': 'registry.yaml 归一化用的工具注册表路径，非产物/台账路径',
     'tool_run.py::REGISTRY': 'tool_run 运行时工具注册表路径，非产物/台账路径',
 }
+
 # 🔑 豁免**必须非空** —— 空表 + 新常量 = 应报未登记，不得静默
+# 🔑 第一百五十二轮：**非路径常量豁免表**（G440 反向扫描专用）。
+#    🔴 与 PATH_CONST_ALLOW **分开**：后者是**路径**常量豁免，G406 把每条都当路径常量校验
+#       （实测：82 条非路径常量混进去 → G406 报『僵尸豁免』rc=1 —— 两个语义不能共用一张表）。
+CONST_SCAN_ALLOW = {
+    'push_api.py::HERE': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::BASELINE_FP_HISTORY_MAX': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::CONST_SCAN_ALLOW': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::CONST_SCAN_ALLOW_MIN_REASON': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::LEGACY_SAMPLE_N': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::LEGACY_SHOW_N': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::OWNER': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::REPO': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::TOK': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::API': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::HDR': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::CLEANUP_CALLS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::CLEANUP_VERIFY_FNS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::CLEANUP_SCAN_MIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::SELFTEST_TMP_DIR': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::ROUND_END_STEPS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::ROUND_END_REQUIRED_GIDS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::MUTATION_TARGET_MIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::MUTATION_SELF_EXCLUDE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::PUSH_LOCK_ARGS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::PUSH_EXCLUSIVE_NAMES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::DOC_ROUND_SKIP_PARTS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'push_api.py::NOTATION_SAMPLES_MIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::HERE': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::REPO_ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::LEGAL_GATES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::DUP_CMDS_GUARDIAN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::INTENTIONAL_DUP_CMDS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::GATES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::BOTH_LAYERS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'run_all_gates.py::MANUAL_GATES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::DEFAULT_REQUIRE_SINCE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::DECLARED_CAPABILITIES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::CAPABILITY_PROBE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::CAPABILITY_EFFECT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::CAPABILITY_ARTIFACT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::CAPABILITY_ARTIFACT_KEYS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::GATE_RC_DOMAIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::CAPABILITY_ANCHOR_SPEC': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::ALL_CONTENT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::ALL_CONTENT_FN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::ALLOWLIST_FILES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::NO_ARTIFACT_FLAG': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::NO_ART_ARTIFACT_FN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'claim_verify.py::NO_ART_TRUTH_FN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::PY': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::DECLARED_CAPABILITIES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CAPABILITY_PROBE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CAPABILITY_ARTIFACT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CAPABILITY_ARTIFACT_KEYS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CAPABILITY_ANCHOR_FLOOR': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CHAOS_BASELINE_FILE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CHAOS_BASELINE_TOLERANCE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CHAOS_ARTIFACT_FULL_RATIO': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CHAOS_DENOM_TOLERANCE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::TYPE_RULES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::ASSERTABLE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::SEMANTIC': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::POISON': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::INTERFACE_ADAPTERS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::VALID_OVERRIDE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::TEXT_REPLACEMENTS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::PLACEHOLDERS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::VALID_BY_TYPE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::FIXTURE_OVERRIDES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::COMPLETENESS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::CATALOG_KW': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'gate_chaos.py::NOT_CATALOG': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'coverage_gate.py::UNKNOWN_ANY': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'coverage_gate.py::ROW': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::ALLOWED': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::RESTRICTED': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::UNKNOWN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::NOT_APP': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::BLOCKING': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::STATUS_HELP': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::FONT_FIELDS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::BOM_TOOLS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    'license_gate.py::TEMPLATE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
+    '_scan_cross_ref_consts.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    '_scan_value_root_cands.py::HERE': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    '_scan_value_root_cands.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+}
+
+# 🔑 豁免**必须写明理由**（与 PATH_CONST_ALLOW_MIN_REASON 同构）
+CONST_SCAN_ALLOW_MIN_REASON = 6
 PATH_CONST_ALLOW_MIN_REASON = 6
 
 # 🔑 第一百一十四轮：**元登记项** —— 被依赖的"登记表本身"。
@@ -223,6 +325,7 @@ PATH_CONST_ALLOW_MIN_REASON = 6
 SELF_REGISTERED_META = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
                         'DEPENDENT_NAMES_REQUIRED', 'PATH_CONST_ALLOW',
                         'PATH_CONST_ALLOW_MIN_REASON',
+                        'CONST_SCAN_ALLOW', 'CONST_SCAN_ALLOW_MIN_REASON',
                         'CRITERIA_ROOTS_REQUIRED')
 # 🔑 第一百三十五轮：**判据存在性**的反向登记项（G426 依赖）。
 #    🔴 134 轮破坏实测⑦⑧：G425 的判据⑧（行为反证）被删、判据⑨（判据不能验自己）
@@ -340,6 +443,21 @@ CACHE_RECHECK_FN = '_cache_recheck_bad_v2'  # 复核判据函数名登记项（�
 #       🔴 判据造的样本集 == 实现查的样本集 ⇒ 反证退化成自我验证，恒绿。
 #    🔑 故 G439：**每一条**都要各造一次篡改，逐条验证"改了会不会响"。
 CACHE_PROOF_N = 64         # 反证**逐条覆盖**的条目上限（超 → 拒绝给结论）
+# ── 第一百五十二轮：G440（非路径常量的**反向扫描**）──
+#    🔴 151 轮实测③：删 `CACHE_PROOF_N` 登记项 → G405/G406 **均 rc=0**。
+#    🔑 真因：G406 只扫**路径**常量（os.path.join(ROOT/HERE,...) 形式），
+#       非路径常量（CACHE_PROOF_N / CACHE_RECHECK_N / NET_RETRY_MAX …）
+#       **被删登记无人发现** —— 151 轮诚实结论指名的真实缺口。
+#    🔑 处置：把扫描面从"路径"扩到"核心基建文件里**被引用**的模块级大写常量"，
+#       要求它们**必须仍在** DEPENDENT_NAMES 或 PATH_CONST_ALLOW 内。
+CONST_SCAN_FILES = ('push_api.py', 'run_all_gates.py', 'claim_verify.py', 'gate_chaos.py', 'coverage_gate.py', 'license_gate.py', '_scan_cross_ref_consts.py', '_scan_value_root_cands.py')
+CONST_SCAN_MIN = 100          # 扫描到的常量数下限（实现被桩化 → 拒绝给结论）
+CONST_SCAN_FN = '_scan_ref_consts_bad'
+CONST_SCAN_META_EXEMPT = ('DEPENDENT_NAMES', 'DEPENDENT_NAMES_MIN',
+                           'DEPENDENT_NAMES_REQUIRED', 'PATH_CONST_ALLOW',
+                           'PATH_CONST_ALLOW_MIN_REASON', 'SELF_REGISTERED_META',
+                           'CRITERIA_ROOTS_REQUIRED')
+
 
 
 def req(method, url, data=None):
@@ -3088,6 +3206,103 @@ def cmd_assert_cache_recheck():
         return 1
     print(u'\u2705 内容寻址缓存**全量**复核通过'
           u'（首/中/尾三条反证均已覆盖；任一条被篡改都会被发现）')
+    return 0
+
+
+def _scan_ref_consts_bad():
+    """🔑 G440 **唯一实现**：反向扫描 —— 核心基建文件里**被引用**的模块级
+    大写常量，必须仍在 DEPENDENT_NAMES 或 PATH_CONST_ALLOW 内。
+
+    🔴 151 轮实测③：删 `CACHE_PROOF_N` 登记项 → G405/G406 **均 rc=0**。
+       🔑 真因：G406 只扫**路径**常量（os.path.join(ROOT/HERE,...)），
+          非路径常量被删登记**无人发现**（CACHE_PROOF_N / CACHE_RECHECK_N 等）。
+    🔑 本函数把扫描面从"路径"扩到"核心基建文件里被引用的大写常量" ——
+       "登记项被删"从此有了一条**不依赖路径形式**的反向守望者。
+    """
+    files = globals().get('CONST_SCAN_FILES')
+    meta = globals().get('CONST_SCAN_META_EXEMPT') or ()
+    if not files:
+        return None, 'CONST_SCAN_FILES 未登记或为空 —— 拒绝给结论'
+    dep = globals().get('DEPENDENT_NAMES') or {}
+    allow = globals().get('PATH_CONST_ALLOW') or {}
+    callow = globals().get('CONST_SCAN_ALLOW') or {}
+    refs = set(); grefs = set()
+    for fn in sorted(os.listdir(os.path.join(ROOT, 'scripts'))):
+        if not fn.endswith('.py'): continue
+        try:
+            t = ast.parse(open(os.path.join(ROOT, 'scripts', fn), encoding='utf-8').read())
+        except Exception:
+            continue
+        for n in ast.walk(t):
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
+                refs.add(n.id)
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) \
+               and n.func.attr == 'get' and n.args \
+               and isinstance(n.args[0], ast.Constant) \
+               and isinstance(n.args[0].value, str):
+                # 🔑 `globals().get('X')`：func.value 是 **Call**（globals()），
+                #    不是 Name —— 151/152 轮实测：按 Name 判会**永远数不到**，
+                #    于是"只经字符串引用"的常量被判成"未被引用"（同 114 轮病）。
+                _v = n.func.value
+                if isinstance(_v, ast.Call) and isinstance(_v.func, ast.Name) \
+                        and _v.func.id == 'globals':
+                    grefs.add(n.args[0].value)
+                elif isinstance(_v, ast.Name) and _v.id == 'globals':
+                    grefs.add(n.args[0].value)
+    bad = []; scanned = 0
+    for fn in files:
+        p = os.path.join(ROOT, 'scripts', fn)
+        if not os.path.exists(p):
+            return None, f'CONST_SCAN_FILES 里的 {fn} 不存在 —— 拒绝给结论'
+        t = ast.parse(open(p, encoding='utf-8').read())
+        for node in t.body:
+            names = []
+            if isinstance(node, ast.Assign):
+                for tg in node.targets:
+                    if isinstance(tg, ast.Name): names.append(tg.id)
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                names.append(node.target.id)
+            for name in names:
+                if not re.fullmatch(r'[A-Z][A-Z0-9_]*', name): continue
+                scanned += 1
+                if name in dep or name in meta: continue
+                if f'{fn}::{name}' in allow: continue
+                r = callow.get(f'{fn}::{name}')
+                if r is not None:
+                    if len(r) < (globals().get('CONST_SCAN_ALLOW_MIN_REASON') or 6):
+                        bad.append((fn, name))   # 豁免理由过短 → 视同未覆盖
+                    continue
+                if not (name in refs or name in grefs): continue
+                bad.append((fn, name))
+    return bad, scanned
+
+
+def cmd_assert_const_covered():
+    """🔑 G440：**非路径常量的反向扫描**（151 轮实测③ 的补偿）。"""
+    print(u'\U0001f511 **非路径常量反向扫描**（G440 · 151 轮实测③ 的补偿）')
+    fn = globals().get('CONST_SCAN_FN')
+    if not fn:
+        print(u'\U0001f534 CONST_SCAN_FN 未登记 —— 拒绝给结论')
+        return 1
+    impl = globals().get(fn)
+    if impl is None:
+        print(u'\U0001f534 %s 不存在 —— 拒绝给结论' % fn)
+        return 1
+    bad, scanned = impl()
+    if bad is None:
+        print(u'\U0001f534 %s' % scanned)
+        return 1
+    minc = globals().get('CONST_SCAN_MIN') or 0
+    if scanned < minc:
+        print(u'\U0001f534 扫描到 %d 个常量 < 下限 %d —— 疑似桩化，拒绝给结论'
+              % (scanned, minc))
+        return 1
+    if bad:
+        for f, n in bad:
+            print(u'   \U0001f534 %s::%s 被引用但未登记也未豁免（登记项被删？）' % (f, n))
+        print(u'\U0001f534 守卫失效（G440）：%d 个未覆盖' % len(bad))
+        return 1
+    print(u'   \u2705 扫描 %d 个常量，全部已登记或已豁免' % scanned)
     return 0
 
 
@@ -6752,6 +6967,9 @@ def main():
     ap.add_argument('--assert-cache-recheck-proof', action='store_true',
                     help='G439：反证样本集**不得**与实现实际检查集合重合'
                          '（逐条各造一次篡改；150 轮判据⑦ 只造首/中/尾 3 条）')
+    ap.add_argument('--assert-const-covered', action='store_true',
+                    help='G440：非路径常量**反向扫描**（被引用的常量必须仍在'
+                         '登记表/豁免表内；151 轮实测③ 删 CACHE_PROOF_N 无人发现）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--assert-no-tmp-in-index', action='store_true',
@@ -6823,6 +7041,8 @@ def main():
         return cmd_assert_net_budget()
     if getattr(a, 'assert_cache_recheck_proof', False):
         return cmd_assert_cache_recheck_proof()
+    if getattr(a, 'assert_const_covered', False):
+        return cmd_assert_const_covered()
     if a.assert_cache_recheck:
         os.chdir(ROOT)
         return cmd_assert_cache_recheck()
