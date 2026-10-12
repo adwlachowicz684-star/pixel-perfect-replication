@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-13T03:24:17+0800",
+  "generated_at": "2026-10-13T04:18:46+0800",
   "baseline_modes": {
-    "100644": 345
+    "100644": 348
   },
   "baseline_fp_history": [
     {
@@ -243,10 +243,26 @@
       "legacy_from": 5,
       "legacy_to": 5,
       "at": "2026-10-13T03:24:17+0800"
+    },
+    {
+      "seq": 16,
+      "seq_in_round": 1,
+      "round": 154,
+      "from_fp": "60ac63b643475475e02577864e562e932c4c1648",
+      "to_fp": "c7ea5caa03be6527bb04b4f18edc34979a5183f1",
+      "from_modes": {
+        "100644": 345
+      },
+      "to_modes": {
+        "100644": 348
+      },
+      "legacy_from": 5,
+      "legacy_to": 5,
+      "at": "2026-10-13T04:18:46+0800"
     }
   ],
-  "baseline_fp": "60ac63b643475475e02577864e562e932c4c1648",
-  "checked_commits": 73,
+  "baseline_fp": "c7ea5caa03be6527bb04b4f18edc34979a5183f1",
+  "checked_commits": 74,
   "checked_shas": [
     "01853a19d67d",
     "036dd17dc98a",
@@ -299,6 +315,7 @@
     "9de87c55f224",
     "9f8549817859",
     "a05d89412d1f",
+    "a58b22d9d077",
     "a6c4dba454c4",
     "aa4c29c838da",
     "ad62a0aaffc4",
@@ -345,7 +362,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "fb8e6fee3ed0ae9bd493d2b475bd77213b55266a",
       "baseline_modes": {
-        "100644": 345
+        "100644": 348
       },
       "dist": {
         "100755": 266
@@ -373,7 +390,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 345
+        "100644": 348
       },
       "dist": {
         "100755": 265
@@ -401,7 +418,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "24ebf7c0865bbbd2c9d21e7ebeb2f293f525ad4b",
       "baseline_modes": {
-        "100644": 345
+        "100644": 348
       },
       "dist": {
         "100755": 265
@@ -429,7 +446,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "5c75c6a7eab13e8ca7034c3ac8cb13431b1e0340",
       "baseline_modes": {
-        "100644": 345
+        "100644": 348
       },
       "dist": {
         "100755": 264
@@ -457,7 +474,7 @@
       "odd_sample_truncated": true,
       "odd_paths_sha": "46cc5bbc81c3dbd40103f6a5fa83d02670c3b198",
       "baseline_modes": {
-        "100644": 345
+        "100644": 348
       },
       "dist": {
         "100755": 262

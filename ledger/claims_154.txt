@@ -1,0 +1,58 @@
+# 第一百五十四轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**tree / commit / ref 三个写环节必须走同一套重试**（G442），
+#    补 153 轮诚实结论④ 点名的真实缺口。
+# 🔴 153 轮点名：G431 只守 blob；main() 里 POST git/trees · POST git/commits ·
+#    PATCH git/refs/heads/main **三处全是裸 req**，一次 502 就 sys.exit(1) →
+#    整轮白干，而 153 轮实测的 HTTP 502 正是服务端随机故障（两次失败文件不同）。
+# ✅ 抽出唯一实现 req_retry(method, url, payload)：四个写环节（含 blobs）共用
+#    同一套重试（BLOB_NET_RETRY 次退避 + _blob_retryable 判据）。
+#    🔑 G431 判据② 同步改为两段：req_retry 内有循环走 _blob_retryable
+#    **且** mk_blob 调 req_retry —— 否则循环搬走后 mk_blob 自己只发一次。
+# 🔑 对照实验①（同一状态：把 tree 环节改回裸 req，还原 153 轮形态）：
+#    G442 rc=1 🔴 · **G431 rc=0 ✅** —— 不是"两条都拦住"，G431 真的守不住。
+# 🔴 破坏⑦ 实测：**G442 判据自身是恒真的** —— 只删清单里 ('git/commits','POST')
+#    一条 → 剩下三项都走 req_retry → G442 **自己 rc=0**，而该环节从此不受守护。
+#    🔑 与 152 轮 G440 判据⑥ 同款，**本类第七次**：条目/字段缺失被当成"没有违规"
+#    （106 轮）。✅ 补判据⑥ **反向扫描**：源码里出现的每个远端写环节
+#    （POST/PATCH/PUT/DELETE 且 URL 含 /git/）必须在清单内且不得出现裸 req。
+#    🔑 ② 与 ⑥ 互为反向：② = 清单里每个环节必须真被找到；⑥ = 源码里每个写环节
+#       必须在清单里。缺任一侧都开洞。
+# 🔴 判据② 扫描范围修正：第一版限定 main()，而 git/blobs 在 mk_blob 里 →
+#    把"清单里有 blobs"误判成"环节被删"。改为全文件扫描。
+# 🔑 七方向破坏实测：①tree 改回裸 req rc=1 · ②清空 WRITE_RETRY_STEPS rc=1 ·
+#    ③桩化 req_retry rc=1（行为反证）· ④一致改名 req_retry→req_retry_v2 rc=0
+#    不误报 · ⑤_blob_retryable 无差别 True（4xx 也重试）rc=1 ·
+#    ⑥自测抄一份不调真实实现 rc=1 · ⑦删清单一条 rc=1（判据⑥ 抓到）。
+#    恢复后七方向全部转 rc=0。
+# 🔴 **本轮改动把既有门禁 G427 弄失效了，而它自己报的是"无法判定"**：
+#    把三处写操作改走 req_retry 后，G427 判时序的锚点只认裸 `req('POST', ...git/trees...)`
+#    → 找不到 → 报"无法判定时序，拒绝给结论" → **推送被自己挡住**。
+#    🔑 与 133/134 轮"不认写法"同病（**本类第八次**）：改进代码会把既有门禁
+#    弄失效，而它表现得像环境问题（这里是"推不动"）。
+#    ✅ 锚点改为同时认 `req` 与 `req_retry`；修复后 G427 从"无法判定"转为正常判定
+#    （报"1 个文件未提交"—— 说明它真在判，不是恒真）。
+# 🔴 本轮自己踩的坑：apply 脚本里 G442 代码放在**普通三引号字符串**中，
+#    其中的 '\n🔴 ...' 被 Python 转义成真换行 → push_api.py SyntaxError
+#    （unterminated string literal）。🔑 与大文件静默截断（144 轮）同源：
+#    **写入形态与预期不一致，且当时看不出来**；靠语法检查才暴露。
+grep:scripts/push_api.py::def req_retry(method, url, payload=None):
+grep:scripts/push_api.py::WRITE_RETRY_STEPS = (
+grep:scripts/push_api.py::def cmd_assert_write_retry():
+grep:scripts/push_api.py::    ap.add_argument('--assert-write-retry', action='store_true',
+grep:scripts/push_api.py::    if a.assert_write_retry:
+grep:scripts/push_api.py::    d = req_retry('POST', f'{API}/git/blobs', payload)
+grep:scripts/push_api.py::    t = req_retry('POST', f'{API}/git/trees', {'tree': tree})
+grep:scripts/push_api.py::    c = req_retry('POST', f'{API}/git/commits',
+grep:scripts/push_api.py::    upd = req_retry('PATCH', f'{API}/git/refs/heads/main',
+grep:scripts/push_api.py::    'WRITE_RETRY_STEPS': ('const',
+grep:scripts/push_api.py::    'req_retry': ('fn',
+grep:scripts/push_api.py::    'cmd_assert_write_retry': ('fn',
+grep:scripts/push_api.py::⑥ 反向扫描（源码 → 清单）:
+grep:scripts/push_api.py::and n.func.id in ('req', 'req_retry') and n.args:
+grep:scripts/run_all_gates.py::("G442", "**tree/commit/ref 必须走同一套重试**（不许裸调 req）",
+grep:scripts/run_all_gates.py::    ('G442', 'G431',
+grep:README.md::第一百五十四轮
+grep:README.md::对照实验（同一状态：tree 改回裸 req）：G442 rc=1
+cmd:push_api.py --assert-write-retry
+gate:G442
+cmd:push_api.py --assert-blob-retry
