@@ -179,7 +179,14 @@ DEPENDENT_NAMES = {
     #       新增**必须同步登记**，否则 G406 会报"未登记"（已生效三次）。
     'CACHE_RECHECK_N': ('const', '缓存复核全量覆盖的条目上限（G438 依赖）'),
     'CACHE_RECHECK_FN': ('const', '复核判据函数名登记项（G438 依赖）'),
-    '_cache_recheck_bad': ('fn', 'G438 缓存**全量**复核的唯一实现'),
+    '_cache_recheck_bad_v2': ('fn', 'G438 缓存**全量**复核的唯一实现'),
+    # 🔑 第一百五十一轮：G439 依赖
+    'CACHE_PROOF_N': ('const', '反证逐条覆盖的条目上限（G439 依赖）'),
+    # 🔑 第一百五十一轮：G439 依赖（🔴 第一版遗漏此行，破坏③ 无从验证）
+
+    # 🔑 第一百五十一轮：G439 依赖
+
+    'cmd_assert_cache_recheck_proof': ('fn', 'G439 反证全量覆盖的断言入口'),
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
     #    —— 否则递推重新开始。🔑 它由 G407（元项存在+被引用）守护，不靠本表。
@@ -231,7 +238,11 @@ CRITERIA_ROOTS_REQUIRED = ('G425_c8_行为反证', 'G425_c9_判据不能验自�
                            #    🔴 139 轮已证明：G429 的名字判据在"一致改名"下 rc=0；
                            #    🔴 且"实现体换成 return []"时 G429 三条判据**照绿**
                            #       —— 只有**真起进程跑真实实现**能发现。
-                           'G430_c2_名字锚点', 'G430_c3_行为反证')
+                           'G430_c2_名字锚点', 'G430_c3_行为反证',
+                           # 🔑 第一百五十一轮：G439 的两条核心判据同样"可被改成桩"。
+                           #    🔴 本轮实测：判据④ 的"非空即已发现"分类被联网失败
+                           #       蒙混成"已发现" → 五条全绿，反证**毫无意义**。
+                           'G439_c4_逐条反证', 'G439_c7_分类器自检')
 # 🔑 第一百零三轮：台账里每条遗留**最多记多少个异常文件路径**。
 LEGACY_SAMPLE_N = 10
 # 🔑 `--show-legacy-files` 每个 commit **最多打印多少个路径**（避免刷屏）
@@ -320,7 +331,15 @@ NET_GUARD_FN_DEFAULT = '_net_guard'  # 判据⑥：登记项被清空时的兜�
 #       （106 轮"缺失 ≠ 没有"在**覆盖范围**上的又一次应用）。
 #    🔴 故改为**全量**；N 只作规模上限：超出即**拒绝给结论**，不静默少查。
 CACHE_RECHECK_N = 64       # 缓存复核**全量覆盖**的条目上限（超 → 拒绝给结论）
-CACHE_RECHECK_FN = '_cache_recheck_bad'  # 复核判据函数名登记项（防一致改名失效）
+CACHE_RECHECK_FN = '_cache_recheck_bad_v2'  # 复核判据函数名登记项（防一致改名失效）
+
+# ── 第一百五十一轮：G439（反证样本集**不得**与实现实际检查集合重合）──
+# 🔴 第一百五十轮把实现从"抽样 3 条"改成"全量"，但**判据⑦ 仍只造首/中/尾 3 条**的反证。
+#    🔑 后果：若实现悄悄改成"只查首/中/尾三条"，判据⑦ 造的恰好就是这三条 → 全过。
+#    🔑 这是 79 轮**自证循环**在**反证样本集**上的又一次应用：
+#       🔴 判据造的样本集 == 实现查的样本集 ⇒ 反证退化成自我验证，恒绿。
+#    🔑 故 G439：**每一条**都要各造一次篡改，逐条验证"改了会不会响"。
+CACHE_PROOF_N = 64         # 反证**逐条覆盖**的条目上限（超 → 拒绝给结论）
 
 
 def req(method, url, data=None):
@@ -2928,7 +2947,7 @@ def cmd_assert_net_budget():
 
 
 
-def _cache_recheck_bad(d, _budget=None):
+def _cache_recheck_bad_v2(d, _budget=None):
     """🔑 G438 **唯一实现**：真去重测台账里已缓存的条目，比对 dist。
 
     🔑 第一百五十轮：**全量**（不抽样）—— 149 轮 N=3 时第 4、5 条被篡改发现不了。
@@ -3071,6 +3090,156 @@ def cmd_assert_cache_recheck():
           u'（首/中/尾三条反证均已覆盖；任一条被篡改都会被发现）')
     return 0
 
+
+def cmd_assert_cache_recheck_proof():
+    """🔑 G439：**反证样本集不得与实现实际检查集合重合**（自证循环）。
+
+    🔴 第一百五十轮把 `_cache_recheck_bad_v2` 从"抽样 3 条"改成"全量"，
+       但 G438 判据⑦ 的反证**仍只造首 / 中 / 尾 3 条**。
+       🔑 于是：若实现悄悄退回"只查首/中/尾三条"，判据⑦ 造的恰好就是这三条
+          → **全过**；而第 2、4 条被篡改**无人发现**（149 轮同款病的变体）。
+
+    判据：
+      ① CACHE_PROOF_N 为正整数
+      ② CACHE_RECHECK_FN 指向的函数真存在且可调用（防一致改名失效）
+      ③ 台账条目数 ≤ CACHE_PROOF_N（超出 → 拒绝给结论，绝不静默少验）
+      ④ **逐条行为反证**：对 known_legacy 的**每一条**各造一次篡改，
+         实现**必须**每一条都发现（🔑 不查"代码里写了全量"这种写法）
+      ⑤ 真实台账全量复核无异常
+      ⑥ 时间预算守卫真存在（防 128/146/147 轮回归被杀重演）
+      ⑦ 🔑 **反证不得把"没做成"当成"已发现"**：
+         🔴 第一百五十一轮实测：判据④ 用"返回非空 = 已发现"时，
+            实现若退回"只查首/中/尾三条"，**未覆盖的条目**因**联网失败/超时**
+            同样返回非空 → 全部判成"已发现" → **G439 恒绿，反证毫无意义**。
+         🔑 故：判据④ 按**消息内容**三分类（真发现 / 无法判定 / 未发现），
+            且判据⑦ 造一个"必然失败"的样本，分类器**必须**判为"无法判定"。
+    """
+    print('=' * 70)
+    print(u'\U0001f511 **反证样本集不得与实现检查集合重合**（G439 · 自证循环）')
+    print('=' * 70)
+    bad = []
+    _n = CACHE_PROOF_N
+    if not isinstance(_n, int) or _n <= 0:
+        bad.append(u'CACHE_PROOF_N 非正整数 —— 逐条反证失效')
+    _fn = globals().get(CACHE_RECHECK_FN)
+    if _fn is None or not callable(_fn):
+        bad.append(u'%s 不存在或不可调用 —— 复核静默失效' % CACHE_RECHECK_FN)
+        print()
+        for b in bad:
+            print(u'\U0001f534 ' + b)
+        print(u'\n\U0001f534 守卫失效（G439）')
+        return 1
+    try:
+        with io.open(HISTORY_KNOWN, encoding='utf-8') as f:
+            d = json.load(f)
+    except Exception as ex:
+        print(u'\U0001f534 台账读不到（%s）—— **拒绝给结论**' % ex)
+        return 1
+    kl = d.get('known_legacy')
+    if not isinstance(kl, list) or not kl:
+        bad.append(u'known_legacy 缺失或为空 —— 无可反证条目，**拒绝给结论**')
+        print()
+        for b in bad:
+            print(u'\U0001f534 ' + b)
+        print(u'\n\U0001f534 守卫失效（G439）')
+        return 1
+    # ── 判据③：逐条覆盖的上限 ──
+    if len(kl) > _n:
+        bad.append(u'known_legacy %d 条 > CACHE_PROOF_N=%d —— %d 条未被反证'
+                   u'（逐条覆盖失效，拒绝给结论）' % (len(kl), _n, len(kl) - _n))
+    print(u'\U0001f511 判据③ 逐条覆盖：条目 %d · 上限 %d · %s'
+          % (len(kl), _n, u'全覆盖' if len(kl) <= _n else u'**未覆盖**'))
+    # ── 判据④：逐条行为反证（🔑 三分类，见判据⑦）──
+    import copy as _copy2
+
+    def _classify(msgs, sha):
+        """🔑 把实现的返回分成三类 —— 反证**不得**把"没做成"当"已发现"。
+
+        🔴 第一百五十一轮实测：用"返回非空 = 已发现"时，
+           未覆盖条目因**联网失败/超时**同样返回非空 → 全判"已发现" → 反证恒绿。
+        """
+        # 🔑 先按 **本条 sha** 过滤，再分类（避免别的条目的消息混进来）
+        msgs = [m for m in (msgs or []) if sha and sha in m]
+        # 🔴 顺序很关键：**先**判"没做成"。
+        #    🔑 第一百五十一轮实测：实现返回
+        #       「重测 X 失败（…）—— **拒绝给结论**（断网 ≠ 没被篡改）」
+        #       里含"篡改"二字 —— 若先判"已发现"，失败样本会被误判成发现，
+        #       🔴 判据④ 立刻退化成"非空即通过"，反证恒绿。
+        inconcl = [m for m in msgs if u'拒绝给结论' in m]
+        if inconcl:
+            return (u'🔴 无法判定（实现未做成：%s）' % (inconcl[0][:50])), False, True
+        hit = [m for m in msgs if u'dist 与实测不符' in m]
+        if hit:
+            return u'✔ 已发现（dist 与实测不符）', True, False
+        return u'🔴 未发现（实现未就该条返回任何结论）', False, False
+
+    for _i in range(len(kl)):
+        t2 = _copy2.deepcopy(d)
+        _e = t2['known_legacy'][_i]
+        _sha = _e.get('sha')
+        _dist = dict(_e.get('dist') or {})
+        _dist['999999'] = 1
+        _e['dist'] = _dist
+        got = _fn(t2, NET_BUDGET_S)
+        tag, ok, inconcl = _classify(got, _sha)
+        if inconcl:
+            bad.append(u'判据④ 逐条反证无效：篡改第 %d 条（共 %d 条）后实现**未做成**'
+                       u'（联网/预算）—— 反证不能把"失败"当"已发现"，**拒绝给结论**'
+                       % (_i + 1, len(kl)))
+        elif not ok:
+            bad.append(u'判据④ 逐条反证失败：篡改第 %d 条（共 %d 条）**未被发现**'
+                       u' —— 实现未覆盖该条（自证循环：判据造的样本恰是它查的样本）'
+                       % (_i + 1, len(kl)))
+        print(u'\U0001f511 判据④ 反证 第 %d/%d 条 → %s' % (_i + 1, len(kl), tag))
+    # ── 判据⑤：真实台账 ──
+    real = _fn(d, NET_BUDGET_S)
+    print(u'\U0001f511 判据⑤ 真实台账复核 %d 条 → %s'
+          % (len(kl), u'一致' if not real else u'发现 %d 条' % len(real)))
+    bad.extend(real)
+    # ── 判据⑦：反证**不得**把"没做成"当"已发现"（第一百五十一轮实测补）──
+    #    🔴 本轮第一次实现用"sha = 全 0"造失败样本，**实测失败形态取决于远端**，
+    #       GitHub 对不存在的 sha 的返回让分类器仍判"已发现"（判据⑦ 误报自身）。
+    #    🔑 改为**确定性注入**：临时把模块级 `req` 换成固定失败的桩，
+    #       分类器**必须**判"无法判定" —— 判据不再依赖远端当时怎么回。
+    import copy as _copy3
+    _real_req = globals().get('req')
+
+    def _stub_req(method, url, data=None):
+        return {'__err': 'G439_INJECT', '__body': 'injected failure'}
+
+    t3 = _copy3.deepcopy(d)
+    _e3 = t3['known_legacy'][0]
+    _sha3 = _e3.get('sha')
+    _d3 = dict(_e3.get('dist') or {})
+    _d3['999999'] = 1
+    _e3['dist'] = _d3
+    globals()['req'] = _stub_req
+    try:
+        got3 = _fn(t3, NET_BUDGET_S)
+    finally:
+        if _real_req is not None:
+            globals()['req'] = _real_req
+    tag3, ok3, inc3 = _classify(got3, _sha3)
+    print(u'\U0001f511 判据⑦ 反证分类器自检（确定性注入联网失败）→ %s' % tag3)
+    if ok3:
+        bad.append(u'判据⑦ 反证分类器失效：实现未做成（联网失败/超时）'
+                   u'却被判为"已发现" —— 判据④ 将恒绿，**反证毫无意义**')
+    elif not inc3:
+        bad.append(u'判据⑦ 反证分类器失效：必然失败的样本既非"已发现"'
+                   u'亦非"无法判定"（返回 %s）—— 分类规则与实现消息不匹配'
+                   % (got3[:1] or u'空'))
+    # ── 判据⑥：时间预算守卫 ──
+    _gf = NET_GUARD_FN or NET_GUARD_FN_DEFAULT
+    if not callable(globals().get(_gf)):
+        bad.append(u'%s 不可调用 —— 时间预算守卫未接线' % _gf)
+    print()
+    if bad:
+        for b in bad:
+            print(u'\U0001f534 ' + b)
+        print(u'\n\U0001f534 守卫失效（G439）')
+        return 1
+    print(u'\u2705 反证**逐条**覆盖通过（%d 条各造一次篡改，全部被发现）' % len(kl))
+    return 0
 
 def cmd_assert_history_known():
     """🔑 G396：历史遗留台账必须与**实测**一致（双向断言）。
@@ -6580,6 +6749,9 @@ def main():
     ap.add_argument('--assert-cache-recheck', action='store_true',
                     help='G438：内容寻址缓存**全量复核**（缓存被篡改后'
                          '不得仍被信任；148 轮"信任缓存"削弱的补偿）')
+    ap.add_argument('--assert-cache-recheck-proof', action='store_true',
+                    help='G439：反证样本集**不得**与实现实际检查集合重合'
+                         '（逐条各造一次篡改；150 轮判据⑦ 只造首/中/尾 3 条）')
     ap.add_argument('--assert-history-known', action='store_true',
                     help='G396：历史遗留台账与实测**双向**一致')
     ap.add_argument('--assert-no-tmp-in-index', action='store_true',
@@ -6649,6 +6821,8 @@ def main():
     if a.assert_net_budget:
         os.chdir(ROOT)
         return cmd_assert_net_budget()
+    if getattr(a, 'assert_cache_recheck_proof', False):
+        return cmd_assert_cache_recheck_proof()
     if a.assert_cache_recheck:
         os.chdir(ROOT)
         return cmd_assert_cache_recheck()

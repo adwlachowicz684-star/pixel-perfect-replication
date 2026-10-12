@@ -1,0 +1,33 @@
+# 第一百五十一轮完成声明（G381/G382/G383 校验）
+# 🔑 本轮主题：**反证样本集不得与实现实际检查集合重合**（79 轮自证循环在"反证样本"上的应用）
+# 🔴 150 轮把 `_cache_recheck_bad` 改成"全量"，但 G438 判据⑦ 仍只造**首/中/尾 3 条**反证
+#    → 实现若退回"只查这三条"，判据⑦ 造的恰好就是这三条 → **恒绿**。
+# 🔑 新增 G439：对 known_legacy 的**每一条**各造一次篡改（判据④），逐条验证"改了会不会响"。
+# 🔴🔑 本轮**最重要的实测**：判据④ 第一版用"返回非空 = 已发现"是**错的**。
+#    实现返回的失败消息为「重测 X 失败（…）—— **拒绝给结论**（断网 ≠ **没被篡改**）」，
+#    其中含"篡改"二字 → 失败样本被误判成"已发现" → 五条全绿而**反证毫无意义**。
+#    ✅ 判据④ 改为三分类（真发现 / 无法判定 / 未发现），且**先判"没做成"**。
+# 🔑 新增判据⑦：**确定性注入**联网失败（临时把模块级 req 换成固定失败桩），
+#    分类器**必须**判"无法判定"；判成"已发现"即判据④ 恒绿 → rc=1。
+#    🔴 第一版用"sha = 全 0"造失败样本，失败形态**取决于远端当时怎么回** → 判据⑦ 误报自身；
+#       🔑 改为注入后判据不再依赖远端（133 轮"判据与实现解耦"同构）。
+# 🔑 对照实验①（同一状态：实现只查首/中/尾三条）：G438 rc=0 放行 · G439 rc=1 抓到
+# 🔑 对照实验⑥（分类器顺序改回"先判已发现"）：G439 rc=1（判据⑦ 独自抓到）
+# 🔑 对照实验⑤（桩化 G439 入口）：G439 自身 rc=0（桩不自检）· G426 rc=1（判据存在性信任根抓到）
+# 🔑 G439 两条核心判据已登记进 ledger/trust_root.json::CRITERIA_ROOTS（G439_c4 / G439_c7）
+# 🔴 实测暴露的**真实缺口**（不符预期，如实记录）：
+#    ③ 删 CACHE_PROOF_N 登记项 → **G405/G406 均 rc=0**。
+#       🔑 G406 只扫**路径**常量（`os.path.join(ROOT/HERE, ...)`），非路径常量被删登记**无人发现**。
+grep:scripts/push_api.py::CACHE_PROOF_N = 64
+grep:scripts/push_api.py::def cmd_assert_cache_recheck_proof():
+grep:scripts/push_api.py::    # ── 判据④：逐条行为反证（🔑 三分类，见判据⑦）──
+grep:scripts/push_api.py::        inconcl = [m for m in msgs if u'拒绝给结论' in m]
+grep:scripts/push_api.py::        hit = [m for m in msgs if u'dist 与实测不符' in m]
+grep:scripts/push_api.py::_classify(got3, _sha3)
+grep:scripts/push_api.py::    def _stub_req(method, url, data=None):
+grep:scripts/push_api.py::                           'G439_c4_逐条反证', 'G439_c7_分类器自检')
+grep:scripts/run_all_gates.py::("G439", "**反证样本集不得与实现检查集合重合**（逐条各造一次篡改）",
+grep:README.md::第一百五十一轮
+grep:references/游戏引擎复刻.md::第一百五十一轮
+cmd:push_api.py --assert-cache-recheck-proof
+gate:G439
