@@ -1,0 +1,60 @@
+# 第一百五十五轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**写环节扫描不许"一处对了就放行"**（G443），
+#    补 154 轮判据② 的真实缺陷（153 轮诚实结论③ 点名的"排除 GET 与 append"）。
+# 🔴 154 轮判据② 的洞：found[seg] 是函数名**集合**，只看 'req_retry' not in fns
+#    → 同一环节一处走 req_retry，**另一处裸 req 写调用就被掩盖**。
+# 🔑 对照实验①（同一状态：tree 环节新增一处裸 req 写调用，原有 req_retry 仍在）：
+#    **旧判据② rc=0 ✅ 放行** · G442 rc=1 🔴 抓到 —— 掩盖真实存在，不是推演。
+# 🔑 对照实验②（GET 的 req_retry + POST 的裸 req）：旧判据② rc=0 ——
+#    🔴 它不认 HTTP 方法，GET 读调用就能顶替写调用。
+# 🔑 对照实验⑤（把判据改成"有 req_retry 就放行"）：**G442 rc=0 ✅** ·
+#    G443 rc=1 🔴 —— 同一状态一绿一红，G442 看不见自己的判据被削弱。
+# ✅ 抽出**唯一实现** `_write_step_scan`（三条约束：a) 函数名只认 req/req_retry，
+#    排除 append 等噪声；b) 首参必须是**写方法**常量 POST/PATCH/PUT/DELETE；
+#    c) 分函数计数而非合并成集合）与 `_write_step_bad`（至少一个 req_retry
+#    且**零个裸 req**）；G442 判据② 改为调用它俩 —— 不许各写一份（152 轮同病）。
+# 🔴 判据稀释实测（方向⑥）：把 WRITE_METHODS 加上 GET 后，第一版判据④ 被
+#    **其它三个环节**的"找不到"顶替成 rc=0 —— 判据看起来在守，其实被稀释。
+#    ✅ 改为只认**该环节**（git/trees）的违规。🔑 与"数几个≠验在哪"同源。
+# 🔴 本轮自己踩的坑（**第七次**同类）：apply 脚本把 G443 源码放在普通三引号
+#    字符串中，而 G443 内部又用三引号定义反证样本 → 字符串提前闭合，
+#    push_api.py 被写成 SyntaxError（且脚本自身不报错）。
+#    🔑 与 144 轮大文件静默截断同源：**写入形态与预期不一致，当时看不出来**。
+#    ✅ 反证样本改用 chr(10).join([...])，并在每次写入后读回核对 + 语法检查。
+# 🔑 七方向破坏实测全部符合预期：①新增裸 req 写调用 G442=1/旧判据=0（核心对照）·
+#    ②GET req_retry + POST 裸 req G442=1/旧判据=0 · ③append 无关调用 均=0 不误报 ·
+#    ④删清单一条 G442=1 · ⑤削弱判据 G442=0/**G443=1** · ⑥WRITE_METHODS 加 GET
+#    均=1 · ⑦判据② 改回内联 均=1。恢复后基准 md5 一致。
+# 🔑 连带修复：147 轮清单里的 `BOTH_LAYERS_MIN = 16` 因本轮改到 17 而失效。
+#    ✅ 改为不带数值的 `BOTH_LAYERS_MIN`（与 146 轮一致）—— 🔑 **组数会随新增
+#       互补层而变化**，声明"该常量存在"比"等于某值"稳定；数值本身由
+#       `--check-both-layers` 实测（23 组 ≥ 17）守住。
+# ⚠️ 诚实结论：① G443 只守**扫描判据的准确性**，不守"新增未登记写环节"
+#    （那是判据⑥ 的职责）；② 反证样本只覆盖 git/trees 一个环节，
+#    另三个环节靠 "找不到" 间接兜底；③ 同时改代码与环节清单仍绕过
+#    （109 轮已知边界）；④ 全量回归本轮未跑完，通过数为关键子集口径。
+grep:scripts/push_api.py::WRITE_METHODS = ('POST', 'PATCH', 'PUT', 'DELETE')
+grep:scripts/push_api.py::WRITE_SCAN_FN = '_write_step_scan'
+grep:scripts/push_api.py::def _write_step_scan(tree, steps):
+grep:scripts/push_api.py::def _write_step_bad(found, steps):
+grep:scripts/push_api.py::def cmd_assert_write_step_scan():
+grep:scripts/push_api.py::    found = _write_step_scan(tree, steps)
+grep:scripts/push_api.py::    'WRITE_METHODS': ('const',
+grep:scripts/push_api.py::    'WRITE_SCAN_FN': ('const',
+grep:scripts/push_api.py::    '_write_step_scan': ('fn',
+grep:scripts/push_api.py::    '_write_step_bad': ('fn',
+grep:scripts/push_api.py::    'cmd_assert_write_step_scan': ('fn',
+grep:scripts/push_api.py::    ap.add_argument('--assert-write-step-scan', action='store_true',
+grep:scripts/push_api.py::    if a.assert_write_step_scan:
+grep:scripts/push_api.py::            hit = any((want_kind in x and 'git/trees' in x) for x in b)
+grep:scripts/push_api.py::        if c.get('req', 0) > 0:
+grep:scripts/run_all_gates.py::("G443", "**写环节扫描不许一处对了就放行**（裸 req 不得被掩盖）",
+grep:scripts/run_all_gates.py::    ('G442', 'G443',
+grep:scripts/run_all_gates.py::BOTH_LAYERS_MIN
+grep:README.md::第一百五十五轮
+grep:README.md::旧判据② rc=0 放行
+grep:README.md::对照实验⑤（判据改成"有 req_retry 就放行"）
+cmd:push_api.py --assert-write-step-scan
+cmd:push_api.py --assert-write-retry
+cmd:run_all_gates.py --check-both-layers
+gate:G443
