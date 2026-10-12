@@ -1,0 +1,60 @@
+# 第一百五十三轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**豁免必须是结构化分类**（G441），补 152 轮诚实结论② 的真实缺口
+# 🔴 152 轮诚实结论②：85 条豁免是**批量生成、理由统一** —— 实测 75 条理由
+#    完全相同（'核心基建非登记表依赖项…'）+ 10 条另一理由完全相同。
+#    🔑 统一理由 = 分不清"真不该登记"与"随手豁免的"，于是 G440 的实际约束力
+#       只取决于"谁在写那张表"，而不是"该不该"。
+# 🔑 新增 G441：豁免值必须是「分类: 该常量自己的说明」，分类取自
+#    CONST_SCAN_CATEGORIES（9 个枚举），分类表外的值一律拒绝；分类定义最短 20
+#    字符；说明最短 6 字符；🔑 同一分类下说明完全相同的条目 ≤ 2（批量指纹）。
+# 🔑 对照实验①（同一状态：把 push_api.py::HERE 的分类改成未定义的 BOGUS_CAT）：
+#    G441 rc=1 抓到 · G440(--assert-const-covered) rc=0 放行。
+#    🔑 不是"两条都拦住" —— G440 真的守不住，G441 的存在理由被实测证明。
+# 🔑 七方向破坏实测：②分类表清空 rc=1（下限 CONST_SCAN_CAT_MIN=6）·
+#    ③同分类下 3 条说明雷同 rc=1（SAME_DETAIL_MAX=2）· ④分类定义改"同上" rc=1 ·
+#    ⑤桩化实现 rc=1（判据⑥ 行为反证抓到）· ⑥豁免值无分类前缀 rc=1 ·
+#    ⑦一致改名（实现/常量/登记项三处同步）rc=0 不误报。
+# 🔴 判据④（说明最短长度）一上岗就抓到 11 条说明过短 —— 逐条补上常量自身特征
+#    （'仓库根目录' → 'claim_verify 解析出的仓库根'），否则 PATH_ROOT 下会有 6 条
+#    一字不差，"雷同上限"判据形同虚设。
+# 🔴 本轮自己踩的两个坑：① 常量插入时 '\n'.join() 吞掉尾部换行 → SyntaxError
+#    （clines 末尾补空元素）；② 命令分发插成了**嵌套**（插在 G440 的 if 体内，
+#    缩进取的是 return 的 8 而非 if 的 4），只传 --assert-const-exempt 时外层
+#    if 为 False 直接跳过 → 走到推送前检查分支。
+# 🔴 破坏脚本第一次全"回读不一致"：back = read() 写在 write(new) **之前**，
+#    读到的是原文件（118 轮"恢复快照取早了"的变体）—— 改成先写再读。
+# 🔴 豁免条数下限误用 CONST_SCAN_MIN（那是**常量扫描数**下限 149，不是豁免条数
+#    85）→ 报"豁免仅 85 条 < 下限 100"。改用独立常量 CONST_SCAN_EXEMPT_MIN=60。
+# 🔴 信任根同步（G408 报出来的）：152 轮新增 CONST_SCAN_ALLOW 时**未同步**
+#    ledger/trust_root.json → 本轮 G408 rc=1（说明它真在守）。✅ 已把
+#    CONST_SCAN_ALLOW / CONST_SCAN_ALLOW_MIN_REASON 补进 SELF_REGISTERED_META。
+#    🔴 插入顺序第一次写反（MIN_REASON 在前）→ 仍 rc=1：G408 比的是**列表**不是集合。
+# 🔴 G431 判据修正（本轮推送实测）：连续两次推送都因 **HTTP 502** 中止，而两次
+#    失败的却是**不同的文件**（target_stack.py → game_asset.py）→ 服务端随机故障。
+#    🔑 141 轮判据「HTTP 4xx/5xx 一律不重试」被推翻：**5xx 与网络抖动同性质**。
+#    ✅ 新增 _blob_retryable：NET: 或 5xx 可重试，4xx 不重试；G431 判据④ 改 403、
+#    新增判据⑤（503 抖 2 次必须成功且真调 3 次）。
+# 🔑 对照实验（完整还原成"只认 NET:"）：③ NET rc=0 · ④ 403 rc=0 · **⑤ 503 rc=1**
+#    —— 判据⑤ 的独立贡献被证明。🔴 第一次还原**不完整**（只删 int 分支，正则仍在）
+#    → 对照"仍然通过"，差点被读成"判据⑤ 无效"。
+grep:scripts/push_api.py::CONST_SCAN_CATEGORIES = {
+grep:scripts/push_api.py::CONST_SCAN_CAT_MIN = 6
+grep:scripts/push_api.py::CONST_SCAN_CATDEF_MIN = 20
+grep:scripts/push_api.py::CONST_SCAN_DETAIL_MIN = 6
+grep:scripts/push_api.py::CONST_SCAN_SAME_DETAIL_MAX = 2
+grep:scripts/push_api.py::CONST_SCAN_EXEMPT_MIN = 60
+grep:scripts/push_api.py::CONST_SCAN_EXEMPT_FN = '_scan_const_exempt_bad'
+grep:scripts/push_api.py::def _scan_const_exempt_bad():
+grep:scripts/push_api.py::def cmd_assert_const_exempt_covered():
+grep:scripts/push_api.py::ap.add_argument('--assert-const-exempt', action='store_true',
+grep:scripts/push_api.py::    if getattr(a, 'assert_const_exempt', False):
+grep:scripts/push_api.py::'push_api.py::HERE': 'PATH_ROOT: push_api 所在脚本目录，非产物或台账路径',
+grep:scripts/run_all_gates.py::("G441", "**豁免必须是结构化分类**（分类枚举外的值一律拒绝 · 逐条说明可复核）",
+grep:scripts/run_all_gates.py::    ('G441', 'G440',
+grep:README.md::第一百五十三轮
+grep:references/游戏引擎复刻.md::第一百五十三轮
+cmd:push_api.py --assert-const-exempt
+gate:G441
+grep:scripts/push_api.py::def _blob_retryable(err):
+grep:scripts/push_api.py::⑤ 5xx 反证：503 抖 2 次
+cmd:push_api.py --assert-blob-retry

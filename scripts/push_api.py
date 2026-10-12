@@ -194,6 +194,18 @@ DEPENDENT_NAMES = {
     'CONST_SCAN_META_EXEMPT': ('const', '元项豁免名（SELF_REGISTERED_META 等，防递推）'),
     '_scan_ref_consts_bad': ('fn', 'G440 非路径常量反向扫描的唯一实现'),
     'cmd_assert_const_covered': ('fn', 'G440 非路径常量反向扫描的断言入口'),
+    # 🔑 第一百五十三轮：G441（豁免结构化分类）依赖
+    'CONST_SCAN_CATEGORIES': ('const', '豁免分类枚举表（G441 依赖）'),
+    'CONST_SCAN_CAT_MIN': ('const', '分类数下限（G441 防清空）'),
+    'CONST_SCAN_CATDEF_MIN': ('const', '分类定义最短长度（G441 依赖）'),
+    'CONST_SCAN_DETAIL_MIN': ('const', '豁免说明最短长度（G441 依赖）'),
+    'CONST_SCAN_SAME_DETAIL_MAX': ('const', '同分类下说明雷同上限（G441 依赖）'),
+    'CONST_SCAN_EXEMPT_FN': ('const', 'G441 唯一实现函数名登记项'),
+    'CONST_SCAN_EXEMPT_MIN': ('const', '豁免条数下限（G441 防清空）'),
+    '_scan_const_exempt_bad': ('fn', 'G441 豁免结构化分类的唯一实现'),
+    'cmd_assert_const_exempt_covered': ('fn', 'G441 豁免结构化分类的断言入口'),
+    # 🔑 第一百五十三轮：G431 判据修正（5xx 可重试）
+    '_blob_retryable': ('fn', 'G431 重试判据：网络层与 HTTP 5xx 可重试，4xx 不可'),
 
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
@@ -226,95 +238,121 @@ PATH_CONST_ALLOW = {
 #    🔴 与 PATH_CONST_ALLOW **分开**：后者是**路径**常量豁免，G406 把每条都当路径常量校验
 #       （实测：82 条非路径常量混进去 → G406 报『僵尸豁免』rc=1 —— 两个语义不能共用一张表）。
 CONST_SCAN_ALLOW = {
-    'push_api.py::HERE': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::BASELINE_FP_HISTORY_MAX': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::CONST_SCAN_ALLOW': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::CONST_SCAN_ALLOW_MIN_REASON': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::LEGACY_SAMPLE_N': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::LEGACY_SHOW_N': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::OWNER': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::REPO': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::TOK': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::API': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::HDR': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::CLEANUP_CALLS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::CLEANUP_VERIFY_FNS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::CLEANUP_SCAN_MIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::SELFTEST_TMP_DIR': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::ROUND_END_STEPS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::ROUND_END_REQUIRED_GIDS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::MUTATION_TARGET_MIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::MUTATION_SELF_EXCLUDE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::PUSH_LOCK_ARGS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::PUSH_EXCLUSIVE_NAMES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::DOC_ROUND_SKIP_PARTS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'push_api.py::NOTATION_SAMPLES_MIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::HERE': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::REPO_ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::LEGAL_GATES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::DUP_CMDS_GUARDIAN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::INTENTIONAL_DUP_CMDS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::GATES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::BOTH_LAYERS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'run_all_gates.py::MANUAL_GATES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::DEFAULT_REQUIRE_SINCE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::DECLARED_CAPABILITIES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::CAPABILITY_PROBE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::CAPABILITY_EFFECT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::CAPABILITY_ARTIFACT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::CAPABILITY_ARTIFACT_KEYS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::GATE_RC_DOMAIN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::CAPABILITY_ANCHOR_SPEC': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::ALL_CONTENT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::ALL_CONTENT_FN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::ALLOWLIST_FILES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::NO_ARTIFACT_FLAG': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::NO_ART_ARTIFACT_FN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'claim_verify.py::NO_ART_TRUTH_FN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::PY': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::DECLARED_CAPABILITIES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CAPABILITY_PROBE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CAPABILITY_ARTIFACT': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CAPABILITY_ARTIFACT_KEYS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CAPABILITY_ANCHOR_FLOOR': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CHAOS_BASELINE_FILE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CHAOS_BASELINE_TOLERANCE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CHAOS_ARTIFACT_FULL_RATIO': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CHAOS_DENOM_TOLERANCE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::TYPE_RULES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::ASSERTABLE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::SEMANTIC': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::POISON': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::INTERFACE_ADAPTERS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::VALID_OVERRIDE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::TEXT_REPLACEMENTS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::PLACEHOLDERS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::VALID_BY_TYPE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::FIXTURE_OVERRIDES': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::COMPLETENESS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::CATALOG_KW': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'gate_chaos.py::NOT_CATALOG': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'coverage_gate.py::UNKNOWN_ANY': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'coverage_gate.py::ROW': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::ALLOWED': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::RESTRICTED': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::UNKNOWN': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::NOT_APP': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::BLOCKING': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::STATUS_HELP': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::FONT_FIELDS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::BOM_TOOLS': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    'license_gate.py::TEMPLATE': '核心基建非登记表依赖项（G440 反向扫描覆盖：删本条即暴露）',
-    '_scan_cross_ref_consts.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    '_scan_value_root_cands.py::HERE': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
-    '_scan_value_root_cands.py::ROOT': '路径根常量（非产物/台账路径；G440 反向扫描覆盖：删本条即暴露）',
+    # 🔑 第一百五十三轮：**逐条人工确认**（152 轮批量生成的统一理由已作废）。
+    #    🔴 152 轮实测：85 条里 75 条理由**完全相同** —— 无法区分
+    #       「真不该登记」与「随手豁免的」，G440 的约束力只取决于谁在写这张表。
+    #    🔑 值格式改为「分类: 该常量自己的说明」，分类取自 CONST_SCAN_CATEGORIES。
+    '_scan_cross_ref_consts.py::ROOT': 'PATH_ROOT: 交叉引用扫描脚本解析出的仓库根',
+    '_scan_value_root_cands.py::HERE': 'PATH_ROOT: 取值根候选扫描脚本所在目录',
+    '_scan_value_root_cands.py::ROOT': 'PATH_ROOT: 取值根候选扫描脚本解析出的仓库根',
+    'claim_verify.py::ALLOWLIST_FILES': 'META_TABLE: 允许清单目录',
+    'claim_verify.py::ALL_CONTENT': 'META_TABLE: 全内容守卫名',
+    'claim_verify.py::ALL_CONTENT_FN': 'FN_IDENT: 全内容守卫的函数名，字符串引用',
+    'claim_verify.py::CAPABILITY_ANCHOR_SPEC': 'PROBE_SPEC: 锚点规格，下界来源',
+    'claim_verify.py::CAPABILITY_ARTIFACT': 'PROBE_SPEC: 能力探针产物文件名',
+    'claim_verify.py::CAPABILITY_ARTIFACT_KEYS': 'PROBE_SPEC: 能力产物里读数的键路径',
+    'claim_verify.py::CAPABILITY_EFFECT': 'PROBE_SPEC: 能力探针的效应描述',
+    'claim_verify.py::CAPABILITY_PROBE': 'PROBE_SPEC: 能力探针命令表',
+    'claim_verify.py::DECLARED_CAPABILITIES': 'META_TABLE: 能力声明表自身',
+    'claim_verify.py::DEFAULT_REQUIRE_SINCE': 'SCAN_TUNING: 逐轮要求默认起始轮',
+    'claim_verify.py::GATE_RC_DOMAIN': 'META_TABLE: 门禁退出码域定义',
+    'claim_verify.py::NO_ARTIFACT_FLAG': 'SELFTEST_CFG: 无产物对照开关，命令行 flag',
+    'claim_verify.py::NO_ART_ARTIFACT_FN': 'FN_IDENT: 无产物时的产物读取函数名',
+    'claim_verify.py::NO_ART_TRUTH_FN': 'FN_IDENT: 无产物时的真值函数名',
+    'claim_verify.py::ROOT': 'PATH_ROOT: claim_verify 解析出的仓库根',
+    'coverage_gate.py::ROW': 'OUTPUT_FMT: coverage_gate 的表格行模板',
+    'coverage_gate.py::UNKNOWN_ANY': 'TYPE_ENUM: 覆盖率未知标记',
+    'gate_chaos.py::ASSERTABLE': 'TYPE_ENUM: 可断言类型集合',
+    'gate_chaos.py::CAPABILITY_ANCHOR_FLOOR': 'PROBE_SPEC: gate_chaos 的锚点下界表',
+    'gate_chaos.py::CAPABILITY_ARTIFACT': 'PROBE_SPEC: 能力探针产物文件名',
+    'gate_chaos.py::CAPABILITY_ARTIFACT_KEYS': 'PROBE_SPEC: 能力产物里读数的键路径',
+    'gate_chaos.py::CAPABILITY_PROBE': 'PROBE_SPEC: 能力探针命令表',
+    'gate_chaos.py::CATALOG_KW': 'SCAN_TUNING: 目录关键词，判断是否目录型',
+    'gate_chaos.py::CHAOS_ARTIFACT_FULL_RATIO': 'SCAN_TUNING: 全量比率，G415 判「是否全量」',
+    'gate_chaos.py::CHAOS_BASELINE_FILE': 'META_TABLE: 基线文件名，台账路径另归 G406',
+    'gate_chaos.py::CHAOS_BASELINE_TOLERANCE': 'SCAN_TUNING: 基线容差，G415 依赖',
+    'gate_chaos.py::CHAOS_DENOM_TOLERANCE': 'SCAN_TUNING: 分母容差，G417 依赖',
+    'gate_chaos.py::COMPLETENESS': 'TYPE_ENUM: 完备性检查名',
+    'gate_chaos.py::DECLARED_CAPABILITIES': 'META_TABLE: 能力声明表自身',
+    'gate_chaos.py::FIXTURE_OVERRIDES': 'TYPE_ENUM: gate_chaos 按夹具名覆盖取值',
+    'gate_chaos.py::INTERFACE_ADAPTERS': 'TYPE_ENUM: 接口适配器表',
+    'gate_chaos.py::NOT_CATALOG': 'SCAN_TUNING: 非目录关键词',
+    'gate_chaos.py::PLACEHOLDERS': 'TYPE_ENUM: gate_chaos 文本替换用的占位符表',
+    'gate_chaos.py::POISON': 'TYPE_ENUM: 破坏注入类型集合',
+    'gate_chaos.py::PY': 'PATH_ROOT: gate_chaos 复用的解释器路径 sys.executable',
+    'gate_chaos.py::ROOT': 'PATH_ROOT: gate_chaos 解析出的仓库根',
+    'gate_chaos.py::SEMANTIC': 'TYPE_ENUM: 语义型类型集合',
+    'gate_chaos.py::TEXT_REPLACEMENTS': 'TYPE_ENUM: 文本替换规则',
+    'gate_chaos.py::TYPE_RULES': 'TYPE_ENUM: 类型到规则的映射',
+    'gate_chaos.py::VALID_BY_TYPE': 'TYPE_ENUM: 按类型的合法值集合',
+    'gate_chaos.py::VALID_OVERRIDE': 'TYPE_ENUM: 合法覆盖值集合',
+    'license_gate.py::ALLOWED': 'TYPE_ENUM: 许可状态-允许',
+    'license_gate.py::BLOCKING': 'TYPE_ENUM: 阻断级别集合',
+    'license_gate.py::BOM_TOOLS': 'OUTPUT_FMT: 物料工具清单',
+    'license_gate.py::FONT_FIELDS': 'OUTPUT_FMT: 字体字段清单',
+    'license_gate.py::NOT_APP': 'TYPE_ENUM: 许可状态-不适用',
+    'license_gate.py::RESTRICTED': 'TYPE_ENUM: 许可状态-受限',
+    'license_gate.py::STATUS_HELP': 'OUTPUT_FMT: 状态说明文本表',
+    'license_gate.py::TEMPLATE': 'OUTPUT_FMT: license_gate 的报告模板',
+    'license_gate.py::UNKNOWN': 'TYPE_ENUM: 许可状态-未知',
+    'push_api.py::API': 'NET_CFG: GitHub API 根地址',
+    'push_api.py::BASELINE_FP_HISTORY_MAX': 'SCAN_TUNING: 变更史保留条数上限',
+    'push_api.py::CLEANUP_CALLS': 'SELFTEST_CFG: 清理类调用的方法名集合，G413 的扫描面',
+    'push_api.py::CLEANUP_SCAN_MIN': 'SCAN_TUNING: 清理调用扫描数下限',
+    'push_api.py::CLEANUP_VERIFY_FNS': 'SELFTEST_CFG: 校验类函数名集合，G413 判「是否带校验」',
+    'push_api.py::CONST_SCAN_ALLOW': 'META_TABLE: G440 的豁免表自身，不能自己登记自己',
+    'push_api.py::CONST_SCAN_ALLOW_MIN_REASON': 'SCAN_TUNING: 豁免理由最短长度阈值',
+    'push_api.py::DOC_ROUND_SKIP_PARTS': 'SCAN_TUNING: 文档轮次解析要跳过的路径片段',
+    'push_api.py::HDR': 'NET_CFG: push_api 发 API 请求用的请求头模板',
+    'push_api.py::HERE': 'PATH_ROOT: push_api 所在脚本目录，非产物或台账路径',
+    'push_api.py::LEGACY_SAMPLE_N': 'SCAN_TUNING: 历史遗留条目抽样条数',
+    'push_api.py::LEGACY_SHOW_N': 'SCAN_TUNING: 历史遗留条目展示条数',
+    'push_api.py::MUTATION_SELF_EXCLUDE': 'SELFTEST_CFG: 变异扫描排除自身的文件名',
+    'push_api.py::MUTATION_TARGET_MIN': 'SELFTEST_CFG: 变异目标数下限',
+    'push_api.py::NOTATION_SAMPLES_MIN': 'SCAN_TUNING: 写法反证样本数下限，G434 依赖',
+    'push_api.py::OWNER': 'NET_CFG: GitHub 仓库属主',
+    'push_api.py::PUSH_EXCLUSIVE_NAMES': 'SELFTEST_CFG: 推送互斥进程名特征，G429 依赖',
+    'push_api.py::PUSH_LOCK_ARGS': 'SELFTEST_CFG: 推送互斥识别用的参数特征',
+    'push_api.py::REPO': 'NET_CFG: GitHub 仓库名',
+    'push_api.py::ROOT': 'PATH_ROOT: push_api 解析出的仓库根，非产物或台账路径',
+    'push_api.py::ROUND_END_REQUIRED_GIDS': 'META_TABLE: 轮次末尾必需的门禁编号集合',
+    'push_api.py::ROUND_END_STEPS': 'META_TABLE: 轮次末尾步骤表，G423/G424 依赖',
+    'push_api.py::SELFTEST_TMP_DIR': 'SELFTEST_CFG: 自测临时目录名，G410/G411 依赖',
+    'push_api.py::TOK': 'NET_CFG: 访问令牌，属凭据不是依赖名',
+    'run_all_gates.py::BOTH_LAYERS': 'META_TABLE: 互补层登记表自身',
+    'run_all_gates.py::DUP_CMDS_GUARDIAN': 'FN_IDENT: 查重命令的 argv 特征',
+    'run_all_gates.py::GATES': 'META_TABLE: 门禁注册表自身',
+    'run_all_gates.py::HERE': 'PATH_ROOT: run_all_gates 所在脚本目录',
+    'run_all_gates.py::INTENTIONAL_DUP_CMDS': 'META_TABLE: 允许重复的（命令,门禁）对',
+    'run_all_gates.py::LEGAL_GATES': 'META_TABLE: 合法门禁编号全集',
+    'run_all_gates.py::MANUAL_GATES': 'META_TABLE: 人工门禁编号集合',
+    'run_all_gates.py::REPO_ROOT': 'PATH_ROOT: run_all_gates 解析出的仓库根',
 }
 
 # 🔑 豁免**必须写明理由**（与 PATH_CONST_ALLOW_MIN_REASON 同构）
 CONST_SCAN_ALLOW_MIN_REASON = 6
+
+
+# 🔑 第一百五十三轮：G441 —— 豁免必须是**结构化分类**，「为什么不该登记」才可复核。
+#    🔴 自由文本理由 → 任何常量都能用同一句话豁免（152 轮实测 75 条同文本）。
+#    🔑 分类是**枚举**：分类表外的值一律拒绝，分类定义必须写明适用范围。
+CONST_SCAN_CATEGORIES = {
+    'FN_IDENT': '以字符串形式引用的函数或命令标识；AST 里不是 Name 节点，G440 的引用判据天然数不到。',
+    'META_TABLE': '元表自身或其键集合；G440 的登记表与豁免表由它构成，让它自己登记自己会形成自证循环。',
+    'NET_CFG': '远端访问配置与凭据（属主、仓库名、令牌、端点、请求头）；属于运行环境变量，不是代码内的被依赖名字。',
+    'OUTPUT_FMT': '输出排版用的模板与字段清单；仅影响打印格式。',
+    'PATH_ROOT': '指向仓库或脚本目录自身的路径根常量；它不指向产物或台账，因此不适用「产物路径必须登记」的语义。',
+    'PROBE_SPEC': '能力探针的规格数据（命令、产物名、读数键路径、锚点规格）；属探针配置而非依赖登记项。',
+    'SCAN_TUNING': '扫描器的阈值、容差与条数配置（调参型数值）；改动影响的是灵敏度而非「某个名字是否仍被登记」。',
+    'SELFTEST_CFG': '自检与自测的运行配置（临时目录、进程特征、开关 flag）；只在自测路径上生效。',
+    'TYPE_ENUM': '类型或状态的取值域集合（枚举与映射表）；它是取值集合而不是依赖名，逐条登记无意义。',
+}
+CONST_SCAN_CAT_MIN = 6            # 分类数下限（表被清空 → 拒绝给结论）
+CONST_SCAN_CATDEF_MIN = 20        # 每个分类的**定义**最短长度（防「同上」）
+CONST_SCAN_DETAIL_MIN = 6         # 每条豁免的**具体说明**最短长度
+CONST_SCAN_SAME_DETAIL_MAX = 2    # 同一分类下说明完全相同的条目数上限（批量指纹）
+CONST_SCAN_EXEMPT_FN = '_scan_const_exempt_bad'
+CONST_SCAN_EXEMPT_MIN = 60        # 豁免条数下限（表被清空/缩小 → 拒绝给结论）
 PATH_CONST_ALLOW_MIN_REASON = 6
 
 # 🔑 第一百一十四轮：**元登记项** —— 被依赖的"登记表本身"。
@@ -658,6 +696,24 @@ def blob_content(path):
     return open(path, 'rb').read()
 
 
+def _blob_retryable(err):
+    """🔑 G431 重试判据（153 轮修正）：**5xx 可重试，4xx 不可重试**。
+
+    🔴 141 轮写的判据是「HTTP 4xx/5xx 一律不重试」—— 本轮实测推翻：
+       连续两次推送都因 `HTTP 502 Server Error` 中止，而**两次失败的却是不
+       同的文件** → 服务端随机故障，不是内容问题。
+    🔑 **5xx 与网络抖动同性质**（服务端临时故障）；**4xx 才是内容/权限**，
+       重试无意义且会放大故障（141 轮这条判断对 4xx 仍然成立）。
+    """
+    if isinstance(err, int):
+        return 500 <= err < 600
+    e = str(err or '')
+    if e.startswith('NET:'):
+        return True
+    m = re.search(r'(?<!\d)(5\d\d)(?!\d)', e)
+    return bool(m)
+
+
 def mk_blob(path):
     """🔑 上传单个 blob（**网络层抖动必须重试** —— 第一百四十一轮）。
 
@@ -666,9 +722,11 @@ def mk_blob(path):
        因 `NET:URLError ... Temporary failure in name resolution` 失败，
        而**只要有一个失败，整次推送就中止**（fail-safe，但也意味着
        🔴 **一次抖动 = 整轮白干**）。
-    🔑 判据：**网络抖动是可重试的失败，内容错误不是** ——
-       只重试 `__err` 以 `NET:` 开头的（104 轮定义的网络层形态），
-       HTTP 4xx/5xx 一律不重试（那是内容/权限问题，重试无意义且会放大故障）。
+    🔑 判据：**网络抖动与服务端 5xx 是可重试的失败，4xx 不是** ——
+       重试 `__err` 以 `NET:` 开头的（104 轮定义的网络层形态）**或 HTTP 5xx**；
+       🔴 HTTP 4xx 一律不重试（内容/权限问题，重试无意义且会放大故障）。
+       🔑 153 轮修正：原判据「4xx/5xx 一律不重试」被实测推翻 —— 连续两次
+           推送都因 `HTTP 502` 中止且**失败文件不同**（服务端随机故障）。
     """
     try:
         raw = blob_content(path)
@@ -680,7 +738,7 @@ def mk_blob(path):
     for _i in range(BLOB_NET_RETRY):
         if '__err' not in d:
             break
-        if not str(d.get('__err', '')).startswith('NET:'):
+        if not _blob_retryable(d.get('__err', '')):
             break
         time.sleep(BLOB_RETRY_SLEEP * (_i + 1))
         d = req('POST', f'{API}/git/blobs', payload)
@@ -3277,6 +3335,100 @@ def _scan_ref_consts_bad():
     return bad, scanned
 
 
+def _scan_const_exempt_bad():
+    """🔑 G441 **唯一实现**：豁免必须是**结构化分类**，而非自由文本。
+
+    🔴 152 轮诚实结论②：85 条豁免**批量生成、理由统一**
+       （实测 75 条文本完全相同 + 10 条另一文本完全相同）。
+       🔑 统一理由 = 分不清「真不该登记」与「随手豁免的」——
+          于是 G440 的约束力只取决于「谁在写这张表」，而不是「该不该」。
+    🔑 本函数把豁免收敛成**枚举分类**：分类表外的值一律拒绝，
+       分类定义必须写明适用范围，同分类下说明雷同超过上限即判「批量生成」。
+    """
+    cats = globals().get('CONST_SCAN_CATEGORIES')
+    if not cats:
+        return None, 'CONST_SCAN_CATEGORIES 未登记或为空 —— 拒绝给结论'
+    mincat = globals().get('CONST_SCAN_CAT_MIN') or 0
+    if len(cats) < mincat:
+        return None, ('分类数 %d < 下限 %d —— 疑似被清空，拒绝给结论'
+                      % (len(cats), mincat))
+    mindef = globals().get('CONST_SCAN_CATDEF_MIN') or 0
+    mindet = globals().get('CONST_SCAN_DETAIL_MIN') or 0
+    maxsame = globals().get('CONST_SCAN_SAME_DETAIL_MAX') or 0
+    allow = globals().get('CONST_SCAN_ALLOW') or {}
+    if not allow:
+        return None, 'CONST_SCAN_ALLOW 未登记或为空 —— 拒绝给结论'
+    bad = []
+    seen = {}
+    for k in sorted(allow):
+        v = allow[k]
+        if not isinstance(v, str) or ':' not in v:
+            bad.append((k, '豁免值缺少「分类: 说明」前缀 —— 自由文本一律拒绝'))
+            continue
+        cat, _, detail = v.partition(':')
+        cat = cat.strip()
+        detail = detail.strip()
+        if cat not in cats:
+            bad.append((k, '分类「%s」未在 CONST_SCAN_CATEGORIES 中定义' % cat))
+            continue
+        if len(cats[cat] or '') < mindef:
+            bad.append((k, '分类「%s」的定义过短（<%d）' % (cat, mindef)))
+            continue
+        if len(detail) < mindet:
+            bad.append((k, '具体说明过短（<%d）—— 无法复核「为什么不该登记」' % mindet))
+            continue
+        seen.setdefault((cat, detail), []).append(k)
+    for (cat, detail), ks in sorted(seen.items()):
+        if len(ks) > maxsame:
+            bad.append((ks[0], '分类「%s」下说明完全相同的条目 %d 条 > 上限 %d'
+                        ' —— 疑似批量生成，非逐条确认' % (cat, len(ks), maxsame)))
+    return bad, len(allow)
+
+
+def cmd_assert_const_exempt_covered():
+    """🔑 G441：**豁免必须是结构化分类**（152 轮诚实结论② 的补偿）。"""
+    print(u'\U0001f511 **豁免结构化分类**（G441 · 152 轮诚实结论② 的补偿）')
+    fn = globals().get('CONST_SCAN_EXEMPT_FN')
+    if not fn:
+        print(u'\U0001f534 CONST_SCAN_EXEMPT_FN 未登记 —— 拒绝给结论')
+        return 1
+    impl = globals().get(fn)
+    if impl is None:
+        print(u'\U0001f534 %s 不存在 —— 拒绝给结论' % fn)
+        return 1
+    bad, scanned = impl()
+    if bad is None:
+        print(u'\U0001f534 %s' % scanned)
+        return 1
+    minx = globals().get('CONST_SCAN_EXEMPT_MIN') or 0
+    if scanned < minx:
+        print(u'\U0001f534 豁免仅 %d 条 < 下限 %d —— 疑似被清空，拒绝给结论'
+              % (scanned, minx))
+        return 1
+    # 🔑 行为反证：注入一条「未定义分类」的豁免，实现**必须**报出来
+    #    🔴 否则判据② 可能恒真（106 轮「缺失被当成没有违规」同病）。
+    save = globals().get('CONST_SCAN_ALLOW')
+    try:
+        injected = dict(save or {})
+        injected['_probe_bogus.py::BOGUS_CONST'] = 'BOGUS_CAT_NOT_DEFINED: 反证注入'
+        globals()['CONST_SCAN_ALLOW'] = injected
+        bad2, _n2 = impl()
+        hit = bool(bad2) and any('BOGUS_CAT_NOT_DEFINED' in (b[1] if len(b) > 1 else '')
+                                 for b in (bad2 or []))
+    finally:
+        globals()['CONST_SCAN_ALLOW'] = save
+    if not hit:
+        print(u'\U0001f534 反证失效：注入「未定义分类」的豁免后未报出 —— 判据恒真')
+        return 1
+    if bad:
+        for k, why in bad:
+            print(u'   \U0001f534 %s —— %s' % (k, why))
+        print(u'\U0001f534 守卫失效（G441）：%d 条豁免不合格' % len(bad))
+        return 1
+    print(u'   \u2705 %d 条豁免全部为已定义分类，逐条说明可复核（反证已验）' % scanned)
+    return 0
+
+
 def cmd_assert_const_covered():
     """🔑 G440：**非路径常量的反向扫描**（151 轮实测③ 的补偿）。"""
     print(u'\U0001f511 **非路径常量反向扫描**（G440 · 151 轮实测③ 的补偿）')
@@ -5269,13 +5421,17 @@ def cmd_assert_blob_retry():
     🔑 四条判据：
        ① `BLOB_NET_RETRY` / `BLOB_RETRY_SLEEP` 存在且为正
           （🔴 缺失/为 0 → 重试静默变成"不重试"，与 106 轮同病）
-       ② AST：`mk_blob` 内确有重试循环，且过滤条件是 `startswith('NET:')`
-          —— 🔑 **重试必须只覆盖网络层**；HTTP 4xx/5xx 重试无意义且放大故障
+       ② AST：`mk_blob` 内确有重试循环，且过滤条件调用 `_blob_retryable`
+          —— 🔑 **重试只覆盖网络层与服务端 5xx**（153 轮修正）
        ③ **行为反证（真调用实现，不抄一份）**：把 `req` 换成"前 2 次返回
           NET 错误、第 3 次成功"，断言 `mk_blob` **最终成功**且真调了 3 次
           → 防"实现被换成只发一次"（130/132 轮判据唯一实现的同款洞）
-       ④ **反向行为反证**：`req` 恒返回 HTTP 500，断言**只调用 1 次**
+       ④ **反向行为反证**：`req` 恒返回 HTTP **403**，断言**只调用 1 次**
           → 防"无差别重试"（把内容/权限错误也重试，会放大故障）
+       ⑤ **5xx 反证（153 轮新增）**：`req` 前 2 次返回 HTTP **503**、第 3 次
+          成功，断言**最终成功**且真调了 3 次
+          🔴 141 轮判据④ 用的是 500 且断言"只调 1 次" —— 它把 5xx
+              与 4xx 混为一谈，本轮实测（两次 502 失败文件不同）证明这是错的
     """
     print('🔑 **blob 网络抖动必须重试**（G431）')
     print('=' * 70)
@@ -5305,13 +5461,12 @@ def cmd_assert_blob_retry():
                     if isinstance(sub, ast.For):
                         for s2 in ast.walk(sub):
                             if isinstance(s2, ast.Call) and isinstance(
-                                    s2.func, ast.Attribute)                                     and s2.func.attr == 'startswith'                                     and any(isinstance(a, ast.Constant)
-                                            and a.value == 'NET:'
-                                            for a in s2.args):
+                                    s2.func, ast.Name)                                     and s2.func.id == '_blob_retryable':
                                 has_loop = has_net = True
     if not has_loop:
-        bad.append('mk_blob 内找不到"仅对 NET 错误重试"的循环 —— 116~140 轮旧实现')
-    print(f'② AST 重试循环 · 只认 NET: {has_loop and has_net}')
+        bad.append('mk_blob 内找不到调用 _blob_retryable 的重试循环'
+                   ' —— 116~140 轮旧实现 / 判据被改回只认 NET:')
+    print(f'② AST 重试循环 · 判据走 _blob_retryable: {has_loop and has_net}')
 
     # ③ 行为反证：抖 2 次后应成功
     real_req = globals().get('req')
@@ -5341,12 +5496,12 @@ def cmd_assert_blob_retry():
     print(f'③ 行为反证：抖 2 次 → 调用 {len(calls)} 次 · 结果 '
           f'{"成功" if sha else "失败"}')
 
-    # ④ 反向：HTTP 错误不得重试
+    # ④ 反向：HTTP **4xx**（内容/权限）不得重试
     calls2 = []
 
     def _fake_http(m, u, d=None):
         calls2.append(1)
-        return {'__err': 500, '__body': 'boom'}
+        return {'__err': 403, '__body': 'boom'}
 
     globals()['req'] = _fake_http
     globals()['BLOB_RETRY_SLEEP'] = 0
@@ -5358,15 +5513,41 @@ def cmd_assert_blob_retry():
         globals()['req'] = real_req
         globals()['BLOB_RETRY_SLEEP'] = old_sleep
     if len(calls2) != 1:
-        bad.append(f'HTTP 500 被调用了 {len(calls2)} 次 —— 无差别重试会放大故障')
-    print(f'④ 反向反证：HTTP 500 调用 {len(calls2)} 次（应为 1）')
+        bad.append(f'HTTP 403 被调用了 {len(calls2)} 次 —— 无差别重试会放大故障')
+    print(f'④ 反向反证：HTTP 403 调用 {len(calls2)} 次（应为 1）')
+
+    # ⑤ 🔑 153 轮新增：**5xx 必须重试**（141 轮判据④ 把 500 当成"不该重试"）
+    calls3 = []
+
+    def _fake_503(m, u, d=None):
+        calls3.append(1)
+        if len(calls3) <= 2:
+            return {'__err': 503, '__body': 'Service Unavailable'}
+        return {'sha': '0' * 40}
+
+    globals()['req'] = _fake_503
+    globals()['BLOB_RETRY_SLEEP'] = 0
+    try:
+        _p3, sha3, err3 = mk_blob('README.md')
+    except Exception as e:
+        sha3, err3 = None, f'异常 {type(e).__name__}: {e}'
+    finally:
+        globals()['req'] = real_req
+        globals()['BLOB_RETRY_SLEEP'] = old_sleep
+    if sha3 is None:
+        bad.append(f'HTTP 503 抖 2 次后仍失败（{err3}）—— '
+                   '5xx 重试没生效（141 轮"5xx 不重试"的旧判据？）')
+    elif len(calls3) < 3:
+        bad.append(f'HTTP 503 只调用了 {len(calls3)} 次 —— 5xx 重试次数不足')
+    print(f'⑤ 5xx 反证：503 抖 2 次 → 调用 {len(calls3)} 次 · 结果 '
+          f'{"成功" if sha3 else "失败"}')
 
     if bad:
         for b in bad:
             print('🔴', b)
         print('=' * 70)
         return 1
-    print('✅ blob 网络抖动重试 4 条判据全部通过')
+    print('✅ blob 可重试失败（网络层 + 5xx）5 条判据全部通过')
     print('=' * 70)
     return 0
 
@@ -6967,6 +7148,8 @@ def main():
     ap.add_argument('--assert-cache-recheck-proof', action='store_true',
                     help='G439：反证样本集**不得**与实现实际检查集合重合'
                          '（逐条各造一次篡改；150 轮判据⑦ 只造首/中/尾 3 条）')
+    ap.add_argument('--assert-const-exempt', action='store_true',
+                    help='G441 豁免必须是结构化分类（152 轮统一理由的补偿）')
     ap.add_argument('--assert-const-covered', action='store_true',
                     help='G440：非路径常量**反向扫描**（被引用的常量必须仍在'
                          '登记表/豁免表内；151 轮实测③ 删 CACHE_PROOF_N 无人发现）')
@@ -7041,6 +7224,8 @@ def main():
         return cmd_assert_net_budget()
     if getattr(a, 'assert_cache_recheck_proof', False):
         return cmd_assert_cache_recheck_proof()
+    if getattr(a, 'assert_const_exempt', False):
+        return cmd_assert_const_exempt_covered()
     if getattr(a, 'assert_const_covered', False):
         return cmd_assert_const_covered()
     if a.assert_cache_recheck:
