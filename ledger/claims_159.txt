@@ -25,7 +25,7 @@
 #    ② 🔴 grefs 口径被放宽（任何 x.get('X') / d['X'] 都算引用 → G440 偏乐观）；
 #    ③ 只测 6 种形态；④ 同时改实现与调用点清单仍绕过（109 轮已知边界）；
 #    ⑤ 全量回归本轮未跑完，通过数为关键子集口径。
-grep:scripts/push_api.py::CALL_TARGET_USERS = ('_scan_ref_consts_bad', '_no_dirty_wired_bad')
+grep:scripts/push_api.py::CALL_TARGET_USERS = ('_write_step_scan', '_no_dirty_wired_bad')
 grep:scripts/push_api.py::CALL_TARGET_USERS_FN = '_call_target_users_bad'
 grep:scripts/push_api.py::CALL_TARGET_FORMS_MIN = 5
 grep:scripts/push_api.py::CALL_TARGET_BAN_ATTRS = ('id', 'attr')
@@ -34,7 +34,7 @@ grep:scripts/push_api.py::WRITE_ENTRY_FNS = ('req', 'req_retry')
 grep:scripts/push_api.py::DIRTY_GUARD_FN = 'cmd_assert_no_dirty'
 grep:scripts/push_api.py::def _call_target_users_bad(tree):
 grep:scripts/push_api.py::def cmd_assert_call_target_single():
-grep:scripts/push_api.py::                grefs |= _call_target_name(n)
+grep:scripts/push_api.py::            if isinstance(n, (ast.Call, ast.Subscript)):
 grep:scripts/push_api.py::                and (_call_target_name(n.func) & set(WRITE_ENTRY_FNS)):
 grep:scripts/push_api.py::            and (_call_target_name(x.func) & {DIRTY_GUARD_FN})
 grep:scripts/push_api.py::    ap.add_argument('--assert-call-target-single', action='store_true',
@@ -47,3 +47,10 @@ cmd:push_api.py --assert-const-covered
 cmd:push_api.py --assert-no-dirty
 cmd:run_all_gates.py --check-both-layers
 gate:G447
+# 🔑 修订记录（第一百六十轮）：两条 needle 因 160 轮修正而失效，已换成等价的真陈述。
+#    - `CALL_TARGET_USERS` 首项 `_scan_ref_consts_bad` → `_write_step_scan`：
+#      🔴 159 轮把**引用计数**接进调用目标解析是**过宽**的（见本文件诚实结论②），
+#        160 轮改走 `_ns_ref_names`，该文件不再是"调用目标解析"的调用点
+#        （改由 G448 守护），清单相应换成真正做调用目标解析的 `_write_step_scan`。
+#    - `grefs |= _call_target_name(n)` → `if isinstance(n, (ast.Call, ast.Subscript)):`：
+#      同上，宽口径已被窄口径取代；改用该处仍然成立的相邻真行。

@@ -1,0 +1,48 @@
+# 第一百六十轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**「引用」口径必须有命名空间限定**（G448），补 159 轮诚实结论②。
+# 🔴 159 轮把 `_scan_ref_consts_bad`（G440）的引用计数改走宽口径 `_call_target_name`，
+#    于是**任何** cfg['X'] / cfg.get('X') / getattr(obj,'X') 都算"引用过"
+#    —— 实测宽口径认 359 个字符串、窄口径认 67 个，宽口径多认的
+#    **无关**字符串 211 个（audit-all / allowlist / 空串 / 999999 …）。
+#    🔑 危害是**稀释**：证据几乎恒真 → 未登记常量一律被判"已引用" → 误报 →
+#       催生**批量豁免**（152 轮实测 75 条理由一字不差）→ 判据被豁免表吃掉。
+# 🔑 修法：抽出唯一实现 `_ns_ref_names`，**只认** globals() / locals() / vars()
+#    上的按字符串访问；任意映射**不算引用**（静态不可判定时"宁可不认"）。
+# 🔑 对照实验①（同一状态：引用计数改回宽口径）：**G440 rc=0** ✅ · **G448 rc=1** 🔴
+#    —— 一绿一红，不是推演。
+# 🔑 内嵌对照（判据④⑤，常驻门禁内部）：命名空间 7 种形态真实实现**必须认**
+#    （漏认 = 真引用被判"没引用"，静默假阴性）；噪声 6 种形态真实实现
+#    **必须不认**、而宽口径**必须认** —— 否则"限定"只是文字游戏。
+# 🔑 判据⑧ 第一版是**恒真的**：桩成恒返回空后仍报合规 —— 真因是探针复用了
+#    **捕获到的函数引用**；改为每次**现场取活实现**后 7/7 全部认不出。
+# 🔑 八方向破坏全部符合预期：①核心对照 G448=1 / G440=0 · ②调用后丢弃结果=1 ·
+#    ③桩化唯一实现=1 · ④命名空间形态表缩到 2 条=1 · ⑤噪声形态表缩到 1 条=1 ·
+#    ⑥一致改名=**0** 不误报 · ⑦噪声形态混进命名空间表=1 · ⑧删 NS_REF_USERS
+#    条目=1。恢复后 md5 一致。
+# 🔑 互补层登记第 28 组（'G440','G448'）：只留 G440 → 口径被放宽时它照样 rc=0；
+#    只留 G448 → 没有"哪些常量该被登记"的实际扫描，口径限定无的放矢。
+# ⚠️ 诚实结论：① 🔴 窄口径会漏"配置字典里的真引用"（SETTINGS['CONST']），
+#    静态不可判定，取"宁可不认"；② 只认三种命名空间函数，__dict__['X'] 未覆盖；
+#    ③ 宽/窄差异的**实测数字只打印不断言** —— 环境变化不应造成假阳性；
+#    ④ 同时改实现与形态表仍绕过（109 轮已知边界）；⑤ 全量回归本轮未跑完。
+grep:scripts/push_api.py::NS_REF_FN = '_ns_ref_names'
+grep:scripts/push_api.py::NS_REF_USERS = ('_scan_ref_consts_bad',)
+grep:scripts/push_api.py::NS_REF_NOISE_MIN = 5
+grep:scripts/push_api.py::def _ns_ref_names(node):
+grep:scripts/push_api.py::def _ns_ref_scope_bad(tree):
+grep:scripts/push_api.py::def cmd_assert_ns_ref_scope():
+grep:scripts/push_api.py::    ap.add_argument('--assert-ns-ref-scope', action='store_true',
+grep:scripts/push_api.py::    if getattr(a, 'assert_ns_ref_scope', False):
+grep:scripts/push_api.py::        return cmd_assert_ns_ref_scope()
+grep:scripts/push_api.py::                grefs |= _ns_ref_names(n)
+grep:scripts/push_api.py::    '_ns_ref_names': ('fn', 'G448 治本唯一实现：只认命名空间限定的按字符串引用'),
+grep:scripts/push_api.py::    '_ns_ref_scope_bad': ('fn', 'G448 唯一实现：口径限定 + 结果真被用'),
+grep:scripts/run_all_gates.py::("G448", "**「引用」口径必须有命名空间限定**（159 轮：任意字典查表都算引用 → 稀释）",
+grep:scripts/run_all_gates.py::    ('G440', 'G448',
+grep:README.md::🔑 第一百六十轮：G448
+grep:references/负面教训库.md::🔑 **判据（160 轮补）**
+cmd:push_api.py --assert-ns-ref-scope
+cmd:push_api.py --assert-const-covered
+cmd:push_api.py --assert-call-target-single
+cmd:run_all_gates.py --check-both-layers
+gate:G448
