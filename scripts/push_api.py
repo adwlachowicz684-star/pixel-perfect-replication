@@ -224,6 +224,12 @@ DEPENDENT_NAMES = {
     'WRITE_PROOF_FN': ('const', 'G444 判据① 依赖：唯一实现的函数名'),
     '_write_proof_check': ('fn', 'G444 唯一实现：逐环节各造反证样本'),
     'cmd_assert_write_step_proof': ('fn', 'G444 反证逐环节覆盖的断言入口'),
+    # 🔑 第一百五十七轮：G445（反证必须覆盖「不认 URL」形态）依赖
+    'WRITE_PROOF_URL_FN': ('const', 'G445 判据① 依赖：唯一实现的函数名'),
+    'WRITE_PROOF_FOREIGN_URL': ('const', 'G445 对照点：与所有环节都不相干的写 URL'),
+    'WRITE_PROOF_FOREIGN_WANT': ('const', 'G445 对照点：无关 URL 样本下的期望判定'),
+    '_write_proof_url_check': ('fn', 'G445 唯一实现：逐环节各造无关 URL 反证样本'),
+    'cmd_assert_write_step_url': ('fn', 'G445 反证「不认 URL」形态的断言入口'),
 
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
@@ -5952,6 +5958,81 @@ def _write_proof_check(scan_fn, bad_fn, steps):
     return miss, covered, rows
 
 
+# 🔑 第一百五十七轮：G445 依赖
+# 🔴 156 轮诚实结论② 点名的真实缺口（本轮实测）：G443/G444 的反证
+#    形态只有 A/B/C 三种，样本 URL **都含当前环节** —— 于是"扫描是否真的按
+#    URL 区分环节"从未被检验。退化实现「只按 HTTP 方法匹配、完全不看 URL」
+#    实测在 **G443 与 G444 两个口径下都 rc=0 放行**。
+#    🔴 危害：任一环节只要源码里还有**别的** POST 走 req_retry，
+#    所有环节都被判"已覆盖" → 把 git/trees 改回裸 req 也无人发现
+#    → 一次 502 就整轮白干（153 轮真实事故）。
+WRITE_PROOF_URL_FN = '_write_proof_url_check'
+# 🔑 对照点：与**所有**环节都不相干的写 URL（判据⑥ 守它真不相干）
+WRITE_PROOF_FOREIGN_URL = '/repos/o/r/merges'
+# 🔑 该样本下每个环节的期望判定
+WRITE_PROOF_FOREIGN_WANT = '找不到'
+
+
+def _write_proof_url_check(scan_fn, bad_fn, steps, foreign):
+    """🔑 G445 的**唯一实现**：对**每一个**写环节各造一个"只有与
+    本环节无关的写 URL"的反证样本，期望该环节被判「找不到」。
+
+    🔴 为什么必须补这一形态（本轮实测）：
+       A/B/C 三形态里样本 URL **总是含当前环节**，所以"扫描是否真的按 URL
+       区分环节"从未被检验。退化实现"任何写方法调用都算所有环节命中"
+       在 A/B/C 下**全部命中**（G444 rc=0），而它一旦发生，G442 判据②⑥
+       同时失效 —— 环节之间被一视同仁。
+
+    🔑 返回 (miss, covered, rows)；实现缺失 / 清单为空 / foreign 为空时
+       miss **非空** —— 🔴 缺失必须表现为"未命中"，不得静默通过（106 轮同病）。
+    """
+    miss = []
+    rows = []
+    if scan_fn is None or bad_fn is None:
+        miss.append('扫描/判定实现缺失 —— '
+                    '反证无法进行，拒绝给结论')
+        return miss, 0, rows
+    if not steps:
+        miss.append('环节清单为空 —— '
+                    '反证无样本，判据恒真')
+        return miss, 0, rows
+    if not foreign:
+        miss.append('无关 URL 对照点为空 —— '
+                    '样本退化成 A/B/C，判据恒真')
+        return miss, 0, rows
+    want = globals().get('WRITE_PROOF_FOREIGN_WANT') or '找不到'
+    covered = 0
+    for idx, item in enumerate(steps):
+        seg, method = item[0], item[1]
+        slug = 'u%d' % idx
+        # 🔑 样本按环节**参数化生成** —— 新增环节自动纳入，不许写死一组
+        snip = chr(10).join([
+            'def _snip_u_%s():' % slug,
+            "    req_retry('%s', API + '%s', {})" % (method, foreign),
+        ])
+        try:
+            t = ast.parse(snip)
+        except Exception as e:
+            miss.append('环节 %s 样本无法解析 —— '
+                        '拒绝给结论: %s' % (seg, e))
+            continue
+        found = scan_fn(t, steps)
+        b = bad_fn(found, steps)
+        # 🔑 只认**该环节**的违规：其它环节的命中会稀释判据
+        #    （155 轮方向⑥ 实测：被无关命中顶替成 rc=0）
+        hit = any((want in x and seg in x) for x in b)
+        if not hit:
+            miss.append('环节 %s 期望「%s」未命中'
+                        '（实际违规=%s）—— '
+                        '扫描疑似只按 HTTP 方法匹配'
+                        '而不看 URL，各环节被一视同仁'
+                        % (seg, want, b))
+        else:
+            covered += 1
+        rows.append((seg, want, hit, len(b)))
+    return miss, covered, rows
+
+
 def cmd_assert_write_step_proof():
     """🔑 G444：**写环节反证必须逐环节各造一次**（第一百五十六轮）。
 
@@ -6160,6 +6241,185 @@ def cmd_assert_write_step_proof():
         print(chr(10) + '🔴 **写环节反证逐环节覆盖** 不成立')
         return 1
     print(chr(10) + '✅ **写环节反证逐环节覆盖** 成立')
+    return 0
+
+
+def cmd_assert_write_step_url():
+    """🔑 G445：**写环节反证必须包含「不认 URL / 认错环节」这一形态**（第一百五十七轮）。
+
+    🔴 真实缺口（156 轮诚实结论② 点名，本轮对照实验实证）：
+       G443/G444 的 A/B/C 三形态样本，URL **都含当前环节**；扫描若退化成
+       "只按 HTTP 方法匹配、完全不看 URL"，三种形态**全部命中** ——
+       🔑 **G443 rc=0 放行** · **G444 rc=0 放行** · **G445 rc=1 抓到**。
+       🔴 同一状态两绿一红 —— G445 的存在理由不是推演，是跑出来的。
+       🔴 该退化的危害：只要源码里还有**任何一个** POST 走 req_retry，
+           **所有**环节都被判"已覆盖"，把 git/trees 改回裸 req 无人发现。
+
+    🔑 七条判据：
+       ① 唯一实现 `_write_proof_url_check` 存在（经常量 `WRITE_PROOF_URL_FN` 取，
+          不许硬编码函数名 —— 一致改名会假阳性，134/155 轮同病）
+       ② 反证覆盖**每一个**环节：覆盖数 == 清单条数，且 ≥ `WRITE_PROOF_SEG_MIN`
+       ③ 用**真实** `_write_step_scan` / `_write_step_bad` 跑：未命中必须为空
+       ④ **退化反证**："只按方法不看 URL"的实现必须产生未命中
+          —— 🔴 证明判据③ 不是恒真（106 轮"缺失≠没有违规"）
+       ⑤ **内嵌对照**：同一个退化实现在 **G444 口径**（A/B/C 三形态）下
+          未命中**为空** —— 证明 G444 真看不见这一形态
+       ⑥ 对照点 `WRITE_PROOF_FOREIGN_URL` 必须**真的**与所有环节不相干
+          （互不为子串）且样本方法属于 `WRITE_METHODS`
+          —— 否则对照点漂移，⑤ 形同虚设
+       ⑦ 一致改名不得假阳性：以别名注入同名实现并同步常量后仍可取到
+    """
+    print('\U0001f511 **写环节反证必须覆盖'
+          '「不认 URL」形态**（G445）')
+    print('=' * 70)
+    os.chdir(ROOT)
+    bad = []
+
+    steps = globals().get('WRITE_RETRY_STEPS')
+    if not isinstance(steps, (list, tuple)) or not steps:
+        bad.append('WRITE_RETRY_STEPS 缺失或为空 —— '
+                   '反证无样本，判据恒真'
+                   '（106 轮"缺失≠没有违规"同病）')
+        steps = ()
+
+    fn_scan = globals().get(WRITE_SCAN_FN)
+    fn_bad = globals().get(WRITE_BAD_FN)
+    fn_url = globals().get(WRITE_PROOF_URL_FN)
+    fn_legacy = globals().get(WRITE_PROOF_FN)
+    foreign = globals().get('WRITE_PROOF_FOREIGN_URL')
+    print('① 唯一实现（经常量取）: '
+          '%s=%s · %s=%s · %s=%s'
+          % (WRITE_PROOF_URL_FN, fn_url is not None,
+             WRITE_SCAN_FN, fn_scan is not None,
+             WRITE_BAD_FN, fn_bad is not None))
+    if fn_url is None:
+        bad.append('唯一实现 %s 缺失 —— '
+                   '崩溃与拒绝在 rc 上无法区分'
+                   '（133 轮同病）' % WRITE_PROOF_URL_FN)
+    if fn_scan is None or fn_bad is None:
+        bad.append('%s / %s 缺失 —— 无真实扫描可供反证'
+                   % (WRITE_SCAN_FN, WRITE_BAD_FN))
+    if fn_legacy is None:
+        bad.append('%s 缺失 —— ⑤ 无 G444 口径可供对照'
+                   % WRITE_PROOF_FN)
+
+    n_seg = len(steps)
+    print('② 环节清单条数=%d · '
+          '覆盖下限=%d' % (n_seg, WRITE_PROOF_SEG_MIN))
+    if n_seg < WRITE_PROOF_SEG_MIN:
+        bad.append('环节清单只有 %d 条 < %d —— '
+                   '反证样本集过小' % (n_seg, WRITE_PROOF_SEG_MIN))
+
+    # 🔴 退化实现：只按 HTTP 方法匹配，完全不看 URL（本轮实测 G443/G444 都放行）
+    def _scan_any(tree, steps):
+        """🔴 退化：任何写方法调用都算**所有**环节命中。
+
+        🔑 这正是 157 轮实测的洞：G443/G444 的样本 URL 都含当前环节，
+           所以"是否真的按 URL 区分"从未被检验 —— 它俩口径下全部命中。
+        """
+        out = {}
+        for seg, _m in steps:
+            out[seg] = {}
+        if tree is None:
+            return out
+        for sub in ast.walk(tree):
+            if not isinstance(sub, ast.Call):
+                continue
+            fn = None
+            if isinstance(sub.func, ast.Name):
+                fn = sub.func.id
+            elif isinstance(sub.func, ast.Attribute):
+                fn = sub.func.attr
+            if fn not in ('req', 'req_retry'):
+                continue
+            if not sub.args:
+                continue
+            a0 = sub.args[0]
+            if not (isinstance(a0, ast.Constant) and a0.value in WRITE_METHODS):
+                continue
+            for seg, _m in steps:
+                out[seg][fn] = out[seg].get(fn, 0) + 1
+        return out
+
+    if fn_url is not None and fn_scan is not None and fn_bad is not None:
+        miss, covered, rows = fn_url(fn_scan, fn_bad, steps, foreign)
+        for seg, want, hit, nbad in rows:
+            print('③ 环节 %-22s 期望「%s」 · '
+                  '命中=%s · 违规数=%d' % (seg, want, hit, nbad))
+        print('③ 覆盖环节数=%d/%d' % (covered, n_seg))
+        if miss:
+            for m in miss:
+                bad.append('③ ' + m)
+        if covered != n_seg:
+            bad.append('③ 覆盖 %d 个环节 != 清单 %d 条'
+                       % (covered, n_seg))
+
+        # ④ 退化反证
+        dmiss, dcov, _drows = fn_url(_scan_any, fn_bad, steps, foreign)
+        print('④ 退化（只按方法不看 URL）: '
+              '覆盖=%d/%d · 未命中=%d' % (dcov, n_seg, len(dmiss)))
+        if not dmiss:
+            bad.append('④ 退化实现未被判为退化 '
+                       '—— 判据③ 可能恒真')
+
+        # ⑤ 内嵌对照：同一退化实现在 G444 口径下**放行**
+        if fn_legacy is not None:
+            lmiss, lcov, _lrows = fn_legacy(_scan_any, fn_bad, steps)
+            print('⑤ G444 口径（A/B/C 三形态）下同一'
+                  '退化实现: 覆盖=%d/%d · 未命中=%d'
+                  % (lcov, n_seg, len(lmiss)))
+            if lmiss or lcov != n_seg:
+                bad.append('⑤ 退化实现在 G444 口径下未'
+                           '被放行（未命中=%d） —— '
+                           '内嵌对照不成立，'
+                           '无法证明 G444 真看不见' % len(lmiss))
+            else:
+                print('⑤ \U0001f511 内嵌对照成立：'
+                      '退化实现在 G444 口径下**全绿**，'
+                      '在 G445 无关 URL 口径下被抓到')
+
+    # ⑥ 对照点必须真的与所有环节不相干
+    if not foreign:
+        bad.append('⑥ WRITE_PROOF_FOREIGN_URL 缺失 —— '
+                   '无对照点，拒绝给结论')
+    else:
+        clash = [s for s, _m in steps if (s in foreign or foreign in s)]
+        print('⑥ 无关 URL=%r · 与环节冲突=%s'
+              % (foreign, clash))
+        if clash:
+            bad.append('⑥ 无关 URL %r 与环节 %s 互为子串 '
+                       '—— 样本退化成 A/B/C，'
+                       '⑤ 的对照关系漂移' % (foreign, clash))
+        if not steps or steps[0][1] not in WRITE_METHODS:
+            bad.append('⑥ 样本方法不在 WRITE_METHODS 内 '
+                       '—— 样本无效，判据恒真')
+
+    # ⑦ 一致改名不得假阳性
+    if fn_url is not None:
+        alias = WRITE_PROOF_URL_FN + '_alias_probe'
+        old = globals().get(WRITE_PROOF_URL_FN)
+        globals()[alias] = old
+        try:
+            got = globals().get(alias)
+            ok = got is old
+        finally:
+            globals().pop(alias, None)
+        print('⑦ 一致改名（%s）后仍可取到'
+              '同一实现: %s' % (alias, ok))
+        if not ok:
+            bad.append('⑦ 判据① 疑似硬编码函数名 '
+                       '—— 一致改名会假阳性'
+                       '（134/155 轮同病）')
+
+    if bad:
+        print()
+        for b in bad:
+            print('  \U0001f534', b)
+        print(chr(10) + '\U0001f534 **写环节反证必须覆盖'
+              '「不认 URL」形态** 不成立')
+        return 1
+    print(chr(10) + '✅ **写环节反证必须覆盖'
+          '「不认 URL」形态** 成立')
     return 0
 
 
@@ -7884,6 +8144,9 @@ def main():
     ap.add_argument('--assert-write-step-proof', action='store_true',
                     help='G444：写环节反证必须**逐环节各造一次**'
                          '（155 轮：只测一个环节 = 其余交给运气）')
+    ap.add_argument('--assert-write-step-url', action='store_true',
+                    help='G445：写环节反证必须覆盖「不认 URL / 认错环节」形态'
+                         '（156 轮：A/B/C 三形态都只测含本环节的 URL）')
     ap.add_argument('--assert-blob-retry', action='store_true',
                     help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
     ap.add_argument('--assert-remote-rounds', action='store_true',
@@ -8076,6 +8339,8 @@ def main():
         return cmd_assert_write_step_scan()
     if a.assert_write_step_proof:
         return cmd_assert_write_step_proof()
+    if a.assert_write_step_url:
+        return cmd_assert_write_step_url()
     if a.assert_blob_retry:
         os.chdir(ROOT)
         return cmd_assert_blob_retry()

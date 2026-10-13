@@ -1,0 +1,48 @@
+# 第一百五十七轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**写环节反证必须覆盖「不认 URL / 认错环节」这一形态**（G445），
+#    补 156 轮诚实结论② 点名的真实缺口。
+# 🔴 156 轮 G444 的 A/B/C 三形态样本，URL **都含当前环节** —— 于是"扫描是否
+#    真的按 URL 区分环节"从未被检验。
+# 🔑 对照实验①（同一状态：_write_step_scan 退化成只按 HTTP 方法匹配、完全不看 URL）：
+#    **G443 rc=0 放行** · **G444 rc=0 放行** · **G445 rc=1 抓到**
+#    —— 同一状态两绿一红，不是推演。
+# 🔴 该退化的危害：只要源码里还有**任何一个** POST 走 req_retry，**所有**环节
+#    都被判"已覆盖" → 把 git/trees 改回裸 req 无人发现 → 一次 502 整轮白干。
+# ✅ 新增唯一实现 `_write_proof_url_check`：对**每一个**写环节各造一个"只有与
+#    本环节无关的写 URL"的样本（WRITE_PROOF_FOREIGN_URL），期望判「找不到」；
+#    样本按环节**参数化生成**（新增环节自动纳入，不许写死一组）。
+# 🔑 内嵌对照（判据⑤，常驻门禁内部）：同一个退化实现在 G444 口径（A/B/C）下
+#    覆盖 4/4、未命中 0（**全绿**），在 G445 无关 URL 口径下覆盖 0/4、未命中 4
+#    —— 一绿一红不用等下一轮做对照实验。
+# 🔴 判据⑥ 守对照点：无关 URL 必须与**所有**环节互不为子串，且样本方法属于
+#    WRITE_METHODS —— 否则样本退化成 A/B/C，⑤ 的对照关系漂移、形同虚设。
+# 🔑 七方向破坏全部符合预期：①退化不看 URL G443=0/G444=0/**G445=1**（核心对照）·
+#    ②桩化唯一实现 G445=1 · ③环节清单清空 G445=1 · ④对照点漂移 G445=1 ·
+#    ⑤一致改名 G445=0（不误报）· ⑥常量值改坏 G445=1 ·
+#    ⑦判据放宽成"覆盖≥1" G445=0（🔴 证明起作用的是「覆盖数必须 == 条数」）。
+#    恢复后 md5 一致（14ddd2bcbdb600d25ffa1c9c1dfae4a6）。
+# ⚠️ 诚实结论：① 🔴 只探测了 D/E/F 三种退化形态（D 不看 URL 被放行；E「git/」
+#    前缀模糊、F「只报首条违规」均被 G444 抓到）—— 其它形态未覆盖；
+#    ② globals().get('req')(...) 这类**按字符串访问**的调用仍不被
+#    _write_step_scan 认（152 轮同款，本类第五次）；
+#    ③ G445 判据自身被放宽无人发现（109 轮已知边界）；
+#    ④ 同时改实现与环节清单仍绕过（109 轮已知边界）。
+grep:scripts/push_api.py::WRITE_PROOF_URL_FN = '_write_proof_url_check'
+grep:scripts/push_api.py::WRITE_PROOF_FOREIGN_URL = '/repos/o/r/merges'
+grep:scripts/push_api.py::WRITE_PROOF_FOREIGN_WANT = '找不到'
+grep:scripts/push_api.py::def _write_proof_url_check(scan_fn, bad_fn, steps, foreign):
+grep:scripts/push_api.py::def cmd_assert_write_step_url():
+grep:scripts/push_api.py::    'WRITE_PROOF_URL_FN': ('const',
+grep:scripts/push_api.py::    'cmd_assert_write_step_url': ('fn',
+grep:scripts/push_api.py::    ap.add_argument('--assert-write-step-url', action='store_true',
+grep:scripts/push_api.py::    if a.assert_write_step_url:
+grep:scripts/run_all_gates.py::("G445", "**写环节反证必须覆盖「不认 URL / 认错环节」形态**（每个环节各造一次）",
+grep:scripts/run_all_gates.py::('G444', 'G445',
+grep:README.md::第一百五十七轮
+grep:references/负面教训库.md::反证形态只测
+cmd:push_api.py --assert-write-step-url
+cmd:push_api.py --assert-write-step-proof
+cmd:push_api.py --assert-write-step-scan
+cmd:push_api.py --assert-write-retry
+cmd:run_all_gates.py --check-both-layers
+gate:G445

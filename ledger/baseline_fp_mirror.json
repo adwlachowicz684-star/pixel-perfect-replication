@@ -1,7 +1,7 @@
 {
-  "history_sha": "8341e6124e96331bd98d9b76063f452578e21521",
-  "history_len": 16,
-  "baseline_fp": "c7ea5caa03be6527bb04b4f18edc34979a5183f1",
+  "history_sha": "96b871e8f62e27012eefac4a4aa2c57e6128920c",
+  "history_len": 17,
+  "baseline_fp": "4dd200fa56757a31d4d819fa7f6e2411a0ac8691",
   "source": "audit/history_mode_known.json",
   "note": "🔑 变更史镜像：整段替换变更史须同时改本文件与台账，否则 G402 会报指纹不符。"
 }
