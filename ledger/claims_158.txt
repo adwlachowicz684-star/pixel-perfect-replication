@@ -1,0 +1,69 @@
+# 第一百五十八轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**写环节扫描必须认「按字符串 / 间接访问」的等价写法**（G446），
+#    补 157 轮诚实结论② 点名的真实缺口，并**同时治本**（本类第五次）。
+# 🔴 缺口：`_write_step_scan` 只认 `ast.Name` / `ast.Attribute` →
+#    `globals().get('req')('POST', ...)` **完全数不到**；
+#    🔑 而"数不到"的表现是"没有违规"，与"真的合规"在输出上**一模一样**
+#    （106 轮"缺失≠没有违规"同病）。
+# 🔑 **治本**：本类第五次（114 / 133 / 134 / 152 / 157②）→ 按 119 轮判据
+#    「重复出现的同类错误应改到让它不可能发生」，抽出唯一实现
+#    `_call_target_name`，一处解析所有等价写法（req / api.req /
+#    globals().get('req') / locals().get('req') / vars().get('req') /
+#    getattr(m,'req') / ns['req']），不再是"每次补一处"。
+# 🔑 对照实验①（同一状态：`_write_step_scan` 退化成只认 Name/Attribute，
+#    且**仍引用** helper 以排除判据⑧ 干扰）：
+#    **G443 rc=0 · G444 rc=0 · G445 rc=0 · G446 rc=1** —— 三绿一红，不是推演。
+# 🔑 内嵌对照（判据⑤，常驻门禁内部）：同一退化实现在 G444 口径（A/B/C）下
+#    覆盖 4/4、未命中 0（**全绿**），在 G446 间接写法口径下覆盖 0/4、未命中 4。
+# 🔑 判据⑥ 实测**证明对照形态是真的"间接"**：`globals().get('req')` 与
+#    `getattr(m,'req')` 两种形态下，真实实现识别=1、只认 Name 的实现识别=**0**
+#    —— 否则样本退化成普通写法，④⑤ 的对照关系漂移、形同虚设。
+# 🔑 判据⑧（治本必须真的被用上）：`_write_step_scan` 体内必须引用
+#    `_call_target_name`（AST 验），防"写了 helper 却没人调"（148 轮第三次）。
+# 🔑 八方向破坏全部符合预期：①只认 Name/Attribute G443=0/G444=0/G445=0/**G446=1**
+#    （核心对照）· ②桩化唯一实现=1 · ③一致改名=0 不误报 ·
+#    ④对照形态改成直接写法=1 · ⑤环节清单缩到 1 条=1 · ⑥常量值改坏=1 ·
+#    ⑦只对首环节生效（部分覆盖）=1 · ⑦b ⑦+判据放宽成"覆盖≥1"=**0**
+#    （🔴 证明起作用的是「未命中为空 + 覆盖数 == 条数」两条）。
+#    恢复后 md5 一致（a523fab59e082b656ada45faed2ee020）。
+# 🔑 互补层登记第 26 组（'G444','G446'）：只留 G444 → 扫描退化成只认
+#    ast.Name/Attribute 时三形态照样全绿；只留 G446 → 逐环节覆盖与形态数下限无人查。
+# ⚠️ 诚实结论：① 🔴 **判据⑧ 比看起来弱** —— 它只验"文本上引用了 helper"，
+#    破坏① 里"调用了 helper 却丢弃结果"照样通过 ⑧（靠 ③④ 行为反证兜住）；
+#    ② 其余扫描器（`_scan_ref_consts` / G427 时序锚点等）**仍未共用**
+#    `_call_target_name`，同类漏洞可能在别处重演；③ 只测 2 种间接形态；
+#    ④ 同时改实现与形态清单仍绕过（109 轮已知边界）；
+#    ⑤ 全量回归本轮未跑完，通过数为关键子集口径。
+grep:scripts/push_api.py::CALL_TARGET_FN = '_call_target_name'
+grep:scripts/push_api.py::def _call_target_name(fnode):
+grep:scripts/push_api.py::        names = _call_target_name(sub.func)
+grep:scripts/push_api.py::WRITE_PROOF_ALIAS_FN = '_write_proof_alias_check'
+grep:scripts/push_api.py::WRITE_PROOF_ALIAS_FORMS = ("globals().get('req')", "getattr(m, 'req')")
+grep:scripts/push_api.py::def _write_proof_alias_check(scan_fn, bad_fn, steps):
+grep:scripts/push_api.py::def cmd_assert_write_step_alias():
+grep:scripts/push_api.py::    ap.add_argument('--assert-write-step-alias', action='store_true',
+grep:scripts/push_api.py::    if a.assert_write_step_alias:
+grep:scripts/push_api.py::        return cmd_assert_write_step_alias()
+grep:scripts/run_all_gates.py::("G446", "**写环节扫描必须认「按字符串 / 间接访问」的等价写法**（157 轮缺口，本轮治本）",
+grep:scripts/run_all_gates.py::     'G444 造 A/B/C 三形态样本，但**调用都用直接名字写法**；'
+grep:README.md::第一百五十八轮
+grep:references/负面教训库.md::扫描只认"直接名字写法"（158 轮实证
+grep:references/负面教训库.md::判据（158 轮补）
+cmd:push_api.py --assert-write-step-alias
+cmd:push_api.py --assert-write-step-url
+cmd:push_api.py --assert-write-step-proof
+cmd:push_api.py --assert-write-step-scan
+cmd:push_api.py --assert-write-retry
+cmd:push_api.py --assert-dependent-names
+cmd:push_api.py --assert-path-consts
+cmd:push_api.py --assert-const-exempt
+cmd:push_api.py --assert-const-covered
+cmd:push_api.py --assert-round-regex-single
+cmd:push_api.py --assert-meta-names
+cmd:push_api.py --assert-trust-root
+cmd:run_all_gates.py --check-both-layers
+gate:G446
+gate:G445
+gate:G444
+gate:G443
+gate:G442

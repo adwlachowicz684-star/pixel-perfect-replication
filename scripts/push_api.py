@@ -230,6 +230,14 @@ DEPENDENT_NAMES = {
     'WRITE_PROOF_FOREIGN_WANT': ('const', 'G445 对照点：无关 URL 样本下的期望判定'),
     '_write_proof_url_check': ('fn', 'G445 唯一实现：逐环节各造无关 URL 反证样本'),
     'cmd_assert_write_step_url': ('fn', 'G445 反证「不认 URL」形态的断言入口'),
+    # 🔑 第一百五十八轮：G446（写环节扫描必须认等价写法）+ 治本 helper
+    'CALL_TARGET_FN': ('const', 'G446 判据①⑧ 依赖：调用目标名解析唯一实现的函数名'),
+    'WRITE_PROOF_ALIAS_FN': ('const', 'G446 判据① 依赖：唯一实现的函数名'),
+    'WRITE_PROOF_ALIAS_FORMS': ('const', 'G446 对照点：间接访问形态（只认 Name 的实现必须认不出）'),
+    'WRITE_PROOF_ALIAS_WANT': ('const', 'G446 对照点：间接形态样本下的期望判定'),
+    '_call_target_name': ('fn', 'G446 治本唯一实现：解析 Call 的目标名（不认写法）'),
+    '_write_proof_alias_check': ('fn', 'G446 唯一实现：逐环节各造间接写法反证样本'),
+    'cmd_assert_write_step_alias': ('fn', 'G446 反证「不认间接写法」的断言入口'),
 
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
@@ -5473,6 +5481,52 @@ WRITE_METHODS = ('POST', 'PATCH', 'PUT', 'DELETE')
 WRITE_SCAN_FN = '_write_step_scan'
 WRITE_BAD_FN = '_write_step_bad'
 
+# 🔑 第一百五十八轮：**调用目标名解析的唯一实现**（治本）
+#    🔴 本类第五次（114 / 133 / 134 / 152 / 157②）：扫描器只认
+#       `ast.Name` / `ast.Attribute`，于是 `globals().get('req')('POST', ...)`
+#       这类**按字符串访问**的调用**完全数不到** —— 而"数不到"的表现是
+#       "没有违规"，与"真的合规"在输出上**一模一样**（106 轮同病）。
+#    🔑 119 轮判据：重复出现的同类错误应改到"让它不可能发生"，
+#       而不是每次补一处 —— 故等价写法统一由本函数一处解析。
+CALL_TARGET_FN = '_call_target_name'
+
+
+def _call_target_name(fnode):
+    """解析一个 Call 的 `func` 节点，返回它**可能**对应的函数名集合。
+
+    🔑 覆盖形态（**不认写法** —— 等价写法必须都认）：
+        req(...)                     -> {'req'}
+        api.req(...)                 -> {'req'}
+        globals().get('req')(...)    -> {'req'}   🔴 157 轮实测数不到
+        locals().get('req')(...)     -> {'req'}
+        vars().get('req')(...)       -> {'req'}
+        getattr(mod, 'req')(...)     -> {'req'}
+        ns['req'](...)               -> {'req'}
+    """
+    names = set()
+    if fnode is None:
+        return names
+    if isinstance(fnode, ast.Name):
+        names.add(fnode.id)
+    elif isinstance(fnode, ast.Attribute):
+        names.add(fnode.attr)
+    elif isinstance(fnode, ast.Subscript):
+        sl = fnode.slice
+        if isinstance(sl, ast.Constant) and isinstance(sl.value, str):
+            names.add(sl.value)
+    elif isinstance(fnode, ast.Call):
+        inner = fnode.func
+        iname = None
+        if isinstance(inner, ast.Name):
+            iname = inner.id
+        elif isinstance(inner, ast.Attribute):
+            iname = inner.attr
+        if iname in ('get', 'getattr'):
+            for arg in fnode.args:
+                if isinstance(arg, ast.Constant)                         and isinstance(arg.value, str):
+                    names.add(arg.value)
+    return names
+
 
 def _write_step_scan(tree, steps):
     """🔑 G442 判据② 的**唯一实现**：扫描源码里的远端**写**调用。
@@ -5497,14 +5551,17 @@ def _write_step_scan(tree, steps):
     for sub in ast.walk(tree):
         if not isinstance(sub, ast.Call):
             continue
+        # 🔑 第一百五十八轮治本：**等价写法由唯一实现一处解析**
+        #    —— 只认 ast.Name / ast.Attribute 时，`globals().get('req')(...)`
+        #       这类按字符串访问的调用完全数不到（157 轮实测，本类第五次）。
+        names = _call_target_name(sub.func)
         fn = None
-        if isinstance(sub.func, ast.Name):
-            fn = sub.func.id
-        elif isinstance(sub.func, ast.Attribute):
-            fn = sub.func.attr
-        # 🔑 133 轮教训：按名字访问 vs 按字符串访问都要认；
-        #    但**只认网络入口函数**，其余一律排除（154 轮缺陷 a）。
-        if fn not in ('req', 'req_retry'):
+        for cand in ('req', 'req_retry'):
+            if cand in names:
+                fn = cand
+                break
+        # 🔑 只认网络入口函数，其余一律排除（154 轮缺陷 a）
+        if fn is None:
             continue
         if not sub.args:
             continue
@@ -6420,6 +6477,277 @@ def cmd_assert_write_step_url():
         return 1
     print(chr(10) + '✅ **写环节反证必须覆盖'
           '「不认 URL」形态** 成立')
+    return 0
+
+
+# ────────────────────────────────────────────────────────────────────────
+# 🔑 第一百五十八轮：G446 —— **写环节扫描必须认「按字符串 / 间接访问」的等价写法**
+# ────────────────────────────────────────────────────────────────────────
+# 🔴 真实缺口（157 轮诚实结论② 点名）：`_write_step_scan` 只认 `ast.Name` /
+#    `ast.Attribute`，于是 `globals().get('req')('POST', ...)` 这类**按字符串
+#    访问**的调用**完全数不到** —— 🔑 而"数不到"的表现是"没有违规"，与
+#    "真的合规"在输出上**一模一样**（106 轮"缺失≠没有违规"同病）。
+# 🔑 本类第五次（114 / 133 / 134 / 152 / 157②）→ 本轮**治本**：抽出唯一实现
+#    `_call_target_name`，等价写法由它一处解析（119 轮判据：重复出现的同类
+#    错误应改到"让它不可能发生"，而不是每次补一处）。
+WRITE_PROOF_ALIAS_FN = '_write_proof_alias_check'
+# 🔑 反证样本用到的**间接访问形态**（判据⑥ 守：必须是真的"间接" ——
+#    即"只认 Name / Attribute"的实现**认不出**它，否则样本退化）
+WRITE_PROOF_ALIAS_FORMS = ("globals().get('req')", "getattr(m, 'req')")
+# 🔑 期望判定：间接形态的裸 req 必须被报成「裸 req」（而不是「找不到」）
+WRITE_PROOF_ALIAS_WANT = '裸 req'
+
+
+def _write_proof_alias_check(scan_fn, bad_fn, steps):
+    """🔑 G446 的唯一实现：对每个写环节各造一个「间接形态的裸 req」样本。
+
+    🔑 每个环节的样本 = 一处**合规**的 `req_retry` 写调用
+       + 一处**间接形态**的裸 `req` 写调用（同一个 URL 片段）。
+       🔴 若不放合规那处，违规会是「找不到」而不是「裸 req」，
+          判据就抓不到"只认 Name"这一退化（106 轮同病）。
+    """
+    miss = []
+    rows = []
+    covered = 0
+    want = globals().get('WRITE_PROOF_ALIAS_WANT') or '裸 req'
+    forms = globals().get('WRITE_PROOF_ALIAS_FORMS') or ()
+    if not callable(scan_fn) or not callable(bad_fn):
+        return (['扫描 / 判定实现缺失 —— 拒绝给结论'], 0, rows)
+    if not steps:
+        return (['环节清单为空 —— 拒绝给结论'], 0, rows)
+    if not forms:
+        return (['WRITE_PROOF_ALIAS_FORMS 为空 —— 无对照形态，拒绝给结论'],
+                0, rows)
+    form = forms[0]
+    methods = globals().get('WRITE_METHODS') or ()
+    for seg, m in steps:
+        if m not in methods:
+            miss.append('环节 %s 的方法 %r 不在 WRITE_METHODS 内' % (seg, m))
+            continue
+        url = 'https://api.github.com/repos/o/r/' + seg
+        src = ('def _probe():\n'
+               "    req_retry('%s', '%s')\n"
+               "    %s('%s', '%s')\n" % (m, url, form, m, url))
+        try:
+            tree = ast.parse(src)
+        except SyntaxError as e:
+            miss.append('环节 %s 反证样本解析失败（%s）' % (seg, e))
+            continue
+        found = scan_fn(tree, steps)
+        v = bad_fn(found, steps)
+        hit = any(want in x for x in v)
+        rows.append((seg, want, hit, len(v)))
+        if hit:
+            covered += 1
+        else:
+            miss.append('环节 %s：间接形态（%s）的裸 req 未被判违规'
+                        ' —— 扫描不认按字符串访问（157 轮实测缺口）'
+                        % (seg, form))
+    return (miss, covered, rows)
+
+
+def cmd_assert_write_step_alias():
+    """🔑 G446：**写环节扫描必须认「按字符串 / 间接访问」的等价写法**（第一百五十八轮）。
+
+    🔴 真实缺口（157 轮诚实结论② 点名，本轮对照实验实证）：
+       `_write_step_scan` 只认 `ast.Name` / `ast.Attribute`，
+       `globals().get('req')('POST', ...)` **完全数不到** ——
+       🔑 而"数不到"的表现是"没有违规"，与"真的合规"一模一样。
+       🔑 本类第五次（114 / 133 / 134 / 152 / 157②）—— 故本轮同时**治本**：
+          抽出唯一实现 `_call_target_name`，所有等价写法由它一处解析。
+
+    🔑 八条判据：
+       ① 唯一实现 `_write_proof_alias_check` 与 `_call_target_name` 都存在
+          （经常量取，不许硬编码函数名 —— 134/155 轮同病）
+       ② 反证覆盖**每一个**环节：覆盖数 == 清单条数，且 ≥ `WRITE_PROOF_SEG_MIN`
+       ③ 用**真实** `_write_step_scan` / `_write_step_bad` 跑：未命中必须为空
+       ④ **退化反证**：还原"只认 Name / Attribute"的实现必须产生未命中
+          —— 🔴 证明判据③ 不是恒真（106 轮"缺失≠没有违规"）
+       ⑤ **内嵌对照**：同一退化实现在 G444 口径（A/B/C）下**全绿**
+          —— 证明 G444 真看不见这一形态
+       ⑥ **对照点守卫**：每个间接形态必须① 真实实现认得出、② "只认 Name"
+          的实现**认不出** —— 否则样本退化，④⑤ 的对照关系漂移
+       ⑦ 一致改名不得假阳性
+       ⑧ 🔑 **治本必须真的被用上**：`_write_step_scan` 体内必须引用
+          `_call_target_name` —— 防"写了 helper 却没人调"
+          （148 轮"声称与实现不符"第三次）
+    """
+    print('\U0001f511 **写环节扫描必须认「按字符串 / 间接访问」'
+          '的等价写法**（G446）')
+    print('=' * 70)
+    os.chdir(ROOT)
+    bad = []
+
+    steps = globals().get('WRITE_RETRY_STEPS')
+    if not isinstance(steps, (list, tuple)) or not steps:
+        bad.append('WRITE_RETRY_STEPS 缺失或为空 —— '
+                   '反证无样本，判据恒真（106 轮同病）')
+        steps = ()
+
+    ct_key = 'CALL_TARGET_FN'
+    ct_name = globals().get(ct_key)
+    fn_ct = globals().get(ct_name) if isinstance(ct_name, str) else None
+    fn_scan = globals().get(WRITE_SCAN_FN)
+    fn_bad = globals().get(WRITE_BAD_FN)
+    fn_alias = globals().get(WRITE_PROOF_ALIAS_FN)
+    fn_legacy = globals().get(WRITE_PROOF_FN)
+    print('① 唯一实现（经常量取）: %s=%s · %s=%s · %s=%s · %s=%s'
+          % (WRITE_PROOF_ALIAS_FN, fn_alias is not None,
+             ct_key, fn_ct is not None,
+             WRITE_SCAN_FN, fn_scan is not None,
+             WRITE_BAD_FN, fn_bad is not None))
+    if fn_alias is None:
+        bad.append('唯一实现 %s 缺失 —— 崩溃与拒绝在 rc 上无法区分'
+                   '（133 轮同病）' % WRITE_PROOF_ALIAS_FN)
+    if fn_ct is None:
+        bad.append('%s 或其指向的实现 %r 缺失 —— '
+                   '治本的唯一实现不存在' % (ct_key, ct_name))
+    if fn_scan is None or fn_bad is None:
+        bad.append('%s / %s 缺失 —— 无真实扫描可供反证'
+                   % (WRITE_SCAN_FN, WRITE_BAD_FN))
+    if fn_legacy is None:
+        bad.append('%s 缺失 —— ⑤ 无 G444 口径可供对照' % WRITE_PROOF_FN)
+
+    n_seg = len(steps)
+    print('② 环节清单条数=%d · 覆盖下限=%d'
+          % (n_seg, WRITE_PROOF_SEG_MIN))
+    if n_seg < WRITE_PROOF_SEG_MIN:
+        bad.append('环节清单只有 %d 条 < %d —— 反证样本集过小'
+                   % (n_seg, WRITE_PROOF_SEG_MIN))
+
+    # 🔴 退化实现：只认 ast.Name / ast.Attribute（157 轮修复前的形态）
+    def _scan_name_only(tree, steps):
+        """🔴 退化：只认直接名字调用，数不到 `globals().get('req')(...)`。"""
+        found = {}
+        if tree is None:
+            return found
+        for sub in ast.walk(tree):
+            if not isinstance(sub, ast.Call):
+                continue
+            fn = None
+            if isinstance(sub.func, ast.Name):
+                fn = sub.func.id
+            elif isinstance(sub.func, ast.Attribute):
+                fn = sub.func.attr
+            if fn not in ('req', 'req_retry'):
+                continue
+            if not sub.args:
+                continue
+            a0 = sub.args[0]
+            if not (isinstance(a0, ast.Constant)
+                    and a0.value in WRITE_METHODS):
+                continue
+            blob = ast.dump(sub)
+            for seg, _m in steps:
+                if seg in blob:
+                    found.setdefault(seg, {}).setdefault(fn, 0)
+                    found[seg][fn] += 1
+        return found
+
+    if fn_alias is not None and fn_scan is not None and fn_bad is not None:
+        miss, covered, rows = fn_alias(fn_scan, fn_bad, steps)
+        for seg, want, hit, nbad in rows:
+            print('③ 环节 %-22s 期望「%s」 · 命中=%s · 违规数=%d'
+                  % (seg, want, hit, nbad))
+        print('③ 覆盖环节数=%d/%d' % (covered, n_seg))
+        if miss:
+            for m in miss:
+                bad.append('③ ' + m)
+        if covered != n_seg:
+            bad.append('③ 覆盖 %d 个环节 != 清单 %d 条'
+                       % (covered, n_seg))
+
+        # ④ 退化反证
+        dmiss, dcov, _drows = fn_alias(_scan_name_only, fn_bad, steps)
+        print('④ 退化（只认 Name/Attribute）: 覆盖=%d/%d · 未命中=%d'
+              % (dcov, n_seg, len(dmiss)))
+        if not dmiss:
+            bad.append('④ 退化实现未被判为退化 —— 判据③ 可能恒真')
+
+        # ⑤ 内嵌对照
+        if fn_legacy is not None:
+            lmiss, lcov, _lrows = fn_legacy(_scan_name_only, fn_bad, steps)
+            print('⑤ G444 口径（A/B/C 三形态）下同一退化实现: '
+                  '覆盖=%d/%d · 未命中=%d' % (lcov, n_seg, len(lmiss)))
+            if lmiss or lcov != n_seg:
+                bad.append('⑤ 退化实现在 G444 口径下未被放行'
+                           '（未命中=%d） —— 内嵌对照不成立，'
+                           '无法证明 G444 真看不见' % len(lmiss))
+            else:
+                print('⑤ \U0001f511 内嵌对照成立：退化实现在 G444 口径下'
+                      '**全绿**，在 G446 间接写法口径下被抓到')
+
+    # ⑥ 对照点守卫：形态必须真的"间接"
+    forms = globals().get('WRITE_PROOF_ALIAS_FORMS')
+    if not forms:
+        bad.append('⑥ WRITE_PROOF_ALIAS_FORMS 缺失或为空 —— '
+                   '无对照形态，拒绝给结论')
+    elif fn_scan is not None and steps:
+        for form in forms:
+            url = 'https://api.github.com/repos/o/r/' + steps[0][0]
+            src = ("def _f():\n    %s('%s', '%s')\n"
+                   % (form, steps[0][1], url))
+            try:
+                t2 = ast.parse(src)
+            except SyntaxError as e:
+                bad.append('⑥ 形态 %r 不是合法源码（%s）' % (form, e))
+                continue
+            n_real = sum(sum(v.values())
+                         for v in fn_scan(t2, steps).values())
+            n_old = sum(sum(v.values())
+                        for v in _scan_name_only(t2, steps).values())
+            print('⑥ 形态 %-24s 真实实现识别=%d · 只认Name实现识别=%d'
+                  % (form, n_real, n_old))
+            if n_real < 1:
+                bad.append('⑥ 形态 %r 连真实实现都认不出 —— 样本无效，'
+                           '判据恒真' % form)
+            if n_old >= 1:
+                bad.append('⑥ 形态 %r 被"只认 Name"的实现认出 —— '
+                           '样本退化，④⑤ 的对照关系漂移' % form)
+
+    # ⑦ 一致改名不得假阳性
+    if fn_alias is not None:
+        alias = WRITE_PROOF_ALIAS_FN + '_alias_probe'
+        old = globals().get(WRITE_PROOF_ALIAS_FN)
+        globals()[alias] = old
+        try:
+            ok = globals().get(alias) is old
+        finally:
+            globals().pop(alias, None)
+        print('⑦ 一致改名（%s）后仍可取到同一实现: %s' % (alias, ok))
+        if not ok:
+            bad.append('⑦ 判据① 疑似硬编码函数名 —— 一致改名会假阳性'
+                       '（134/155 轮同病）')
+
+    # ⑧ 治本必须真的被用上
+    scan_name = globals().get('WRITE_SCAN_FN')
+    if fn_ct is not None and isinstance(ct_name, str):
+        used = False
+        try:
+            with open(os.path.join(ROOT, 'scripts', 'push_api.py'),
+                      encoding='utf-8') as fh:
+                t3 = ast.parse(fh.read())
+            for nd in ast.walk(t3):
+                if isinstance(nd, ast.FunctionDef) and nd.name == scan_name:
+                    used = ct_name in ast.dump(nd)
+        except (OSError, SyntaxError) as e:
+            bad.append('⑧ 无法解析自身源码以验证引用（%s）' % e)
+            used = False
+        print('⑧ %s 在 %s 体内被引用: %s'
+              % (ct_name, scan_name, used))
+        if not used:
+            bad.append('⑧ 治本实现 %r 未被 %s 引用 —— '
+                       'helper 写了却没人调（148 轮同病）'
+                       % (ct_name, scan_name))
+
+    if bad:
+        print()
+        for b in bad:
+            print('  \U0001f534', b)
+        print(chr(10) + '\U0001f534 **写环节扫描必须认等价写法** 不成立')
+        return 1
+    print(chr(10) + '✅ **写环节扫描必须认「按字符串 / 间接访问」'
+          '的等价写法** 成立')
     return 0
 
 
@@ -8147,6 +8475,9 @@ def main():
     ap.add_argument('--assert-write-step-url', action='store_true',
                     help='G445：写环节反证必须覆盖「不认 URL / 认错环节」形态'
                          '（156 轮：A/B/C 三形态都只测含本环节的 URL）')
+    ap.add_argument('--assert-write-step-alias', action='store_true',
+                    help='G446：写环节扫描必须认「按字符串 / 间接访问」的等价写法'
+                         '（157 轮：globals().get(\'req\')(...) 完全数不到）')
     ap.add_argument('--assert-blob-retry', action='store_true',
                     help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
     ap.add_argument('--assert-remote-rounds', action='store_true',
@@ -8341,6 +8672,8 @@ def main():
         return cmd_assert_write_step_proof()
     if a.assert_write_step_url:
         return cmd_assert_write_step_url()
+    if a.assert_write_step_alias:
+        return cmd_assert_write_step_alias()
     if a.assert_blob_retry:
         os.chdir(ROOT)
         return cmd_assert_blob_retry()
