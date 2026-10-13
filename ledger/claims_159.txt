@@ -1,0 +1,49 @@
+# 第一百五十九轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**等价写法解析必须唯一实现，且结果真被用**（G447），
+#    补 158 轮诚实结论点名的两处残留。
+# 🔴 残留①：`_call_target_name` 只推广到 `_write_step_scan` ——
+#    `_scan_ref_consts_bad`（G440）与 `_no_dirty_wired_bad`（G427 锚点）
+#    **各自仍自造**"只认 ast.Name / ast.Attribute"的解析；
+#    🔑 本类第五次（114 / 133 / 134 / 152 / 157②）其实只治好了一处。
+# 🔴 残留②：G446 判据⑧ 只验"文本上引用了 helper" ——
+#    🔑 **调用了却丢弃结果**（独立表达式语句）照样通过它，
+#    而"解析了却不用"与"没解析"在输出上**完全一样**。
+# 🔑 对照实验②（同一状态：调用后丢弃结果）：
+#    **G446 判据⑧ 口径 = 放行** · **G447 判据③ = rc 1** —— 一绿一红，不是推演。
+# 🔑 内嵌对照（判据⑤，常驻门禁内部）：合成"调用但丢弃结果"的函数，
+#    断言判据③ 抓到、G446 判据⑧ 口径（文本引用）放行 —— 证明③ 不是恒真。
+# 🔑 判据④ 逐形态各造一次（G444 同款）：六种间接访问形态，
+#    真实实现都认得出、"只认 Name"的实现都认不出（否则样本退化）。
+# 🔑 判据② 反向扫描：**不得自造直判写法**（比较 func.id / func.attr，
+#    或比较 'get' / 'getattr' 字面量）—— 出现即说明没走唯一实现。
+# 🔑 七方向破坏全部符合预期：①还原自造解析=1 · ②调用后丢弃结果=1（核心对照）·
+#    ③删一条调用点=1 · ④形态表缩到 4 条=1 · ⑤混进直接写法形态=1 ·
+#    ⑥一致改名=0 不误报 · ⑦桩化唯一实现=1。恢复后 md5 一致。
+# 🔑 互补层登记第 27 组（'G446','G447'）：只留 G446 → 这两处自造解析与
+#    "丢弃结果"无人发现；只留 G447 → 写环节扫描的逐环节 / 逐形态覆盖无人查。
+# ⚠️ 诚实结论：① 🔴 判据② 的"自造写法"是启发式（特征表外的自造写法可绕过）；
+#    ② 🔴 grefs 口径被放宽（任何 x.get('X') / d['X'] 都算引用 → G440 偏乐观）；
+#    ③ 只测 6 种形态；④ 同时改实现与调用点清单仍绕过（109 轮已知边界）；
+#    ⑤ 全量回归本轮未跑完，通过数为关键子集口径。
+grep:scripts/push_api.py::CALL_TARGET_USERS = ('_scan_ref_consts_bad', '_no_dirty_wired_bad')
+grep:scripts/push_api.py::CALL_TARGET_USERS_FN = '_call_target_users_bad'
+grep:scripts/push_api.py::CALL_TARGET_FORMS_MIN = 5
+grep:scripts/push_api.py::CALL_TARGET_BAN_ATTRS = ('id', 'attr')
+grep:scripts/push_api.py::CALL_TARGET_BAN_STR = ('get', 'getattr')
+grep:scripts/push_api.py::WRITE_ENTRY_FNS = ('req', 'req_retry')
+grep:scripts/push_api.py::DIRTY_GUARD_FN = 'cmd_assert_no_dirty'
+grep:scripts/push_api.py::def _call_target_users_bad(tree):
+grep:scripts/push_api.py::def cmd_assert_call_target_single():
+grep:scripts/push_api.py::                grefs |= _call_target_name(n)
+grep:scripts/push_api.py::                and (_call_target_name(n.func) & set(WRITE_ENTRY_FNS)):
+grep:scripts/push_api.py::            and (_call_target_name(x.func) & {DIRTY_GUARD_FN})
+grep:scripts/push_api.py::    ap.add_argument('--assert-call-target-single', action='store_true',
+grep:scripts/push_api.py::    if a.assert_call_target_single:
+grep:scripts/push_api.py::        return cmd_assert_call_target_single()
+grep:scripts/run_all_gates.py::("G447", "**等价写法解析必须唯一实现，且结果真被用**（158 轮残留：只推广了一处）",
+grep:scripts/run_all_gates.py::    ('G446', 'G447',
+cmd:push_api.py --assert-call-target-single
+cmd:push_api.py --assert-const-covered
+cmd:push_api.py --assert-no-dirty
+cmd:run_all_gates.py --check-both-layers
+gate:G447

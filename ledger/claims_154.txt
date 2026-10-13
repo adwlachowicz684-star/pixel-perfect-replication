@@ -48,7 +48,9 @@ grep:scripts/push_api.py::    'WRITE_RETRY_STEPS': ('const',
 grep:scripts/push_api.py::    'req_retry': ('fn',
 grep:scripts/push_api.py::    'cmd_assert_write_retry': ('fn',
 grep:scripts/push_api.py::⑥ 反向扫描（源码 → 清单）:
-grep:scripts/push_api.py::and n.func.id in ('req', 'req_retry') and n.args:
+# 🔑 159 轮修订：锚点改走唯一实现 `_call_target_name`（不再按 func.id 直判）——
+#    同一事实（G427 时序锚点认 req/req_retry）改用**不认写法**的等价 needle。
+grep:scripts/push_api.py::& set(WRITE_ENTRY_FNS)):
 grep:scripts/run_all_gates.py::("G442", "**tree/commit/ref 必须走同一套重试**（不许裸调 req）",
 grep:scripts/run_all_gates.py::    ('G442', 'G431',
 grep:README.md::第一百五十四轮

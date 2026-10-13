@@ -238,6 +238,18 @@ DEPENDENT_NAMES = {
     '_call_target_name': ('fn', 'G446 治本唯一实现：解析 Call 的目标名（不认写法）'),
     '_write_proof_alias_check': ('fn', 'G446 唯一实现：逐环节各造间接写法反证样本'),
     'cmd_assert_write_step_alias': ('fn', 'G446 反证「不认间接写法」的断言入口'),
+    # 🔑 第一百五十九轮：G447（等价写法解析唯一实现 + 结果真被用）
+    'CALL_TARGET_USERS': ('const', 'G447 判据② 依赖：必须走唯一实现的调用点'),
+    'CALL_TARGET_USERS_MIN': ('const', 'G447 判据⑦ 下限：调用点条目数'),
+    'CALL_TARGET_USERS_FN': ('const', 'G447 判据① 依赖：唯一实现的函数名'),
+    'CALL_TARGET_FORMS': ('const', 'G447 判据④ 依赖：间接访问形态表'),
+    'CALL_TARGET_FORMS_MIN': ('const', 'G447 判据⑦ 下限：形态表条目数'),
+    'CALL_TARGET_BAN_ATTRS': ('const', 'G447 判据② 依赖：自造直判的特征属性名'),
+    'CALL_TARGET_BAN_STR': ('const', 'G447 判据② 依赖：自造直判的特征字符串'),
+    'WRITE_ENTRY_FNS': ('const', 'G427/G442 锚点依赖：远端写入入口函数名'),
+    'DIRTY_GUARD_FN': ('const', 'G427 判据③ 依赖：未提交检查的入口函数名'),
+    '_call_target_users_bad': ('fn', 'G447 唯一实现：调用点必须走唯一实现'),
+    'cmd_assert_call_target_single': ('fn', 'G447 断言入口'),
 
     # 🔴 第一百三十五轮实测：**不得**在这里登记 'CRITERIA_ROOTS_REQUIRED'。
     #    它已进 SELF_REGISTERED_META（元项），G408 判据③ 规定"元项不得退回登记项"
@@ -3332,6 +3344,8 @@ def _scan_ref_consts_bad():
     allow = globals().get('PATH_CONST_ALLOW') or {}
     callow = globals().get('CONST_SCAN_ALLOW') or {}
     refs = set(); grefs = set()
+    # 🔑 唯一实现：`_call_target_name` 在模块级定义，直接调用
+    #    （与 `_write_step_scan` 同款 —— 不许再自造一份解析）
     for fn in sorted(os.listdir(os.path.join(ROOT, 'scripts'))):
         if not fn.endswith('.py'): continue
         try:
@@ -3341,19 +3355,16 @@ def _scan_ref_consts_bad():
         for n in ast.walk(t):
             if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load):
                 refs.add(n.id)
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) \
-               and n.func.attr == 'get' and n.args \
-               and isinstance(n.args[0], ast.Constant) \
-               and isinstance(n.args[0].value, str):
-                # 🔑 `globals().get('X')`：func.value 是 **Call**（globals()），
-                #    不是 Name —— 151/152 轮实测：按 Name 判会**永远数不到**，
-                #    于是"只经字符串引用"的常量被判成"未被引用"（同 114 轮病）。
-                _v = n.func.value
-                if isinstance(_v, ast.Call) and isinstance(_v.func, ast.Name) \
-                        and _v.func.id == 'globals':
-                    grefs.add(n.args[0].value)
-                elif isinstance(_v, ast.Name) and _v.id == 'globals':
-                    grefs.add(n.args[0].value)
+            # 🔑 第一百五十九轮：**治本推广** —— 按字符串 / 间接访问的所有等价
+            #    写法由唯一实现 `_call_target_name` 一处解析（119 轮判据：
+            #    重复出现的同类错误应改到"让它不可能发生"）。
+            #    🔴 原实现只认 `globals().get('X')` 一种形态 ——
+            #       `getattr(m, 'X')` / `ns['X']` / `locals().get('X')` /
+            #       `vars().get('X')` / `globals()['X']` **数不到**，
+            #       而"数不到"的表现是"未被引用"，与"真的没被引用"一模一样
+            #       （152 轮同病的**残留**，本类第五次）。
+            if isinstance(n, (ast.Call, ast.Subscript)):
+                grefs |= _call_target_name(n)
     bad = []; scanned = 0
     for fn in files:
         p = os.path.join(ROOT, 'scripts', fn)
@@ -4956,8 +4967,8 @@ def _no_dirty_wired_bad():
         #       → 报"无法判定时序，拒绝给结论" → **推送被自己挡住**。
         #    🔑 与 133/134 轮"不认写法"同病（本类第八次）：
         #       **改进代码会把既有门禁弄失效，而它表现得像环境问题。**
-        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) \
-                and n.func.id in ('req', 'req_retry') and n.args:
+        if isinstance(n, ast.Call) and n.args \
+                and (_call_target_name(n.func) & set(WRITE_ENTRY_FNS)):
             a0 = n.args[0]
             if isinstance(a0, ast.Constant) and a0.value == 'POST':
                 seg = lines[n.lineno - 1] if n.lineno - 1 < len(lines) else ''
@@ -4972,8 +4983,8 @@ def _no_dirty_wired_bad():
         if not isinstance(n, ast.If):
             continue
         hit_call = any(
-            isinstance(x, ast.Call) and isinstance(x.func, ast.Name)
-            and x.func.id == 'cmd_assert_no_dirty'
+            isinstance(x, ast.Call)
+            and (_call_target_name(x.func) & {DIRTY_GUARD_FN})
             for x in ast.walk(n.test))
         if not hit_call:
             continue
@@ -5489,6 +5500,22 @@ WRITE_BAD_FN = '_write_step_bad'
 #    🔑 119 轮判据：重复出现的同类错误应改到"让它不可能发生"，
 #       而不是每次补一处 —— 故等价写法统一由本函数一处解析。
 CALL_TARGET_FN = '_call_target_name'
+# 🔑 第一百五十九轮：G427 锚点 / 守卫解析用到的名字集（常量化 ——
+#    否则函数体内出现 'req' 字面量，会被 G447 判据② 当成"自造直判写法"）
+WRITE_ENTRY_FNS = ('req', 'req_retry')
+DIRTY_GUARD_FN = 'cmd_assert_no_dirty'
+# 🔑 G447（第一百五十九轮）：**必须走唯一实现的调用点** + 反证形态表
+CALL_TARGET_USERS = ('_scan_ref_consts_bad', '_no_dirty_wired_bad')
+CALL_TARGET_USERS_MIN = 2
+CALL_TARGET_USERS_FN = '_call_target_users_bad'
+CALL_TARGET_FORMS = ("globals().get('X')", "locals().get('X')",
+                     "vars().get('X')", "getattr(m, 'X')",
+                     "ns['X']", "globals()['X']")
+CALL_TARGET_FORMS_MIN = 5
+# 🔑 判据② 的"自造写法"特征：按 func.id / func.attr 直判，或比较
+#    'get' / 'getattr' 字面量 —— 出现即说明这里没走唯一实现
+CALL_TARGET_BAN_ATTRS = ('id', 'attr')
+CALL_TARGET_BAN_STR = ('get', 'getattr')
 
 
 def _call_target_name(fnode):
@@ -6748,6 +6775,223 @@ def cmd_assert_write_step_alias():
         return 1
     print(chr(10) + '✅ **写环节扫描必须认「按字符串 / 间接访问」'
           '的等价写法** 成立')
+    return 0
+
+
+
+def _call_target_users_bad(tree):
+    """🔑 G447 判据②③ 的**唯一实现**：调用点必须走唯一实现，且结果真被用。
+
+    🔴 158 轮诚实结论点名的两处残留：
+       ① `_scan_ref_consts_bad`（G440）与 `_no_dirty_wired_bad`（G427 锚点）
+          各自**自造**"按名字直判"的解析 —— 只认 `ast.Name` / `ast.Attribute`
+          → 本类第五次的病在**这两处依旧存在**。
+       ② G446 判据⑧ 只验"文本上引用了 helper" —— 🔑 **调用了却丢弃结果**
+          照样通过（解析了不用 = 没解析，且**没有任何输出变化**）。
+    🔑 本函数三条：必须调用唯一实现 / 结果不得被丢弃 / 不得自造直判写法。
+    """
+    rows = []
+    if tree is None:
+        return ['源码树为空 —— 拒绝给结论'], rows
+    ct = globals().get('CALL_TARGET_FN')
+    if not isinstance(ct, str) or not callable(globals().get(ct)):
+        return ['%r 指向的实现不存在 —— 拒绝给结论' % (ct,)], rows
+    users = tuple(globals().get('CALL_TARGET_USERS') or ())
+    minu = int(globals().get('CALL_TARGET_USERS_MIN') or 0)
+    bad = []
+    if len(users) < minu:
+        bad.append('CALL_TARGET_USERS 只有 %d 条 < %d —— 疑似被删条目，'
+                   '扫描面被缩小而无人发现' % (len(users), minu))
+    ban_a = tuple(globals().get('CALL_TARGET_BAN_ATTRS') or ())
+    ban_s = tuple(globals().get('CALL_TARGET_BAN_STR') or ())
+    parents = {}
+    for nd in ast.walk(tree):
+        for ch in ast.iter_child_nodes(nd):
+            parents[id(ch)] = nd
+    fnmap = {}
+    for nd in ast.walk(tree):
+        if isinstance(nd, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            fnmap.setdefault(nd.name, nd)
+    for u in users:
+        fn = fnmap.get(u)
+        if fn is None:
+            bad.append('找不到函数 %s —— 调用点被删？拒绝给结论' % u)
+            continue
+        calls = [n for n in ast.walk(fn)
+                 if isinstance(n, ast.Call) and ct in _call_target_name(n.func)]
+        if not calls:
+            bad.append('%s 未调用 %s —— 自造解析会重演 '
+                       '114/133/134/152/157 的病' % (u, ct))
+        discarded = 0
+        for c in calls:
+            if isinstance(parents.get(id(c)), ast.Expr):
+                discarded += 1
+        if discarded:
+            bad.append('%s 有 %d 处**调用后丢弃结果**（独立表达式语句）'
+                       ' —— 🔴 解析了却不用，等价写法依旧数不到，'
+                       '而 G446 判据⑧ 只看"引用了没有"，看不出来'
+                       % (u, discarded))
+        selfmade = 0
+        for n in ast.walk(fn):
+            if not isinstance(n, ast.Compare):
+                continue
+            ha = any(isinstance(x, ast.Attribute) and x.attr in ban_a
+                     for x in ast.walk(n))
+            hs = any(isinstance(x, ast.Constant) and isinstance(x.value, str)
+                     and x.value in ban_s for x in ast.walk(n))
+            if ha or hs:
+                selfmade += 1
+        if selfmade:
+            bad.append('%s 有 %d 处**自造直判写法**（比较 func.id / func.attr '
+                       '或 "get"/"getattr" 字面量）—— 应改用 %s'
+                       % (u, selfmade, ct))
+        rows.append((u, len(calls), discarded, selfmade))
+    return bad, rows
+
+
+def cmd_assert_call_target_single():
+    """🔑 G447：**等价写法解析必须唯一实现，且结果真被用**（第一百五十九轮）。
+
+    🔴 158 轮诚实结论点名的两个残留（本轮对照实验实证）：
+       ① `_call_target_name` 只推广到了 `_write_step_scan` ——
+          `_scan_ref_consts_bad`（G440）与 `_no_dirty_wired_bad`（G427 锚点）
+          **各自仍自造**"只认 ast.Name / ast.Attribute"的解析。
+       ② G446 判据⑧ 只验"文本上引用了 helper" —— 🔑 **调用后丢弃结果**
+          照样通过它（补这条正是本轮 G447 的动机）。
+
+    🔑 七条判据：
+       ① 唯一实现 `_call_target_name` 存在（经常量取，不许硬编码函数名）
+       ② 调用点必须走唯一实现、且**不得自造**直判写法（AST 反扫）
+       ③ 🔑 **结果必须真被用**：调用节点不得是独立的 `ast.Expr` 语句
+       ④ **逐形态行为反证**：每种间接形态各造一次 —— 真实实现认得出、
+          "只认 Name/Attribute"的实现**认不出**（否则样本退化）
+       ⑤ **内嵌对照**：合成"调用但丢弃结果"的函数 —— 判据③ 抓到，
+          而 G446 判据⑧ 口径（文本引用）**放行** —— 证明③ 不是恒真
+       ⑥ 一致改名不得假阳性
+       ⑦ 形态表 / 调用点表条目数不得小于下限（防删条目缩小视野）
+    """
+    print('\U0001f511 **等价写法解析必须唯一实现，且结果真被用**（G447）')
+    print('=' * 70)
+    os.chdir(ROOT)
+    bad = []
+
+    ct_key = 'CALL_TARGET_FN'
+    ct_name = globals().get(ct_key)
+    fn_ct = globals().get(ct_name) if isinstance(ct_name, str) else None
+    print('① 唯一实现（经常量取）: %s=%r · 可调用=%s'
+          % (ct_key, ct_name, fn_ct is not None))
+    if fn_ct is None:
+        bad.append('%s 缺失或其指向的实现不存在 —— 拒绝给结论' % ct_key)
+
+    src_p = os.path.join(ROOT, 'scripts', 'push_api.py')
+    try:
+        with io.open(src_p, encoding='utf-8') as fh:
+            text = fh.read()
+        tree = ast.parse(text)
+    except (OSError, SyntaxError) as e:
+        print('\U0001f534 解析自身源码失败：%s' % e)
+        return 1
+
+    ufn = globals().get('CALL_TARGET_USERS_FN')
+    fn_users = globals().get(ufn) if isinstance(ufn, str) else None
+    if fn_users is None:
+        bad.append('唯一实现 %r 缺失 —— 拒绝给结论' % ufn)
+        rows = []
+    else:
+        bad2, rows = fn_users(tree)
+        for u, ncall, disc, selfm in rows:
+            print('②③ %-24s 调用处=%d · 丢弃结果=%d · 自造直判=%d'
+                  % (u, ncall, disc, selfm))
+        bad.extend(bad2)
+        users_n = len(tuple(globals().get('CALL_TARGET_USERS') or ()))
+        print('②③ 调用点条数=%d · 实际逐条核验=%d' % (users_n, len(rows)))
+        if len(rows) != users_n:
+            bad.append('②③ 逐条核验了 %d 个调用点 != 清单 %d 条 —— '
+                       '疑似唯一实现被桩化（恒返回空），拒绝给结论'
+                       % (len(rows), users_n))
+
+    # ④ 逐形态行为反证
+    def _ct_name_only(node):
+        """🔴 退化：只认直接名字 —— 数不到所有按字符串 / 间接访问的形态。"""
+        names = set()
+        if isinstance(node, ast.Name):
+            names.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            names.add(node.attr)
+        return names
+
+    forms = tuple(globals().get('CALL_TARGET_FORMS') or ())
+    fmin = int(globals().get('CALL_TARGET_FORMS_MIN') or 0)
+    print('⑦ 形态表条数=%d · 下限=%d' % (len(forms), fmin))
+    if len(forms) < fmin:
+        bad.append('CALL_TARGET_FORMS 只有 %d 条 < %d —— 疑似被删形态'
+                   % (len(forms), fmin))
+    if fn_ct is not None:
+        for form in forms:
+            src = 'def _f():\n    return %s\n' % form
+            try:
+                t2 = ast.parse(src)
+            except SyntaxError as e:
+                bad.append('④ 形态 %r 不是合法源码（%s）' % (form, e))
+                continue
+            got_real = set()
+            got_old = set()
+            for n in ast.walk(t2):
+                got_real |= fn_ct(n)
+                got_old |= _ct_name_only(n)
+            ok_real = 'X' in got_real
+            ok_old = 'X' in got_old
+            print('④ 形态 %-22s 真实实现认出=%s · 只认Name认出=%s'
+                  % (form, ok_real, ok_old))
+            if not ok_real:
+                bad.append('④ 形态 %r 连真实实现都认不出 —— 样本无效，判据恒真'
+                           % form)
+            if ok_old:
+                bad.append('④ 形态 %r 被"只认 Name"的实现认出 —— 样本退化，'
+                           '对照关系漂移' % form)
+
+    # ⑤ 内嵌对照：调用但丢弃结果 —— ③ 抓到，G446 判据⑧ 口径放行
+    if fn_users is not None and isinstance(ct_name, str):
+        dsrc = ('def _scan_ref_consts_bad():\n'
+                '    for n in ():\n'
+                '        %s(n)\n' % ct_name)
+        try:
+            t3 = ast.parse(dsrc)
+            dbad, _drows = fn_users(t3)
+            caught = any('丢弃结果' in x for x in dbad)
+            legacy_ok = ct_name in ast.dump(t3)
+            print('⑤ 内嵌对照：③ 判据抓到=%s · G446 判据⑧ 口径（文本引用）= 放行 %s'
+                  % (caught, legacy_ok))
+            if not caught:
+                bad.append('⑤ "调用却丢弃结果"未被判据③ 抓到 —— 判据③ 恒真')
+            if not legacy_ok:
+                bad.append('⑤ 内嵌对照不成立：G446 判据⑧ 口径应当放行该样本')
+            else:
+                print('⑤ \U0001f511 内嵌对照成立：判据⑧ 只看"引用了没有"，'
+                      '判据③ 才看"结果有没有被用"')
+        except SyntaxError as e:
+            bad.append('⑤ 内嵌对照样本解析失败（%s）' % e)
+
+    # ⑥ 一致改名不得假阳性
+    if isinstance(ct_name, str):
+        alias = ct_name + '_alias_probe'
+        old = globals().get(ct_name)
+        globals()[alias] = old
+        try:
+            ok = globals().get(alias) is old
+        finally:
+            globals().pop(alias, None)
+        print('⑥ 一致改名（%s）后仍可取到同一实现: %s' % (alias, ok))
+        if not ok:
+            bad.append('⑥ 判据① 疑似硬编码函数名 —— 一致改名会假阳性')
+
+    if bad:
+        print()
+        for b in bad:
+            print('  \U0001f534', b)
+        print(chr(10) + '\U0001f534 **等价写法解析唯一实现** 不成立')
+        return 1
+    print(chr(10) + '✅ **等价写法解析必须唯一实现，且结果真被用** 成立')
     return 0
 
 
@@ -8478,6 +8722,9 @@ def main():
     ap.add_argument('--assert-write-step-alias', action='store_true',
                     help='G446：写环节扫描必须认「按字符串 / 间接访问」的等价写法'
                          '（157 轮：globals().get(\'req\')(...) 完全数不到）')
+    ap.add_argument('--assert-call-target-single', action='store_true',
+                    help='G447：等价写法解析必须唯一实现，且结果真被用'
+                         '（158 轮：只推广了一处 · 调用后丢弃结果照样绿）')
     ap.add_argument('--assert-blob-retry', action='store_true',
                     help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
     ap.add_argument('--assert-remote-rounds', action='store_true',
@@ -8674,6 +8921,9 @@ def main():
         return cmd_assert_write_step_url()
     if a.assert_write_step_alias:
         return cmd_assert_write_step_alias()
+    if a.assert_call_target_single:
+        os.chdir(ROOT)
+        return cmd_assert_call_target_single()
     if a.assert_blob_retry:
         os.chdir(ROOT)
         return cmd_assert_blob_retry()
