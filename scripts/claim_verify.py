@@ -58,6 +58,14 @@ DEFAULT_REQUIRE_SINCE = 75
 #       否则 `DEFAULT_REQUIRE_SINCE` 的逐轮要求会阻断。
 ROUND_GAP_ALLOWLIST = os.path.join(ROOT, 'ledger', 'round_gap_allowlist.txt')
 
+# 🔑 第一百六十一轮：G384 的**轮次读数**必须与 G433 同源。
+#    🔴 160 轮实测发现：G384 取文档**标题**最大轮次 = 154，而清单已到 160 ——
+#       155~160 轮"有没有写清单"**实际没被它守**（文档标题停在 154）。
+#    🔑 判定读数改为**全文口径**（与 G433 `_doc_round_set` 同一实现，
+#       不抄一份），标题口径**降级为对比打印**（可见性，不参与判定）。
+ROUND_READING_FN = '_shared_doc_rounds'
+ROUND_READING_SRC = '_doc_round_set'
+
 # 🔑 第七十九轮：`--all` 三段的**稳定标记行**。
 #    🔴 G385 此前与 G382~G384 **跑同一条命令**，三者不再独立：
 #       若 `--all` 内部漏跑某项，三条仍会显示同一 rc，G385 也发现不了。
@@ -968,6 +976,47 @@ def _rounds_in_docs(docs):
     return out
 
 
+def _shared_doc_rounds():
+    """🔑 G384 的判定读数 —— 与 G433 **同源**（唯一实现 `push_api._doc_round_set`）。
+
+    🔴 为什么不在本文件另写一份：
+       160 轮实测 —— 本文件原有一条"只认标题 + 只认中文"的解析，
+       它读到的最大轮次是 154，而真实轮次已到 160；
+       🔑 于是 155~160 轮"有没有写清单"**没有任何门禁在守**。
+       若在此处再抄一份全文解析，就又造了**第二份正则字面量**
+       （145 轮 G435 想根除的病），两边会各自漂移。
+    ✅ 因此：**延迟导入** push_api 并调用它的唯一实现。
+       （push_api 顶层不导入本模块 —— 它只在 `_cn_round` 内部延迟导入，
+         故此处导入不会形成顶层循环。）
+
+    返回 (dict{轮次:set(相对路径)}|None, md 文件数)；None = **读不到**，
+    调用方必须**拒绝给结论**（106 轮："读不到 ≠ 没有违规"）。
+    """
+    sd = os.path.dirname(os.path.abspath(__file__))
+    if sd not in sys.path:
+        sys.path.insert(0, sd)
+    try:
+        import push_api as _pa
+    except Exception as e:
+        print('\n🔴 共享轮次读数**不可导入**（%s: %s）—— 拒绝给结论'
+              % (type(e).__name__, e))
+        return None, 0
+    fn = getattr(_pa, ROUND_READING_SRC, None)
+    if fn is None:
+        print('\n🔴 push_api 缺少 `%s` —— 拒绝给结论' % ROUND_READING_SRC)
+        return None, 0
+    try:
+        r = fn()
+    except Exception as e:
+        print('\n🔴 共享轮次读数**调用失败**（%s: %s）—— 拒绝给结论'
+              % (type(e).__name__, e))
+        return None, 0
+    if isinstance(r, tuple) and len(r) == 2:
+        return r
+    print('\n🔴 共享轮次读数返回形态异常 —— 拒绝给结论')
+    return None, 0
+
+
 def cmd_check_current(a):
     """G384 · 🔑 **最新一轮必须写了声明清单**。
 
@@ -983,15 +1032,32 @@ def cmd_check_current(a):
     print('=' * 70)
     docs = a.docs or sorted(glob.glob(os.path.join(
         ROOT, 'references', '*.md')) + glob.glob(os.path.join(ROOT, '*.md')))
-    rounds = _rounds_in_docs(docs)
-    if not rounds:
-        print('\n🔴 未能从文档标题中解析出任何轮次 —— '
-              '**不得静默通过**（与"空表即通过"同源）')
+    # 🔑 判定读数：**全文口径**，与 G433 同源（唯一实现在 push_api）。
+    full, n_md = _shared_doc_rounds()
+    if full is None:
+        print('\n🔴 **判定读数不可得** —— 不得静默通过'
+              '（标题口径可能仍读得出，但那是 160 轮那个**漏检**的读数）')
         print('\n' + '=' * 70 + '\n🔴 守卫失效\n' + '=' * 70)
         return 1
-    mx = max(rounds)
-    print(f'\n文档扫描: {len(docs)} 个 · 解析到轮次 {len(rounds)} 个 '
-          f'（最大 = 第 {mx} 轮，来自 {sorted(rounds[mx])[:2]}）')
+    if not full:
+        print('\n🔴 全文口径解析出 0 个轮次 —— **不得静默通过**'
+              '（与"空表即通过"同源）')
+        print('\n' + '=' * 70 + '\n🔴 守卫失效\n' + '=' * 70)
+        return 1
+    mx = max(full)
+    print(f'\n判定读数（全文口径，与 G433 同源）: md {n_md} 个 · '
+          f'轮次 {len(full)} 个 · 最大 = 第 {mx} 轮 '
+          f'（来自 {sorted(full[mx])[:2]}）')
+    # 🔑 对比读数：**标题口径**（160 轮那个会漏检的读数）—— 只打印，不判定。
+    rounds = _rounds_in_docs(docs)
+    mx_title = max(rounds) if rounds else None
+    print(f'对比读数（标题口径，仅供复核）: 最大 = '
+          f'第 {mx_title if mx_title is not None else "无"} 轮')
+    if mx_title is not None and mx_title < mx:
+        lag = sorted(n for n in full if n > mx_title)
+        print(f'   🔑 两口径差 {mx - mx_title} 轮 —— '
+              f'标题口径漏掉 {lag[:12]}{" …" if len(lag) > 12 else ""}'
+              f'（这正是 160 轮实测的漏检）')
 
     files = sorted(glob.glob(os.path.join(ROOT, 'ledger', 'claims_*.txt')))
     have = set()
@@ -1000,6 +1066,12 @@ def cmd_check_current(a):
         if m:
             have.add(int(m.group(1)))
     print(f'ledger 清单: {len(files)} 份 → 轮次 {sorted(have)}')
+
+    # 🔑 159 轮教训："调用了 helper 却丢弃结果"与"没调用"在输出上无法区分。
+    if mx not in full:
+        print('\n🔴 判定读数自相矛盾（max 不在集合内）—— 拒绝给结论')
+        print('\n' + '=' * 70 + '\n🔴 守卫失效\n' + '=' * 70)
+        return 1
 
     since = a.require_since
     if since is not None:

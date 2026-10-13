@@ -260,6 +260,15 @@ DEPENDENT_NAMES = {
     'NS_REF_USERS': ('const', 'G448 判据② 依赖：引用计数必须走限定实现的调用点'),
     'NS_REF_USERS_MIN': ('const', 'G448 判据⑦ 下限：调用点条目数'),
     'NS_REF_SCOPE_FN': ('const', 'G448 判据① 依赖：唯一实现的函数名'),
+    # 🔑 第一百六十一轮：G449（G384 轮次读数必须与 G433 同源）依赖的常量/函数。
+    #    🔴 按 115/120/127/139/142…160 轮同一条规程：新增常量**必须同步登记**，
+    #       否则 G406 会报"未登记"（它已在真实工作流中生效多次）。
+    'ROUND_READING_BAD_FN': ('const', 'G449 判据① 依赖：唯一实现的函数名'),
+    'ROUND_READING_CV_FN_CONST': ('const', 'G449 判据③ 依赖：claim_verify 侧登记常量名'),
+    'ROUND_READING_SRC_CONST': ('const', 'G449 判据③ 依赖：源实现名登记常量'),
+    'ROUND_READING_MIN_MD': ('const', 'G449 判据⑤ 依赖：独立口径 md 数下限'),
+    '_round_reading_bad': ('fn', 'G449 判据①②③⑤⑥ 的唯一实现'),
+    '_rr_static': ('fn', 'G449 判据③④ 的静态检查（可被改名后的 tree 直接调用）'),
     '_ns_ref_names': ('fn', 'G448 治本唯一实现：只认命名空间限定的按字符串引用'),
     '_ns_ref_scope_bad': ('fn', 'G448 唯一实现：口径限定 + 结果真被用'),
     'cmd_assert_ns_ref_scope': ('fn', 'G448 断言入口'),
@@ -303,6 +312,13 @@ CONST_SCAN_ALLOW = {
     '_scan_value_root_cands.py::HERE': 'PATH_ROOT: 取值根候选扫描脚本所在目录',
     '_scan_value_root_cands.py::ROOT': 'PATH_ROOT: 取值根候选扫描脚本解析出的仓库根',
     'claim_verify.py::ALLOWLIST_FILES': 'META_TABLE: 允许清单目录',
+    'ROUND_READING_BAD_FN': 'FN_IDENT: G449 唯一实现的函数名登记项',
+    'ROUND_READING_CV_FN_CONST': 'FN_IDENT: G449 引用的 claim_verify 侧常量名',
+    'ROUND_READING_SRC_CONST': 'FN_IDENT: G449 引用的源实现名常量',
+    'ROUND_READING_MIN_MD': 'SCAN_TUNING: G449 独立口径 md 文件数下限',
+    # 🔑 第一百六十一轮：claim_verify.py 侧新增的两个常量（G440 实测报未覆盖）
+    'claim_verify.py::ROUND_READING_FN': 'FN_IDENT: claim_verify 侧共享读数函数名登记项',
+    'claim_verify.py::ROUND_READING_SRC': 'FN_IDENT: claim_verify 侧源实现名登记项',
     'claim_verify.py::ALL_CONTENT': 'META_TABLE: 全内容守卫名',
     'claim_verify.py::ALL_CONTENT_FN': 'FN_IDENT: 全内容守卫的函数名，字符串引用',
     'claim_verify.py::CAPABILITY_ANCHOR_SPEC': 'PROBE_SPEC: 锚点规格，下界来源',
@@ -7139,6 +7155,286 @@ def _ns_ref_scope_bad(tree):
     return bad, rows
 
 
+# 🔑 第一百六十一轮：G449 —— **G384 的轮次读数必须与 G433 同源**。
+#    🔴 160 轮实测发现：G384 取文档**标题**最大轮次 = **154**，而 ledger 清单
+#       已到 **160** —— 155~160 轮"有没有写清单"**实际没有任何门禁在守**
+#       （G433 另走全文口径，所以轮次对账仍是 160，二者读数不同源）。
+#    🔑 病根与 145 轮"两份正则字面量"、160 轮"两个口径"同源：
+#       **同一个"当前是第几轮"，两套读数，窄的那套形同虚设。**
+ROUND_READING_BAD_FN = '_round_reading_bad'
+ROUND_READING_CV_FN_CONST = 'ROUND_READING_FN'
+ROUND_READING_SRC_CONST = 'ROUND_READING_SRC'
+ROUND_READING_MIN_MD = 20
+
+
+def _rr_static(tree):
+    """🔑 G449 判据③：**源码层**检查（可被**改名后**的 tree 直接调用）。
+
+    🔑 刻意不硬编码函数名 —— 一致改名不得假阳性（111 轮同款）。
+    返回 (bad_list, info_dict)。
+    """
+    bad = []
+    info = {}
+    consts = {}
+    for n in tree.body:
+        if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name):
+            v = getattr(n, 'value', None)
+            if isinstance(v, ast.Constant) and isinstance(v.value, str):
+                consts[n.targets[0].id] = v.value
+    cvk = globals().get('ROUND_READING_CV_FN_CONST') or ''
+    srck = globals().get('ROUND_READING_SRC_CONST') or ''
+    fnkey = consts.get(cvk)
+    info['fnkey'] = fnkey
+    info['srckey'] = consts.get(srck)
+    funcs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    if not fnkey:
+        bad.append('❸ 常量 %r 缺失 —— 无法定位共享读数函数，拒绝给结论' % cvk)
+    elif fnkey not in funcs:
+        bad.append('❸ 共享读数函数 %r 不存在 —— 拒绝给结论' % fnkey)
+    else:
+        used = {x.id for x in ast.walk(funcs[fnkey]) if isinstance(x, ast.Name)}
+        info['src_const_used'] = srck in used
+        if srck not in used:
+            bad.append('❸ 共享读数函数 %r 未引用 %r —— '
+                       '疑似**另抄一份解析**，拒绝给结论' % (fnkey, srck))
+    cc = funcs.get('cmd_check_current')
+    if cc is None:
+        bad.append('❸ cmd_check_current 不存在 —— 拒绝给结论')
+    elif fnkey:
+        called = set()
+        for x in ast.walk(cc):
+            if isinstance(x, ast.Call) and isinstance(x.func, ast.Name):
+                called.add(x.func.id)
+        info['cc_calls'] = sorted(called)
+        if fnkey not in called:
+            bad.append('❸ cmd_check_current 未调用共享读数 %r —— '
+                       '判定读数可能**退回窄口径**，拒绝给结论' % fnkey)
+    return bad, info
+
+
+def _round_reading_bad(cv_path=None):
+    """🔑 G449 判据①②③⑤⑥ 的**唯一实现**（可被行为反证直接调用）。
+
+    返回 (bad_list, info_dict)；bad 非空 = **拒绝给结论**。
+    """
+    import subprocess as _sp
+    bad = []
+    info = {}
+    cv_path = cv_path or os.path.join(ROOT, 'scripts', 'claim_verify.py')
+    try:
+        with io.open(cv_path, encoding='utf-8') as fh:
+            text = fh.read()
+        tree = ast.parse(text)
+    except (OSError, SyntaxError) as e:
+        return (['❶ 无法解析 %s：%s —— 拒绝给结论' % (cv_path, e)], info)
+    b3, i3 = _rr_static(tree)
+    info.update(i3)
+    bad.extend(b3)
+
+    # ① 行为层：**真跑一次**（与实现解耦，重构/改名都不会让它静默失效）
+    py = sys.executable or 'python3'
+    try:
+        pp = _sp.run([py, cv_path, '--check-current'],
+                     capture_output=True, text=True, timeout=600)
+    except Exception as e:
+        bad.append('❶ 子进程跑 --check-current 失败（%s: %s）—— 拒绝给结论'
+                   % (type(e).__name__, e))
+        return bad, info
+    out = pp.stdout or ''
+    m_full = re.search(r'判定读数[^\n]*?最大 = 第\s*(\d+)\s*轮', out)
+    m_title = re.search(r'对比读数[^\n]*?最大 = 第\s*(\d+)\s*轮', out)
+    info['rc'] = pp.returncode
+    info['mx_full'] = int(m_full.group(1)) if m_full else None
+    info['mx_title'] = int(m_title.group(1)) if m_title else None
+    # ⑥ 解析不到 = **拒绝给结论**（106 轮："读不到 ≠ 没有违规"）
+    if info['mx_full'] is None:
+        bad.append('❻ 未能从输出解析出「判定读数」—— 拒绝给结论'
+                   '（不得静默当成"没有落后"）')
+
+    # ⑤ 独立口径（G433 同一实现 `_doc_round_set`）必须读得到
+    indep, n_md = _doc_round_set()
+    info['n_md'] = n_md
+    info['indep'] = max(indep) if indep else None
+    mmin = int(globals().get('ROUND_READING_MIN_MD') or 0)
+    if n_md < mmin:
+        bad.append('❺ 独立口径 md 仅 %d 个 < %d —— 拒绝给结论' % (n_md, mmin))
+    if indep is None:
+        bad.append('❺ 独立口径读不到 —— 拒绝给结论')
+    elif info['mx_full'] is not None and info['mx_full'] < info['indep']:
+        bad.append('❶ 判定读数 %d **落后于**独立口径 %d —— 第 %d~%d 轮'
+                   '"有没有写清单"**无人守**（160 轮实测漏检）'
+                   % (info['mx_full'], info['indep'],
+                      info['mx_full'] + 1, info['indep']))
+    return bad, info
+
+
+def cmd_assert_round_reading():
+    """🔑 G449：**G384 的轮次读数必须与 G433 同源**（第一百六十一轮）。
+
+    🔴 160 轮实测（本轮对照实验实证）：G384 取文档**标题**最大轮次 = 154，
+       而 ledger 清单已到 160；🔑 把判定读数**退回标题口径**时 ——
+           G384  rc=0 ✅ 放行（154 有清单）
+           G449  rc=1 🔴 判定读数 154 落后于独立口径 160
+       **不是"两条都拦住"** —— G384 真的看不见，G449 的存在理由被实测证明。
+
+    🔑 七条判据：
+       ① 行为层真跑 `--check-current`：判定读数 ≥ 独立口径（G433 同源实现）
+       ② 🔑 **常驻反证**：把共享读数 monkeypatch 回标题口径 → 必须被抓到，
+          且该状态下 **G384 自身 rc=0**（"一绿一红"证明独立贡献）
+       ③ 源码层：`cmd_check_current` 必须调用共享读数；共享读数必须引用
+          「源实现名」常量（防另抄一份解析）
+       ④ 一致改名不得假阳性（**不硬编码函数名**，用改名后的 tree 直接验）
+       ⑤ 独立口径读不到 → 拒绝给结论（md 数下限）
+       ⑥ 解析不到判定读数 → 拒绝给结论（不得当成"没有落后"）
+       ⑦ 反证必须**真的改变了读数**（否则"反证"是空转）
+    """
+    print('=' * 70)
+    print('G449 · 🔑 **G384 的轮次读数必须与 G433 同源**')
+    print('   （160 轮：标题口径停在 154，155~160 轮无人守）')
+    print('=' * 70)
+    os.chdir(ROOT)
+    bad = []
+
+    fnk = globals().get('ROUND_READING_BAD_FN')
+    fn = globals().get(fnk) if isinstance(fnk, str) else None
+    if fn is None:
+        print('🔴 唯一实现 %r 缺失 —— 拒绝给结论' % fnk)
+        return 1
+
+    b1, i1 = fn()
+    print('\n① 真文件: rc=%s · 判定读数=%s · 对比读数=%s · 独立口径=%s（md %s）'
+          % (i1.get('rc'), i1.get('mx_full'), i1.get('mx_title'),
+             i1.get('indep'), i1.get('n_md')))
+    print('③ 共享读数函数=%r · 引用源实现名常量=%s · cmd_check_current 调用=%s'
+          % (i1.get('fnkey'), i1.get('src_const_used'),
+             (i1.get('fnkey') in (i1.get('cc_calls') or []))))
+    for x in b1:
+        print('   🔴 ' + x)
+    bad.extend(b1)
+
+    # ② 常驻反证：把共享读数**退回标题口径**（还原 160 轮那个漏检）
+    import argparse as _ap
+    sd = os.path.join(ROOT, 'scripts')
+    if sd not in sys.path:
+        sys.path.insert(0, sd)
+    try:
+        import claim_verify as cv
+    except Exception as e:
+        bad.append('② 无法导入 claim_verify（%s: %s）—— 拒绝给结论'
+                   % (type(e).__name__, e))
+        cv = None
+    if cv is not None:
+        orig = getattr(cv, '_shared_doc_rounds', None)
+        if orig is None:
+            bad.append('② claim_verify 缺少 `_shared_doc_rounds` —— 拒绝给结论')
+        else:
+            def _fake_title():
+                """🔑 反证 A：退回**标题口径**（160 轮那个真实漏检的读数）。"""
+                docs = sorted(
+                    glob.glob(os.path.join(cv.ROOT, 'references', '*.md'))
+                    + glob.glob(os.path.join(cv.ROOT, '*.md')))
+                return cv._rounds_in_docs(docs), 0
+
+            def _fake_lag():
+                """🔑 反证 B：**截断**最大轮 —— **不依赖文档写法**，恒稳。
+
+                🔴 若只有反证 A：将来有人把各轮标题补齐，标题口径会追平
+                   独立口径 → 反证 A 失效 → "反证未被发现"假红。
+                """
+                real, n = orig()
+                if not real:
+                    return real, n
+                mxr = max(real)
+                return dict((k, v) for k, v in real.items() if k < mxr), n
+
+            def _run(fake):
+                buf = io.StringIO()
+                oldout = sys.stdout
+                cv._shared_doc_rounds = fake
+                rc = None
+                try:
+                    sys.stdout = buf
+                    rc = cv.cmd_check_current(
+                        _ap.Namespace(docs=None, require_since=None))
+                except Exception as e:
+                    rc = 'EXC:%s' % type(e).__name__
+                finally:
+                    sys.stdout = oldout
+                    cv._shared_doc_rounds = orig
+                out = buf.getvalue()
+                m = re.search(r'判定读数[^\n]*?最大 = 第\s*(\d+)\s*轮', out)
+                return rc, (int(m.group(1)) if m else None)
+
+            indep = i1.get('indep')
+            rc_a, mx_a = _run(_fake_title)
+            print('\n② 反证 A（退回标题口径）: rc=%s · 判定读数=%s · 独立口径=%s'
+                  % (rc_a, mx_a, indep))
+            if mx_a is None or indep is None or mx_a >= indep:
+                print('   ⚠️ 标题口径已追平（%s）—— 改用**截断**反证 B'
+                      '（不依赖文档写法，恒稳）' % mx_a)
+                rc2, mx2 = _run(_fake_lag)
+                how = 'B 截断最大轮'
+            else:
+                rc2, mx2 = rc_a, mx_a
+                how = 'A 标题口径（160 轮真实病复刻）'
+            print('② 反证采用 %s: rc=%s · 判定读数=%s · 独立口径=%s'
+                  % (how, rc2, mx2, indep))
+            if mx2 is None:
+                bad.append('② 反证未解析出判定读数 —— 拒绝给结论')
+            elif indep is None:
+                bad.append('② 独立口径不可用 —— 无法判定反证，拒绝给结论')
+            else:
+                if mx2 >= indep:
+                    bad.append('② 反证**未被发现**：判定读数 %d 未落后于独立口径 '
+                               '%d —— 判据①形同虚设' % (mx2, indep))
+                # ⑦ 反证必须真的改变了读数
+                if i1.get('mx_full') is not None and mx2 == i1['mx_full']:
+                    bad.append('⑦ 反证**没生效**（读数仍为 %d）—— '
+                               '"反证"是空转' % mx2)
+                # 🔑 一绿一红：G384 自身在该状态下必须 rc=0（它看不见）
+                if rc2 != 0:
+                    bad.append('② 反证态下 G384 rc=%s != 0 —— '
+                               '"一绿一红"对照**不成立**，无法证明独立贡献' % rc2)
+                else:
+                    print('   🔑 对照成立：同一状态下 G384 rc=0（放行）· '
+                          'G449 抓到落后 %d → %d' % (mx2, indep))
+
+    # ④ 一致改名不得假阳性（**不硬编码函数名**）
+    try:
+        with io.open(os.path.join(ROOT, 'scripts', 'claim_verify.py'),
+                     encoding='utf-8') as fh:
+            cv_src = fh.read()
+        rnm = cv_src.replace('_shared_doc_rounds', '_rr_shared_renamed')
+        rnm = rnm.replace("ROUND_READING_FN = '_rr_shared_renamed'",
+                          "ROUND_READING_FN = '_rr_shared_renamed'")
+        b4, i4 = _rr_static(ast.parse(rnm))
+        print('\n④ 一致改名: 共享读数函数=%r · bad=%d' % (i4.get('fnkey'), len(b4)))
+        if b4:
+            for x in b4:
+                print('   🔴 ' + x)
+            bad.append('④ 一致改名后**假阳性** —— 判据硬编码了函数名')
+        # ④b 删掉调用点 → 必须抓到（防判据恒真）
+        cut = cv_src.replace('    full, n_md = _shared_doc_rounds()',
+                             '    full, n_md = {}, 0')
+        b4b, _ = _rr_static(ast.parse(cut))
+        print('④b 删掉调用点: bad=%d' % len(b4b))
+        if not b4b:
+            bad.append('④b 删掉调用点后**未被发现** —— 判据③ 恒真')
+    except (OSError, SyntaxError) as e:
+        bad.append('④ 无法构造改名样本：%s —— 拒绝给结论' % e)
+
+    print('\n' + '=' * 70)
+    if bad:
+        for x in bad:
+            print('🔴 ' + x)
+        print('🔴 守卫失效（G449）')
+        print('=' * 70)
+        return 1
+    print('✅ 守卫成立：G384 判定读数与 G433 **同源**，且落后会被抓到')
+    print('=' * 70)
+    return 0
+
+
 def cmd_assert_ns_ref_scope():
     """🔑 G448：**「引用」口径必须有命名空间限定**（第一百六十轮）。
 
@@ -9054,6 +9350,9 @@ def main():
     ap.add_argument('--assert-ns-ref-scope', action='store_true',
                     help='G448：「引用」口径必须有命名空间限定'
                          '（159 轮：任何 cfg[\'X\'] 都算引用 → 证据被稀释）')
+    ap.add_argument('--assert-round-reading', action='store_true',
+                    help='G449：G384 的轮次读数必须与 G433 同源'
+                         '（160 轮：标题口径停在 154，155~160 轮无人守）')
     ap.add_argument('--assert-blob-retry', action='store_true',
                     help='G431：blob 网络抖动必须重试（常量 + AST + 行为反证）')
     ap.add_argument('--assert-remote-rounds', action='store_true',
@@ -9256,6 +9555,9 @@ def main():
     if getattr(a, 'assert_ns_ref_scope', False):
         os.chdir(ROOT)
         return cmd_assert_ns_ref_scope()
+    if getattr(a, 'assert_round_reading', False):
+        os.chdir(ROOT)
+        return cmd_assert_round_reading()
     if a.assert_blob_retry:
         os.chdir(ROOT)
         return cmd_assert_blob_retry()

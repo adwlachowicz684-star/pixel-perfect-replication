@@ -1,0 +1,45 @@
+# 第一百六十一轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**G384 的轮次读数必须与 G433 同源**（新增 G449），补 160 轮诚实结论②。
+# 🔴 160 轮实测：G384 取文档**标题**最大轮次 = 154，而 ledger 清单已到 160 ——
+#    155~160 轮"有没有写清单"**没有任何门禁在守**（G433 另走全文口径，故对账仍 160）。
+# 🔑 修法：判定读数改为**全文口径**，唯一实现来自 push_api._doc_round_set（与 G433 同一
+#    函数，延迟导入防循环）；标题口径**降级为对比打印**（只打印差值，不参与判定）。
+# 🔑 对照实验（同一状态：判定读数退回标题口径）：**G384 rc=0 放行 · G449 rc=1 抓到
+#    "判定读数 154 落后于独立口径 160"** —— 一绿一红，不是推演。
+# 🔑 八方向破坏：①核心对照 G384=0/G449=1 · ②桩化唯一实现=1 · ③删登记项（见下）·
+#    ④一致改名=0 不误报 · ⑤md 下限抬到不可达=1 · ⑥共享读数另抄一份=1 ·
+#    ⑦删 claim_verify 的 ROUND_READING_FN 常量=1 · ⑧反证空转=1。恢复后全绿。
+# 🔴 方向③ 的教训：**期望设错了** —— 删 DEPENDENT_NAMES 登记项后 G449 rc=0，
+#    它守的本就不是登记表；真正抓到未登记的是 **G440 rc=1**。
+#    "门禁没红"不等于"门禁失效"，与 106 轮"字段缺失被当成没有违规"同侧。
+# 🔴 真实缺陷（G440 在真实工作流中抓到）：本轮在 claim_verify.py 新增的
+#    ROUND_READING_FN / ROUND_READING_SRC **忘了登记**，已补登记（188 个常量全绿）。
+# 🔑 反证稳定性：只做反证 A（退回标题口径）时，将来补齐各轮标题会让 A 失效 → 假红；
+#    故加反证 B（**截断**最大轮，不依赖文档写法），A 追平时自动切 B。
+# ⚠️ 诚实结论：① 标题补齐后两口径差归零，"标题漏检"这个真实病就复现不出来了；
+#    ② G449 只比**最大轮次**，不逐轮比对（逐轮是 G433 的职责）；
+#    ③ 判定读数用**子进程**跑 --check-current，回归里多花约 10 秒；
+#    ④ 共享读数跨文件**延迟导入** push_api，若其顶层将来有副作用会拖慢 claim_verify；
+#    ⑤ 同时改 cmd_check_current 与 G449 判据仍绕过（109 轮已知边界）；
+#    ⑥ 全量回归本轮未跑完。
+grep:scripts/claim_verify.py::ROUND_READING_FN = '_shared_doc_rounds'
+grep:scripts/claim_verify.py::ROUND_READING_SRC = '_doc_round_set'
+grep:scripts/claim_verify.py::def _shared_doc_rounds():
+grep:scripts/claim_verify.py::判定读数（全文口径，与 G433 同源）
+grep:scripts/claim_verify.py::对比读数（标题口径，仅供复核）
+grep:scripts/claim_verify.py::两口径差
+grep:scripts/push_api.py::ROUND_READING_BAD_FN = '_round_reading_bad'
+grep:scripts/push_api.py::ROUND_READING_CV_FN_CONST = 'ROUND_READING_FN'
+grep:scripts/push_api.py::ROUND_READING_SRC_CONST = 'ROUND_READING_SRC'
+grep:scripts/push_api.py::ROUND_READING_MIN_MD = 20
+grep:scripts/push_api.py::def _round_reading_bad(cv_path=None):
+grep:scripts/push_api.py::def _rr_static(tree):
+grep:scripts/push_api.py::def cmd_assert_round_reading():
+grep:scripts/push_api.py::❻ 未能从输出解析出「判定读数」
+grep:scripts/push_api.py::❶ 判定读数
+grep:scripts/push_api.py::'ROUND_READING_BAD_FN': ('const',
+grep:scripts/push_api.py::'claim_verify.py::ROUND_READING_SRC': 'FN_IDENT:
+grep:scripts/run_all_gates.py::("G449",
+grep:scripts/run_all_gates.py::('G384', 'G449',
+grep:README.md::第一百六十一轮
+grep:references/游戏引擎复刻.md::第一百六十一轮
