@@ -1,0 +1,46 @@
+# 第一百五十六轮完成声明（G381/G382/G383/G384 校验）
+# 🔑 本轮主题：**写环节反证必须逐环节各造一次**（G444），
+#    补 155 轮诚实结论② 点名的真实缺口。
+# 🔴 155 轮 G443 的 ②/③/④ 三个反证样本**都只造 git/trees 一个环节**，
+#    其余三个环节（blobs / commits / refs）靠"找不到"**间接**兜底
+#    —— 扫描若退化成只对那一个环节生效，其余环节的裸 req 从此无人发现。
+# 🔑 对照实验①（同一状态：_write_step_scan 退化成只认 git/trees）：
+#    **G443 rc=0 放行** · **G444 rc=1 抓到** —— 同一状态一绿一红，不是推演。
+# 🔑 内嵌对照（判据⑤，常驻门禁内部）：同一个退化实现在 G443 口径下
+#    A/B/C **全部命中**，在 G444 逐环节口径下覆盖 1/4、未命中 6 条。
+# ✅ 新增唯一实现 `_write_proof_check`：对**每一个**写环节各造 A/B/C 三形态
+#    （同一环节 req_retry+裸 req 并存 / GET 走 req_retry+写方法裸 req / 只有 GET），
+#    逐环节**独立**判定；样本按环节**参数化生成**（新增环节自动纳入）。
+# 🔴 形态数下限**真查**：第一版只声明了 WRITE_PROOF_KIND_MIN 常量而实现里没用
+#    —— 148 轮"声称与实现不符"同款。✅ 在 _write_proof_check 里比对实际形态数。
+# 🔴 破坏④ 实测：把对照点 WRITE_LEGACY_PROOF_SEG 改成不存在的环节 → 判据⑥ 抓到
+#    （🔑 否则 G443 换了样本环节后，⑤ 的"一绿一红"对照关系漂移、形同虚设）。
+# 🔑 七方向破坏全部符合预期：①只认一个环节 G443=0/**G444=1**（核心对照）·
+#    ②恒空桩 G444=1/G442=1 · ③清单缩到 1 条 G444=1 · ④对照点漂移 G444=1 ·
+#    ⑤桩化唯一实现 G444=1 · ⑥一致改名 G444=0（不误报）· ⑦形态缩到 1 种 G444=1。
+#    恢复后 md5 一致。
+# ⚠️ 诚实结论：① G443 **未改**（保留"只测一个环节"的原语义以便对照），
+#    它守不住的方向靠 G444 兜；② 反证形态只有 A/B/C 三种，"只认写方法但认错
+#    环节"等其它退化形态未覆盖；③ 同时改实现与环节清单仍绕过（109 轮已知边界）。
+grep:scripts/push_api.py::WRITE_PROOF_SEG_MIN = 3
+grep:scripts/push_api.py::WRITE_PROOF_KIND_MIN = 3
+grep:scripts/push_api.py::WRITE_LEGACY_PROOF_SEG = 'git/trees'
+grep:scripts/push_api.py::WRITE_PROOF_FN = '_write_proof_check'
+grep:scripts/push_api.py::def _write_proof_check(scan_fn, bad_fn, steps):
+grep:scripts/push_api.py::def cmd_assert_write_step_proof():
+grep:scripts/push_api.py::    'WRITE_PROOF_SEG_MIN': ('const',
+grep:scripts/push_api.py::    'WRITE_PROOF_KIND_MIN': ('const',
+grep:scripts/push_api.py::    '_write_proof_check': ('fn',
+grep:scripts/push_api.py::    'cmd_assert_write_step_proof': ('fn',
+grep:scripts/push_api.py::    ap.add_argument('--assert-write-step-proof', action='store_true',
+grep:scripts/push_api.py::    if a.assert_write_step_proof:
+grep:scripts/run_all_gates.py::("G444", "**写环节反证必须逐环节各造一次**（不许只测一个环节）",
+grep:scripts/run_all_gates.py::('G443', 'G444',
+grep:README.md::第一百五十六轮
+grep:README.md::G443 rc=0 放行
+grep:references/负面教训库.md::反证样本只造
+cmd:push_api.py --assert-write-step-proof
+cmd:push_api.py --assert-write-step-scan
+cmd:push_api.py --assert-write-retry
+cmd:run_all_gates.py --check-both-layers
+gate:G444
